@@ -1,17 +1,9 @@
-/*
- ============================================================================
- Name        : esi.c
- Author      : 
- Version     :
- Copyright   : Your copyright notice
- Description : Hello World in C, Ansi-style
- ============================================================================
- */
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <parsi/parser.h>
 
-int main(void) {
-	puts("!!!Hello World!!!"); /* prints !!!Hello World!!! */
+int main(int argc, char **argv) {
+	t_esi_operacion prueba = parse("get prueba");
+	printf("%s", prueba.argumentos.GET.clave);
 	return EXIT_SUCCESS;
 }
