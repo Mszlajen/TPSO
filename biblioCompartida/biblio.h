@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <commons/error.h>
 
 #define ERROR -1
 
@@ -17,8 +18,9 @@ typedef struct {
 
 void salir_agraciadamente(int);
 int crearSocketCliente(char *, char *);
+int crearSocketServer(char *, char *);
 FILE* abrirArchivoLectura(char *);
-void enviarHeader (int, short int);
+void enviarHeader (int, header);
 void enviarBuffer (int, void*, int);
 
 #endif /* BIBLIO_H_ */

@@ -24,9 +24,32 @@ int crearSocketCliente(char * IP, char * puerto)
 
 	if(resultado == ERROR)
 	{
+		error_show("fallo la creación del socket para <%s> puerto <%s>", IP, puerto);
 		salir_agraciadamente(1);
 	}
 	return sock;
+}
+
+int crearSocketServer(char * IP, char * puerto)
+{
+	struct addrinfo hints, *res;
+		int sock;
+
+		memset(&hints, 0, sizeof(struct addrinfo));
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
+
+		getaddrinfo(IP, puerto, &hints, &res);
+
+		sock = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol);
+
+		int resultado = bind(sock, res-> ai_addr, res->ai_addrlen);
+		if(resultado == -1)
+		{
+			error_show("fallo la creacion del socket server para <%s> puerto <%s>", IP, puerto);
+			salir_agraciadamente(1);
+		}
+		return sock;
 }
 
 FILE * abrirArchivoLectura (char * dirr)
@@ -41,12 +64,12 @@ void enviarHeader (int sock, header head)
 {
 	int tamHeader = sizeof(header);
 	void * buffer = malloc(tamHeader);
-	memcpy(buffer, (void*) &head, tamHeader);
+	memcpy(buffer, &head, tamHeader);
 	enviarBuffer(sock, buffer, tamHeader);
 	free(buffer);
 }
 
-void enviarBuffer (int sock, void* buffer, int tamBuffer = 0)
+void enviarBuffer (int sock, void* buffer, int tamBuffer)
 {
 	if(tamBuffer == 0)
 		tamBuffer = sizeof(*buffer);
