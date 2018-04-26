@@ -16,10 +16,11 @@ int main(void) {
 
 	socketServerESI = crearSocketServer("127.0.0.2", config_get_string_value(configuracion, "Puerto"));
 
-	crearHiloTerminal();
+	pthread_t hiloTerminal = crearHiloTerminal();
 
-	crearHiloNuevasESI();
-
+	pthread_t hiloESI = crearHiloNuevasESI();
+	pthread_join(hiloTerminal, NULL);
+	pthread_join(hiloESI, NULL);
 }
 
 void inicializacion ()
@@ -55,7 +56,11 @@ void terminal()
 		char * linea = readline("");
 		//Aca va a ir el procesamiento para ver si es una instrucción
 		//y su procesamiento correspondiente
-		system(linea);
+		switch(convertirComando(linea))
+		{
+		default:
+			system(linea);
+		}
 		free(linea);
 	}
 }
@@ -108,4 +113,13 @@ ESI* crearESI (int sock)
 	unaESI -> recursos = list_create();
 	unaESI -> socket = sock;
 	return unaESI;
+}
+
+enum comandos convertirComando(char* linea)
+{
+	/*
+	 * Para hacer despues.
+	 * (Basicamente una secuencia de if)
+	 */
+	return -1;
 }

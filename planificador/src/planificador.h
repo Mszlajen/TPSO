@@ -8,9 +8,11 @@
 #include <commons/config.h>
 #include <commons/collections/list.h>
 #include <commons/error.h>
+#include <commons/string.h>
 #include <biblio.h>
 
 enum t_algoritmo {sjf, srt, hrrn};
+enum comandos {pausa, bloquear, desbloquear, listar, kill, status, deadlock};
 
 typedef struct {
 	int id;
@@ -26,9 +28,11 @@ int conectarConCoordinador();
 void enviarHandshake(int);
 pthread_t crearHiloTerminal ();
 pthread_t crearHiloNuevasESI ();
-void escucharPorESI ();
+
 ESI* crearESI (int);
+enum comandos convertirComando(char *);
 
 void terminal();
+void escucharPorESI ();
 
 #endif /* PLANIFICADOR_H_ */

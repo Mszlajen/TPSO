@@ -22,5 +22,6 @@ int crearSocketServer(char *, char *);
 FILE* abrirArchivoLectura(char *);
 void enviarHeader (int, header);
 void enviarBuffer (int, void*, int);
+void usarPuertoTapado (int);
 
 #endif /* BIBLIO_H_ */

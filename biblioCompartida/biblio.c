@@ -32,7 +32,7 @@ int crearSocketCliente(char * IP, char * puerto)
 
 int crearSocketServer(char * IP, char * puerto)
 {
-	struct addrinfo hints, *res;
+		struct addrinfo hints, *res;
 		int sock;
 
 		memset(&hints, 0, sizeof(struct addrinfo));
@@ -43,13 +43,27 @@ int crearSocketServer(char * IP, char * puerto)
 
 		sock = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol);
 
+		usarPuertoTapado(sock);
+
 		int resultado = bind(sock, res-> ai_addr, res->ai_addrlen);
+
 		if(resultado == -1)
 		{
 			error_show("fallo la creacion del socket server para <%s> puerto <%s>", IP, puerto);
 			salir_agraciadamente(1);
 		}
 		return sock;
+}
+
+void usarPuertoTapado (int sock)
+{
+	int si = 1;
+	if (setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&si,sizeof si) == ERROR)
+	{
+		perror("setsockopt");
+		salir_agraciadamente(1);
+	}
+
 }
 
 FILE * abrirArchivoLectura (char * dirr)
