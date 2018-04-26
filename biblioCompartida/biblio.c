@@ -42,22 +42,28 @@ void enviarHeader (int sock, header head)
 	int tamHeader = sizeof(header);
 	void * buffer = malloc(tamHeader);
 	memcpy(buffer, (void*) &head, tamHeader);
-	int bytesEnviados = send(sock, buffer, tamHeader, 0);
+	enviarBuffer(sock, buffer, tamHeader);
+	free(buffer);
+}
+
+void enviarBuffer (int sock, void* buffer, int tamBuffer = 0)
+{
+	if(tamBuffer == 0)
+		tamBuffer = sizeof(*buffer);
+	int bytesEnviados = send(sock, buffer, tamBuffer, 0);
 	if(bytesEnviados == ERROR)
 		salir_agraciadamente(1);
-	/*
-	 * Lo que sigue es un control porque send
-	 * puede llegar a no enviar todo lo pedido
-	 * (En este caso es tan chico que no deberia
-	 * haber problema pero mejor prevenir que lamentar)
-	 */
+		/*
+		 * Lo que sigue es un control porque send
+		 * puede llegar a no enviar todo lo pedido
+		 * (En este caso es tan chico que no deberia
+		 * haber problema pero mejor prevenir que lamentar)
+		 */
 	int resultSend;
-	while(bytesEnviados != tamHeader)
+	while(bytesEnviados != tamBuffer)
 	{
-		if((resultSend = send(sock, buffer + bytesEnviados, tamHeader - bytesEnviados, 0)) == ERROR)
+		if((resultSend = send(sock, buffer + bytesEnviados, tamBuffer - bytesEnviados, 0)) == ERROR)
 			salir_agraciadamente(1);
 		bytesEnviados += resultSend;
 	}
-
-	free(buffer);
 }

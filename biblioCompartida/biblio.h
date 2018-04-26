@@ -18,6 +18,7 @@ typedef struct {
 void salir_agraciadamente(int);
 int crearSocketCliente(char *, char *);
 FILE* abrirArchivoLectura(char *);
-void enviarAvisoSimple (int, short int);
+void enviarHeader (int, short int);
+void enviarBuffer (int, void*, int);
 
 #endif /* BIBLIO_H_ */
