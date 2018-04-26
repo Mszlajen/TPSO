@@ -8,7 +8,7 @@ int socketCoord, socketServerESI, ESItotales;
 
 
 int main(void) {
-	inicializacion("planificador.config");
+	inicializacion();
 
 	socketCoord = conectarConCoordinador();
 
@@ -22,9 +22,14 @@ int main(void) {
 
 }
 
-void inicializacion (char * archivoConf)
+void inicializacion ()
 {
-	configuracion = config_create(archivoConf);
+	configuracion = config_create("planificador.config");
+	if(configuracion == NULL)
+	{
+		error_show("Fallo al leer el archivo de configuracion del planificador\n");
+		salir_agraciadamente(1);
+	}
 	listos = list_create();
 
 }
@@ -86,7 +91,7 @@ void escucharPorESI ()
 		socketNuevaESI = accept(socketServerESI, (struct sockaddr *) &infoDirr, &size_infoDirr);
 		if(socketNuevaESI == ERROR)
 		{
-			error_show("Fallo en la conexion de ESI");
+			error_show("Fallo en la conexion de ESI\n");
 			continue;
 		}
 		nuevaESI = crearESI(socketNuevaESI);

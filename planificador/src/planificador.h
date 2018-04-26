@@ -20,7 +20,7 @@ typedef struct {
 }ESI;
 
 
-void inicializacion(char*);
+void inicializacion();
 int crearSocketParaESI ();
 int conectarConCoordinador();
 void enviarHandshake(int);
