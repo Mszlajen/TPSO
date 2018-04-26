@@ -16,15 +16,18 @@ typedef struct {
 	int id;
 	int socket;
 	int estimacion;
-	t_list recursos;
+	t_list *recursos;
 }ESI;
 
-void leerArchivoConfiguracion(char*);
+
+void inicializacion(char*);
 int crearSocketParaESI ();
 int conectarConCoordinador();
 void enviarHandshake(int);
 pthread_t crearHiloTerminal ();
-
+pthread_t crearHiloNuevasESI ();
+void escucharPorESI ();
+ESI* crearESI (int);
 
 void terminal();
 
