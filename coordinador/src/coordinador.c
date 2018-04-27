@@ -13,11 +13,30 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
+void hiloDeInstancia(int socket){
+char* buffer = malloc(5));
+int mensajeRecibido = recv(socket,buffer,4,0);
+
+free(buffer);
+}
 void esESIoInstancia (int socketAceptado) {
 	//aqui ira la logica que reconozca segun el header si es un ESI o una Instancia
 	//en caso de ser una Instancia, debere ir a otro modulo que haga send de los tamaños
 	//y cree un hilo que se quede haciendo listen
+char* buffer = malloc(5))//Cuando tengamos definido el tamaño hay que cambiarlo
+int mensajeRecibido = recv(socketAceptado,buffer,4,0);
+
+
+//if (mensajeRecibido==)
+//{
+pthread_t hiloInstancias;
+pthread_created(&hiloInstancias,20,(void*)hiloDeInstancia,socketAceptado);//El segundo argumento del created es para dar espacio de memoria al hilo
+//}
+//else{}
+//HAY QUE PONER EN ALGUN LADO UN CLOSE DEL HILO!!!
+
 }
 
 // me gustaria que revisaran este modulo, por que no recuerdo bien como era lo de los punteros y podria estar cometiendo errores
