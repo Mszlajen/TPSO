@@ -4,7 +4,9 @@ t_config * configuracion;
 
 t_list * listos;
 
-int socketCoord, socketServerESI, ESItotales;
+socket_t socketCoord, socketServerESI;
+
+int ESItotales;
 
 
 int main(void) {
@@ -35,14 +37,14 @@ void inicializacion ()
 
 }
 
-int conectarConCoordinador()
+socket_t conectarConCoordinador()
 {
 	char * IP = config_get_string_value(configuracion, "IPCoord");
 	char * puerto = config_get_string_value(configuracion, "PuertoCoord");
 	return crearSocketCliente(IP, puerto);
 }
 
-void enviarHandshake(int sock)
+void enviarHandshake(socket_t sock)
 {
 	header handshake;
 	handshake.protocolo = 1;
@@ -86,8 +88,9 @@ pthread_t crearHiloNuevasESI()
 
 void escucharPorESI ()
 {
-	int socketNuevaESI, size_infoDirr = sizeof(struct sockaddr_storage);
+	int socketNuevaESI;
 	struct sockaddr_storage infoDirr;
+	socklen_t size_infoDirr = sizeof(struct sockaddr_storage);
 	ESI* nuevaESI;
 	while(1)
 	{

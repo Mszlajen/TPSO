@@ -23,9 +23,8 @@ typedef struct {
 
 
 void inicializacion();
-int crearSocketParaESI ();
-int conectarConCoordinador();
-void enviarHandshake(int);
+socket_t conectarConCoordinador();
+void enviarHandshake(socket_t);
 pthread_t crearHiloTerminal ();
 pthread_t crearHiloNuevasESI ();
 
