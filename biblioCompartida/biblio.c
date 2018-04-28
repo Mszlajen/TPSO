@@ -5,7 +5,7 @@ void salir_agraciadamente (int vSalida)
 	exit(vSalida);
 }
 
-int crearSocketCliente(char * IP, char * puerto)
+socket_t crearSocketCliente(char * IP, char * puerto)
 {
 	struct addrinfo hints;
 	struct addrinfo *server_info;
@@ -26,11 +26,14 @@ int crearSocketCliente(char * IP, char * puerto)
 	{
 		error_show("fallo la creación del socket para <%s> puerto <%s>", IP, puerto);
 		salir_agraciadamente(1);
+		/*
+		 * Puede cambiar si surgue un caso donde falle y no haya que matar al programa directamente
+		 */
 	}
 	return sock;
 }
 
-int crearSocketServer(char * IP, char * puerto)
+socket_t crearSocketServer(char * IP, char * puerto)
 {
 		struct addrinfo hints, *res;
 		int sock;
@@ -47,15 +50,18 @@ int crearSocketServer(char * IP, char * puerto)
 
 		int resultado = bind(sock, res-> ai_addr, res->ai_addrlen);
 
-		if(resultado == -1)
+		if(resultado == ERROR)
 		{
 			error_show("fallo la creacion del socket server para <%s> puerto <%s>", IP, puerto);
 			salir_agraciadamente(1);
+			/*
+			* Puede cambiar si surgue un caso donde falle y no haya que matar al programa directamente
+			*/
 		}
 		return sock;
 }
 
-void usarPuertoTapado (int sock)
+void usarPuertoTapado (socket_t sock)
 {
 	int si = 1;
 	if (setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&si,sizeof si) == ERROR)
@@ -63,44 +69,55 @@ void usarPuertoTapado (int sock)
 		perror("setsockopt");
 		salir_agraciadamente(1);
 	}
-
 }
 
-FILE * abrirArchivoLectura (char * dirr)
-{
-	FILE * archivo = fopen(dirr, "r");
-	if(archivo == NULL)
-		salir_agraciadamente(1);
-	return archivo;
-}
-
-void enviarHeader (int sock, header head)
+int enviarHeader (socket_t sock, header head)
 {
 	int tamHeader = sizeof(header);
 	void * buffer = malloc(tamHeader);
 	memcpy(buffer, &head, tamHeader);
-	enviarBuffer(sock, buffer, tamHeader);
+	int resultado = enviarBuffer(sock, buffer, tamHeader);
 	free(buffer);
+	return resultado;
 }
 
-void enviarBuffer (int sock, void* buffer, int tamBuffer)
+int enviarBuffer (socket_t sock, void* buffer, int tamBuffer)
 {
 	if(tamBuffer == 0)
 		tamBuffer = sizeof(*buffer);
 	int bytesEnviados = send(sock, buffer, tamBuffer, 0);
 	if(bytesEnviados == ERROR)
-		salir_agraciadamente(1);
+		return -1;
 		/*
 		 * Lo que sigue es un control porque send
 		 * puede llegar a no enviar todo lo pedido
-		 * (En este caso es tan chico que no deberia
-		 * haber problema pero mejor prevenir que lamentar)
+		 * (En nuestro caso es poco probable que
+		 * lo necesite porque son mensajes chicos
+		 * pero mejor prevenir que lamentar)
+		 * [Lo mismo aplica a la recepcion]
 		 */
 	int resultSend;
 	while(bytesEnviados != tamBuffer)
 	{
 		if((resultSend = send(sock, buffer + bytesEnviados, tamBuffer - bytesEnviados, 0)) == ERROR)
-			salir_agraciadamente(1);
+			return ERROR;
 		bytesEnviados += resultSend;
 	}
+	return EXITO;
+}
+
+int recibirMensaje(socket_t sock, int tamMens, void** buffer)
+{
+	*buffer = malloc(tamMens);
+	int bytesRecibidos = recv(sock, buffer, tamMens, 0);
+	if(bytesRecibidos == ERROR)
+		return ERROR;
+	int resultRecv;
+	while(bytesRecibidos != tamMens)
+	{
+		if((resultRecv = recv(sock, *buffer + bytesRecibidos, tamMens - bytesRecibidos, 0)) == ERROR)
+			return ERROR;
+		bytesRecibidos += resultRecv;
+	}
+	return EXITO;
 }
