@@ -8,76 +8,66 @@
  ============================================================================
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/socket.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <biblio.h>
+#include <string.h>
 
-void hiloDeInstancia(int socket){
-char* buffer = malloc(5));
-int mensajeRecibido = recv(socket,buffer,4,0);
+#define tamanioDeStackDeInstancia 20
 
-free(buffer);
+void hiloDeInstancia(int socket)
+{
+
 }
-void esESIoInstancia (int socketAceptado) {
-	//aqui ira la logica que reconozca segun el header si es un ESI o una Instancia
-	//en caso de ser una Instancia, debere ir a otro modulo que haga send de los tamaños
-	//y cree un hilo que se quede haciendo listen
-char* buffer = malloc(5))//Cuando tengamos definido el tamaño hay que cambiarlo
-int mensajeRecibido = recv(socketAceptado,buffer,4,0);
+
+void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
+{
+
+	char* mensaje = malloc(5);//Cuando tengamos definido el tamaño hay que cambiarlo
+	int estadoDeLlegada = recibirMensaje(socketAceptado,4,&mensaje);
+
+	/*
+	aqui ira la logica que reconozca segun el header si es un ESI o una
+	Instancia en caso de ser una Instancia, debere ir a el modulo hiloDeInstancia,
+	que hara send de los tamaños y esperara una respuesta.
+	*/
 
 
-//if (mensajeRecibido==)
-//{
-pthread_t hiloInstancias;
-pthread_created(&hiloInstancias,20,(void*)hiloDeInstancia,socketAceptado);//El segundo argumento del created es para dar espacio de memoria al hilo
-//}
-//else{}
+	if (mensaje[0]==2)
+	{
+		pthread_t hiloInstancia;
+		//pthread_create(&hiloInstancia,tamanioDeStackDeInstancia,hiloDeInstancia,socketAceptado);
+	}
+
 //HAY QUE PONER EN ALGUN LADO UN CLOSE DEL HILO!!!
-
 }
 
-// me gustaria que revisaran este modulo, por que no recuerdo bien como era lo de los punteros y podria estar cometiendo errores
-void inicializarSockaddr (struct sockaddr_in *direccion) // debe recibir el puerto, por ahora no lo agregamos
+int esperarYaceptar(int socketCoordinador, int colaMax,struct sockaddr_in* dir)
 {
-	direccion->sin_addr.s_addr = htons(INADDR_ANY);
-	direccion->sin_family = AF_INET;
-	direccion->sin_port = htons(8080); // aca va el puerto que lee del archivo puse 8080 a modo de ejemplo
-	memset(&(direccion->sin_zero),'\0',8);
+	unsigned int tam;
+	listen(socketCoordinador , colaMax);
+	int socket = accept(socketCoordinador, (void*)&dir, &tam);
+	return socket;
 }
 
-void conectarSocket (int socketCoordinador,struct sockaddr_in direccion)
-{
-	if( bind (socketCoordinador, (void*)&direccion , sizeof(struct sockaddr_in) ) != 0)
-		{
-			perror("no se pudo asociar puerto, revisar bind");
-		}
-}
-
-int main(void) {
+void main(void) {
 
 	//previo a esto, se leyo el archivo de configuracion
 
-	struct sockaddr_in direccion,dirPlanificador,dirAceptado;
-	int socketPlanificador, socketAceptado,socketCoordinador = socket(AF_INET,SOCK_STREAM,0);
-	unsigned int tamaDeSockaddr;
+	struct sockaddr_in dirPlanificador,dirAceptado;
+	int socketPlanificador, socketAceptado,socketCoordinador;
 
-	inicializarSockaddr (&direccion);
-	conectarSocket(socketCoordinador, direccion);
+	// el primer parametro es un ip, y el segundo es un puerto
+	// ambos deben venir de archivo de conf.
 
-	listen(socketCoordinador , 2); // espero Planificador
-	socketPlanificador = accept(socketCoordinador, (void*)&dirPlanificador, &tamaDeSockaddr);
+	socketCoordinador = crearSocketServer ("127.0.0.2","8080");
+	socketPlanificador = esperarYaceptar(socketCoordinador, 2 ,&dirPlanificador);
 
-	while (0) {
-		listen(socketCoordinador , 20);
-		socketAceptado = accept(socketCoordinador, (void*)&dirAceptado, &tamaDeSockaddr);
-		esESIoInstancia(socketAceptado);
+	while (0)
+	{
+		socketAceptado = esperarYaceptar(socketCoordinador, 20 ,&dirAceptado);
+		esESIoInstancia(socketAceptado,dirAceptado);
 	}
-
-
-	close(socketCoordinador); // lo dejo para no olvidarmelo
-
-	return EXIT_SUCCESS;
+	//close(socketCoordinador);
 }
