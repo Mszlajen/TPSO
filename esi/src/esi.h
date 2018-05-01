@@ -14,7 +14,7 @@ void conectarConPlanificador();
 
 FILE* abrirArchivoLectura(char*);
 void enviarHandshake (socket_t);
-void hacerLiberaciones();
+void liberarRecursos();
 void salirConError(char*);
 
 #endif /* ESI_H_ */

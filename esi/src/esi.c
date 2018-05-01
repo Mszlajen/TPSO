@@ -11,7 +11,9 @@ int main(int argc, char **argv) {
 
 	conectarConPlanificador();
 
-	while(1) {}
+	puts("Salio todo bien\n");
+	liberarRecursos();
+	exit(0);
 }
 
 void inicializacion(int argc, char** argv)
@@ -57,11 +59,11 @@ void enviarHandshake(socket_t socket)
 void salirConError(char* error)
 {
 	error_show(error);
-	hacerLiberaciones();
+	liberarRecursos();
 	salir_agraciadamente(1);
 }
 
-void hacerLiberaciones()
+void liberarRecursos()
 {
 	if(configuracion != NULL)
 		config_destroy(configuracion);
