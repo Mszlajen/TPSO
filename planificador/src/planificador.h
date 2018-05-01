@@ -12,7 +12,7 @@
 #include <biblio.h>
 
 enum t_algoritmo {sjf, srt, hrrn};
-enum comandos {pausa, bloquear, desbloquear, listar, kill, status, deadlock};
+enum comandos {pausa, bloquear, desbloquear, listar, kill, status, deadlock, salir};
 
 typedef struct {
 	int id;
