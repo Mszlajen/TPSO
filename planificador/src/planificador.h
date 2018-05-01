@@ -23,15 +23,19 @@ typedef struct {
 
 
 void inicializacion();
-socket_t conectarConCoordinador();
+void conectarConCoordinador();
 void enviarHandshake(socket_t);
+void crearServerESI();
 pthread_t crearHiloTerminal ();
 pthread_t crearHiloNuevasESI ();
 
 ESI* crearESI (int);
 enum comandos convertirComando(char *);
+void salirConError(char *);
 
 void terminal();
 void escucharPorESI ();
+void liberarRecursos();
+
 
 #endif /* PLANIFICADOR_H_ */

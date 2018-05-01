@@ -1,10 +1,10 @@
 #include "planificador.h"
 
-t_config * configuracion;
+t_config * configuracion = NULL;
 
-t_list * listos;
+t_list * listos = NULL;
 
-socket_t socketCoord, socketServerESI;
+socket_t socketCoord = ERROR, socketServerESI = ERROR;
 
 int ESItotales;
 
@@ -12,11 +12,11 @@ int ESItotales;
 int main(void) {
 	inicializacion();
 
-	socketCoord = conectarConCoordinador();
+	conectarConCoordinador();
 
 	enviarHandshake(socketCoord);
 
-	socketServerESI = crearSocketServer("127.0.0.2", config_get_string_value(configuracion, "Puerto"));
+	crearServerESI();
 
 	pthread_t hiloTerminal = crearHiloTerminal();
 
@@ -29,19 +29,18 @@ void inicializacion ()
 {
 	configuracion = config_create("planificador.config");
 	if(configuracion == NULL)
-	{
-		error_show("Fallo al leer el archivo de configuracion del planificador\n");
-		salir_agraciadamente(1);
-	}
+		salirConError("Fallo al leer el archivo de configuracion del planificador\n");
 	listos = list_create();
 
 }
 
-socket_t conectarConCoordinador()
+void conectarConCoordinador()
 {
 	char * IP = config_get_string_value(configuracion, "IPCoord");
 	char * puerto = config_get_string_value(configuracion, "PuertoCoord");
-	return crearSocketCliente(IP, puerto);
+	socketCoord = crearSocketCliente(IP, puerto);
+	if(socketCoord == ERROR)
+		salirConError("Fallo al conectar planificador con coordinador\n");
 }
 
 void enviarHandshake(socket_t sock)
@@ -49,6 +48,14 @@ void enviarHandshake(socket_t sock)
 	header handshake;
 	handshake.protocolo = 1;
 	enviarHeader(sock, handshake);
+}
+
+void crearServerESI ()
+{
+	char * puerto = config_get_string_value(configuracion, "Puerto");
+	socketServerESI = crearSocketServer("127.0.0.2", puerto);
+	if(socketServerESI == ERROR)
+		salirConError("Planificador no pudo crear el socket para conectarse con ESI");
 }
 
 void terminal()
@@ -125,4 +132,23 @@ enum comandos convertirComando(char* linea)
 	 * (Basicamente una secuencia de if)
 	 */
 	return -1;
+}
+
+void liberarRecursos()
+{
+	if(configuracion != NULL)
+		config_destroy(configuracion);
+	if(listos != NULL)
+		list_destroy(listos);
+	if(socketCoord != ERROR)
+		cerrarSocket(socketCoord);
+	if(socketServerESI != ERROR)
+		cerrarSocket(socketServerESI);
+}
+
+void salirConError(char * error)
+{
+	error_show(error);
+	liberarRecursos();
+	salir_agraciadamente(1);
 }
