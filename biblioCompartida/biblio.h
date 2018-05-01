@@ -21,23 +21,19 @@ typedef struct {
 } header;
 
 void salir_agraciadamente(int);
-socket_t crearSocketCliente(char *, char *);
-socket_t crearSocketServer(char *, char *);
+socket_t crearSocketCliente(char *, char *); //-1 en error o fileDescriptor en exito
+socket_t crearSocketServer(char *, char *); //-1 en error o fileDescriptor en exito
 void usarPuertoTapado (socket_t);
-/*
- * Todas las funciones de envio y
- * recepcion devuelven 0 para exito
- * y -1 para error.
- */
-int enviarHeader (socket_t, header);
-int enviarBuffer (socket_t, void*, int);
+
+int enviarHeader (socket_t, header); //-1 en error o 0 en exito
+int enviarBuffer (socket_t, void*, int); //-1 en error o 0 en exito
 /*
  * Al tercer parametro de recibirMensaje
  * se le pasa un puntero donde se va a
  * redireccionar a un buffer en memoria
  * creado por la funcion.
  */
-int recibirMensaje (socket_t, int, void**);
+int recibirMensaje (socket_t, int, void**); //-1 en error o 0 en exito
 
 void cerrarSocket(socket_t);
 

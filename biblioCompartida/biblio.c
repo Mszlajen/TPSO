@@ -23,13 +23,7 @@ socket_t crearSocketCliente(char * IP, char * puerto)
 	freeaddrinfo(server_info);
 
 	if(resultado == ERROR)
-	{
-		error_show("fallo la creación del socket para <%s> puerto <%s>\n", IP, puerto);
-		salir_agraciadamente(1);
-		/*
-		 * Puede cambiar si surgue un caso donde falle y no haya que matar al programa directamente
-		 */
-	}
+		return resultado;
 	return sock;
 }
 
@@ -51,13 +45,7 @@ socket_t crearSocketServer(char * IP, char * puerto)
 		int resultado = bind(sock, res-> ai_addr, res->ai_addrlen);
 
 		if(resultado == ERROR)
-		{
-			error_show("fallo la creacion del socket server para <%s> puerto <%s>\n", IP, puerto);
-			salir_agraciadamente(1);
-			/*
-			* Puede cambiar si surgue un caso donde falle y no haya que matar al programa directamente
-			*/
-		}
+			return resultado;
 		return sock;
 }
 
