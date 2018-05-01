@@ -24,7 +24,7 @@ socket_t crearSocketCliente(char * IP, char * puerto)
 
 	if(resultado == ERROR)
 	{
-		error_show("fallo la creación del socket para <%s> puerto <%s>", IP, puerto);
+		error_show("fallo la creación del socket para <%s> puerto <%s>\n", IP, puerto);
 		salir_agraciadamente(1);
 		/*
 		 * Puede cambiar si surgue un caso donde falle y no haya que matar al programa directamente
@@ -52,7 +52,7 @@ socket_t crearSocketServer(char * IP, char * puerto)
 
 		if(resultado == ERROR)
 		{
-			error_show("fallo la creacion del socket server para <%s> puerto <%s>", IP, puerto);
+			error_show("fallo la creacion del socket server para <%s> puerto <%s>\n", IP, puerto);
 			salir_agraciadamente(1);
 			/*
 			* Puede cambiar si surgue un caso donde falle y no haya que matar al programa directamente
@@ -120,4 +120,9 @@ int recibirMensaje(socket_t sock, int tamMens, void** buffer)
 		bytesRecibidos += resultRecv;
 	}
 	return EXITO;
+}
+
+void cerrarSocket(socket_t sock)
+{
+	close(sock);
 }

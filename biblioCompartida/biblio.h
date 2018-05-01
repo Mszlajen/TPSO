@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -37,5 +38,7 @@ int enviarBuffer (socket_t, void*, int);
  * creado por la funcion.
  */
 int recibirMensaje (socket_t, int, void**);
+
+void cerrarSocket(socket_t);
 
 #endif /* BIBLIO_H_ */
