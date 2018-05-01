@@ -97,7 +97,7 @@ int enviarBuffer (socket_t sock, void* buffer, int tamBuffer)
 int recibirMensaje(socket_t sock, int tamMens, void** buffer)
 {
 	*buffer = malloc(tamMens);
-	int bytesRecibidos = recv(sock, buffer, tamMens, 0);
+	int bytesRecibidos = recv(sock, *buffer, tamMens, 0);
 	if(bytesRecibidos == ERROR)
 		return ERROR;
 	int resultRecv;

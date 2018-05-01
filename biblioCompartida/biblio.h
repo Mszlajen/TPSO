@@ -29,9 +29,9 @@ int enviarHeader (socket_t, header); //-1 en error o 0 en exito
 int enviarBuffer (socket_t, void*, int); //-1 en error o 0 en exito
 /*
  * Al tercer parametro de recibirMensaje
- * se le pasa un puntero donde se va a
- * redireccionar a un buffer en memoria
- * creado por la funcion.
+ * se le pasa un puntero por referencia
+ * que se va a redireccionar a un buffer
+ * en memoria creado por la funcion.
  */
 int recibirMensaje (socket_t, int, void**); //-1 en error o 0 en exito
 
