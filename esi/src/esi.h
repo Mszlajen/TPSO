@@ -8,6 +8,12 @@
 #include <commons/error.h>
 #include <biblio.h>
 
+#define archivoConfig "ESI.config"
+#define IPCoord "IPCoord"
+#define PuertoCoord "PuertoCoord"
+#define IPPlan "IPPlan"
+#define PuertoPlan "PuertoPlan"
+
 void inicializacion(int, char**);
 void conectarConCoordinador();
 void conectarConPlanificador();

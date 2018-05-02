@@ -22,14 +22,16 @@ void inicializacion(int argc, char** argv)
 		salirConError("Cantidad de parametros invalida\n");
 	programa = abrirArchivoLectura(argv[1]);
 
-	configuracion = config_create("ESI.config");
+	configuracion = config_create(archivoConfig);
 	if(configuracion == NULL)
 		salirConError("Fallo al abrir el archivo de lectura\n");
 }
 
 void conectarConCoordinador()
 {
-	socketCoord = crearSocketCliente(config_get_string_value(configuracion, "IPCoord"), config_get_string_value(configuracion, "PuertoCoord"));
+	char * IP = config_get_string_value(configuracion, IPCoord);
+	char * puerto = config_get_string_value(configuracion, PuertoCoord);
+	socketCoord = crearSocketCliente(IP, puerto);
 	if(socketCoord == ERROR)
 		salirConError("No se pudo conectar al coordinador\n");
 	enviarHandshake(socketCoord);
@@ -37,7 +39,9 @@ void conectarConCoordinador()
 
 void conectarConPlanificador()
 {
-	socketPlan = crearSocketCliente(config_get_string_value(configuracion, "IPPlan"), config_get_string_value(configuracion, "PuertoPlan"));
+	char * IP = config_get_string_value(configuracion, IPPlan);
+	char * puerto = config_get_string_value(configuracion, PuertoPlan);
+	socketPlan = crearSocketCliente(IP, puerto);
 	if(socketPlan == ERROR)
 		salirConError("No se pudo conectar al coordinador\n");
 	enviarHandshake(socketPlan);

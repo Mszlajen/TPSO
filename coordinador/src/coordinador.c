@@ -15,6 +15,7 @@
 #include <string.h>
 
 #define tamanioDeStackDeInstancia 20
+#define IPEscucha "127.0.0.2"
 
 void hiloDeInstancia(int socket)
 {
@@ -61,7 +62,7 @@ void main(void) {
 	// el primer parametro es un ip, y el segundo es un puerto
 	// ambos deben venir de archivo de conf.
 
-	socketCoordinador = crearSocketServer ("127.0.0.2","8080");
+	socketCoordinador = crearSocketServer (IPEscucha,"8000");
 	socketPlanificador = esperarYaceptar(socketCoordinador, 2 ,&dirPlanificador);
 
 	while (0)
