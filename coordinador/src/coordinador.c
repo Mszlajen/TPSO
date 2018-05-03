@@ -38,10 +38,13 @@ void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 	if (mensaje[0]==2)
 	{
 		pthread_t hiloInstancia;
-		//pthread_create(&hiloInstancia,tamanioDeStackDeInstancia,hiloDeInstancia,socketAceptado);
+		pthread_create(&hiloInstancia,
+					tamanioDeStackDeInstancia,
+					hiloDeInstancia,
+					(void*)socketAceptado);
+		pthread_destroy(hiloInstancia); //asi cierro el hilo, lo deje de referencia
 	}
 
-//HAY QUE PONER EN ALGUN LADO UN CLOSE DEL HILO!!!
 }
 
 int esperarYaceptar(int socketCoordinador, int colaMax,struct sockaddr_in* dir)
