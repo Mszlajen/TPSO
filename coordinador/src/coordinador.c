@@ -8,25 +8,36 @@
  ============================================================================
  */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <biblio.h>
 #include <string.h>
+#include <commons/config.h>
+#include <commons/collections/list.h>
 
-#define tamanioDeStackDeInstancia 20
+
 #define IPEscucha "127.0.0.2"
 
-void hiloDeInstancia(int socket)
-{
+#define archivoConfig "coordinador.config"
+#define Puerto "Puerto"
 
+t_config * configuracion = NULL;
+
+
+
+void hiloDeInstancia()
+{
+	printf ("soy el hilo, hola!");
 }
 
 void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 {
 
-	char* mensaje = malloc(5);//Cuando tengamos definido el tamaño hay que cambiarlo
-	int estadoDeLlegada = recibirMensaje(socketAceptado,4,&mensaje);
+	int* mensaje;
+	int estadoDellegada = recibirMensaje(socketAceptado,4,&mensaje);
 
 	/*
 	aqui ira la logica que reconozca segun el header si es un ESI o una
@@ -34,15 +45,10 @@ void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 	que hara send de los tamaños y esperara una respuesta.
 	*/
 
-
 	if (mensaje[0]==2)
 	{
 		pthread_t hiloInstancia;
-		pthread_create(&hiloInstancia,
-					tamanioDeStackDeInstancia,
-					hiloDeInstancia,
-					(void*)socketAceptado);
-		pthread_destroy(hiloInstancia); //asi cierro el hilo, lo deje de referencia
+		//pthread_create(&hiloInstancia, NULL, (void*) hiloDeInstancia, NULL);
 	}
 
 }
@@ -53,25 +59,66 @@ int esperarYaceptar(int socketCoordinador, int colaMax,struct sockaddr_in* dir)
 	listen(socketCoordinador , colaMax);
 	int socket = accept(socketCoordinador, (void*)&dir, &tam);
 	return socket;
+	}
+
+int validarPlanificador (int socket) {
+	header* handshake = NULL;
+	int estadoDellegada;
+	uint8_t correcto = 1;
+
+	estadoDellegada = recibirMensaje(socket,sizeof(header),&handshake);
+
+	if (estadoDellegada != 0){ printf ("no se pudo recivir header de planificador."); return 1; }
+	if (handshake->protocolo != correcto){ return 1; } else {return 0;}
 }
 
-void main(void) {
 
-	//previo a esto, se leyo el archivo de configuracion
+void liberarRecursos()
+{
+	if(configuracion != NULL)
+		config_destroy(configuracion);
+}
+
+void salirConError(char * error)
+{
+	error_show(error);
+	liberarRecursos();
+	salir_agraciadamente(1);
+}
+
+void inicializacion ()
+{
+	configuracion = config_create(archivoConfig);
+	if(configuracion == NULL)
+		salirConError("Fallo al leer el archivo de configuracion del coordinador\n");
+
+}
+
+int main(void) {
+
+	inicializacion();
 
 	struct sockaddr_in dirPlanificador,dirAceptado;
 	int socketPlanificador, socketAceptado,socketCoordinador;
+	int esPlanificador = 1;
 
-	// el primer parametro es un ip, y el segundo es un puerto
-	// ambos deben venir de archivo de conf.
+	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
 
-	socketCoordinador = crearSocketServer (IPEscucha,"8000");
-	socketPlanificador = esperarYaceptar(socketCoordinador, 2 ,&dirPlanificador);
 
-	while (0)
+	while (esPlanificador) {
+		socketPlanificador = esperarYaceptar(socketCoordinador, 2 ,&dirPlanificador);
+		esPlanificador = validarPlanificador(socketPlanificador );
+	}
+
+
+
+	while (1)
 	{
 		socketAceptado = esperarYaceptar(socketCoordinador, 20 ,&dirAceptado);
 		esESIoInstancia(socketAceptado,dirAceptado);
 	}
 	//close(socketCoordinador);
+	exit(0);
 }
+
+
