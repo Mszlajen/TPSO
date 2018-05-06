@@ -3,10 +3,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <parsi/parser.h>
 #include <commons/config.h>
 #include <commons/error.h>
 #include <biblio.h>
+#include <parsi/parser.h>
 
 #define archivoConfig "ESI.config"
 #define IPCoord "IPCoord"

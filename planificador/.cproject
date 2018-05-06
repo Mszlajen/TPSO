@@ -40,7 +40,6 @@
 								<option id="gnu.c.link.option.libs.2082450187" name="Libraries (-l)" superClass="gnu.c.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" value="biblioCompartida"/>
 									<listOptionValue builtIn="false" value="readline"/>
-									<listOptionValue builtIn="false" value="commons"/>
 									<listOptionValue builtIn="false" value="pthread"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.linker.input.417027164" superClass="cdt.managedbuild.tool.gnu.c.linker.input">
