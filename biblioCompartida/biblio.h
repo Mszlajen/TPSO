@@ -23,6 +23,7 @@ typedef struct {
 void salir_agraciadamente(int);
 socket_t crearSocketCliente(char *, char *); //-1 en error o fileDescriptor en exito
 socket_t crearSocketServer(char *, char *); //-1 en error o fileDescriptor en exito
+int seDesconectoSocket(socket_t); //0 para false o 1 para verdad
 void usarPuertoTapado (socket_t);
 
 int enviarHeader (socket_t, header); //-1 en error o 0 en exito

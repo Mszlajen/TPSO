@@ -49,6 +49,18 @@ socket_t crearSocketServer(char * IP, char * puerto)
 		return sock;
 }
 
+int seDesconectoSocket(socket_t sock)
+{
+	void * buffer = malloc(1);
+	int resultado = recv(sock, buffer, 1, (MSG_PEEK | MSG_DONTWAIT));
+	free(buffer);
+	if(resultado == 0)
+		return 1;
+	else
+		return 0;
+
+}
+
 void usarPuertoTapado (socket_t sock)
 {
 	int si = 1;
