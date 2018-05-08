@@ -55,12 +55,29 @@ void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 	Instancia en caso de ser una Instancia, debere ir a el modulo hiloDeInstancia,
 	que hara send de los tamaños y esperara una respuesta.
 	*/
+	switch(mensaje[0]){
 
-	if (mensaje[0]==2)
+	case 2:
+
+		pthread_t hiloInstancia;
+		//pthread_create(&hiloInstancia, NULL, (void*) hiloDeInstancia, NULL);
+		break;
+
+	case 3:
+
+		// aca ira la accion a realizarse en el caso de ser una ESI
+		break;
+
+	default:
+
+		//Creo que no hace nada si no es Esi o Instancia
+		break;
+
+/*	if (mensaje[0]==2)
 	{
 		pthread_t hiloInstancia;
 		//pthread_create(&hiloInstancia, NULL, (void*) hiloDeInstancia, NULL);
-	}
+	} */
 
 }
 
