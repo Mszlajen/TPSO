@@ -7,26 +7,37 @@
  Description : Hello World in C, Ansi-style
  ============================================================================
  */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <arpa/inet.h>
-#include <pthread.h>
-#include <biblio.h>
-#include <string.h>
-#include <commons/config.h>
-#include <commons/collections/list.h>
-
-
-#define IPEscucha "127.0.0.2"
-
-#define archivoConfig "coordinador.config"
-#define Puerto "Puerto"
+#include "coordinador.h"
 
 t_config * configuracion = NULL;
 
 
+int main(void) {
+
+	inicializacion();
+
+	struct sockaddr_in dirPlanificador,dirAceptado;
+	int socketPlanificador, socketAceptado,socketCoordinador;
+	int esPlanificador = 1;
+
+	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
+
+
+	while (esPlanificador) {
+		socketPlanificador = esperarYaceptar(socketCoordinador, 2 ,&dirPlanificador);
+		esPlanificador = validarPlanificador(socketPlanificador );
+	}
+
+
+
+	while (1)
+	{
+		socketAceptado = esperarYaceptar(socketCoordinador, 20 ,&dirAceptado);
+		esESIoInstancia(socketAceptado,dirAceptado);
+	}
+	//close(socketCoordinador);
+	exit(0);
+}
 
 void hiloDeInstancia()
 {
@@ -86,7 +97,7 @@ void salirConError(char * error)
 	salir_agraciadamente(1);
 }
 
-void inicializacion ()
+void inicializacion()
 {
 	configuracion = config_create(archivoConfig);
 	if(configuracion == NULL)
@@ -94,31 +105,6 @@ void inicializacion ()
 
 }
 
-int main(void) {
 
-	inicializacion();
-
-	struct sockaddr_in dirPlanificador,dirAceptado;
-	int socketPlanificador, socketAceptado,socketCoordinador;
-	int esPlanificador = 1;
-
-	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
-
-
-	while (esPlanificador) {
-		socketPlanificador = esperarYaceptar(socketCoordinador, 2 ,&dirPlanificador);
-		esPlanificador = validarPlanificador(socketPlanificador );
-	}
-
-
-
-	while (1)
-	{
-		socketAceptado = esperarYaceptar(socketCoordinador, 20 ,&dirAceptado);
-		esESIoInstancia(socketAceptado,dirAceptado);
-	}
-	//close(socketCoordinador);
-	exit(0);
-}
 
 
