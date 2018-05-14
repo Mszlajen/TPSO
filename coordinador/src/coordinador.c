@@ -101,6 +101,7 @@ void registrarInstancia(int socket,int* mensaje)
 	if (listaInstancias == NULL)
 		{
 			listaInstancias = list_create();
+			cantInstancias = list_add(listaInstancias,&instanciaRecibida);
 		}
 	else
 		{
