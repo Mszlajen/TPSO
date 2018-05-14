@@ -109,17 +109,6 @@ void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 	switch(mensaje[0]){
 
 	case 2:
-		/*
-		 * Les dice que están declarando de forma implicita
-		 * esta función (lo que es más o menos lo mismo que
-		 * no declararla) porque la usan acá pero está
-		 * definida más abajo de su implementación (o sea,
-		 * acá).
-		 * Pongan el prototipo en la biblioteca (junto con
-		 * todas las funciones que no lo tengan).
-		 *
-		 * [MATI]
-		 */
 		registrarInstancia(socketAceptado,mensaje);
 		break;
 
@@ -160,6 +149,7 @@ void registrarEsi(int socket){
 	 * [MATI]
 	 */
 	pthread_t hiloEsi;
+	nuevaEsi.socket = socket;
 	nuevaEsi.hiloEsi = hiloEsi;
 
 	if (listaEsi == NULL)
@@ -184,15 +174,6 @@ void registrarEsi(int socket){
 	pthread_create(&nuevaEsi.hiloEsi, NULL, (void*) atenderEsi, socket);
 }
 
-/*
- * Dice que hay un conflicto de tipos.
- * No sabria el por qué exacto pero
- * tiene que ver con las declaraciones
- * implicitas así que arreglen eso y
- * capaz se arregla.
- *
- * [MATI]
- */
 void registrarInstancia(int socket,int* mensaje)
 {
 
