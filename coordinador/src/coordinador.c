@@ -10,7 +10,10 @@
 #include "coordinador.h"
 
 t_config * configuracion = NULL;
-
+t_list * listaInstancias = NULL;
+t_list * listaEsi = NULL;
+int cantInstancias;
+int cantEsi;
 
 int main(void) {
 
@@ -39,10 +42,6 @@ int main(void) {
 	exit(0);
 }
 
-void hiloDeInstancia()
-{
-	printf ("soy el hilo, hola!");
-}
 
 void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 {
@@ -50,17 +49,10 @@ void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 	int* mensaje;
 	int estadoDellegada = recibirMensaje(socketAceptado,4,&mensaje);
 
-	/*
-	aqui ira la logica que reconozca segun el header si es un ESI o una
-	Instancia en caso de ser una Instancia, debere ir a el modulo hiloDeInstancia,
-	que hara send de los tamaños y esperara una respuesta.
-	*/
 	switch(mensaje[0]){
 
 	case 2:
-
-		pthread_t hiloInstancia;
-		//pthread_create(&hiloInstancia, NULL, (void*) hiloDeInstancia, NULL);
+		registrarInstancia(socketAceptado,mensaje);
 		break;
 
 	case 3:
@@ -73,12 +65,66 @@ void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 		//Creo que no hace nada si no es Esi o Instancia
 		break;
 
-/*	if (mensaje[0]==2)
-	{
-		pthread_t hiloInstancia;
-		//pthread_create(&hiloInstancia, NULL, (void*) hiloDeInstancia, NULL);
-	} */
+	}
+}
 
+void atenderEsi(int socket){
+
+}
+
+void registrarEsi(int socket){
+
+	Esi nuevaEsi;
+	nuevaEsi.socket = socket;
+	pthread_t hiloEsi;
+	nuevaEsi.hiloEsi = hiloEsi;
+
+	if (listaEsi == NULL)
+		{
+			listaEsi = list_create();
+		}
+	else
+		{
+			cantEsi = list_add(listaEsi,&nuevaEsi);
+		}
+	pthread_create(&nuevaEsi.hiloEsi, NULL, (void*) atenderEsi, socket);
+}
+
+void registrarInstancia(int socket,int* mensaje)
+{
+
+	Instancia instanciaRecibida;
+	instanciaRecibida.socket = socket;
+	memcpy(&instanciaRecibida.nombre,(&mensaje) + 5,(&mensaje)+1);
+	instanciaRecibida.idinstancia =  cantInstancias;
+
+	if (listaInstancias == NULL)
+		{
+			listaInstancias = list_create();
+		}
+	else
+		{
+			cantInstancias = list_add(listaInstancias,&instanciaRecibida);
+		}
+
+	uint8_t protocolo = 5;
+	int copiar;
+	int * buffer = malloc(13);
+
+	memcpy(buffer,&protocolo,1);
+
+	copiar = instanciaRecibida.idinstancia;
+	memcpy(buffer+1,&copiar,4);
+
+	copiar = config_get_int_value(configuracion, "CantEntradas");
+	memcpy(buffer+5,&copiar,4);
+
+	copiar = config_get_int_value(configuracion, "TamEntradas");
+	memcpy(buffer+9,&copiar,4);
+
+	int estado = enviarBuffer (instanciaRecibida.socket, buffer, 13);
+
+	if (estado != 0) {printf ("no se pudo enviar informacion de entradas a la instancia %s",instanciaRecibida.nombre ); }
 }
 
 int esperarYaceptar(int socketCoordinador, int colaMax,struct sockaddr_in* dir)
@@ -119,6 +165,7 @@ void inicializacion()
 	configuracion = config_create(archivoConfig);
 	if(configuracion == NULL)
 		salirConError("Fallo al leer el archivo de configuracion del coordinador\n");
+	cantInstancias = 0;
 
 }
 

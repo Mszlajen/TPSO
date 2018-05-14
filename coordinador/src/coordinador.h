@@ -11,6 +11,16 @@
 #include <commons/config.h>
 #include <commons/collections/list.h>
 
+typedef struct {
+	int socket;
+	int idinstancia;
+	char * nombre;
+} Instancia;
+
+typedef struct {
+	int socket;
+	pthread_t hiloEsi;
+} Esi;
 
 #define IPEscucha "127.0.0.2"
 #define archivoConfig "coordinador.config"
