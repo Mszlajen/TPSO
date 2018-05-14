@@ -75,8 +75,8 @@ void atenderEsi(int socket){
 void registrarEsi(int socket){
 
 	Esi nuevaEsi;
-	nuevaEsi.socket = socket;
 	pthread_t hiloEsi;
+	nuevaEsi.socket = socket;
 	nuevaEsi.hiloEsi = hiloEsi;
 
 	if (listaEsi == NULL)

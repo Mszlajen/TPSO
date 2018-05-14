@@ -33,6 +33,10 @@ int validarPlanificador (int socket);
 void liberarRecursos();
 void salirConError(char * error);
 void inicializacion();
+void atenderEsi(int socket);
+void registrarEsi(int socket);
+void registrarInstancia(int socket,int* mensaje);
+
 
 
 
