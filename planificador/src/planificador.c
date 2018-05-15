@@ -1,6 +1,5 @@
 #include "planificador.h"
-
-t_config * configuracion = NULL;
+#include "configuracion.h"
 
 t_list * listos = NULL;
 
@@ -38,8 +37,7 @@ int main(void) {
 
 void inicializacion ()
 {
-	configuracion = config_create(archivoConfig);
-	if(configuracion == NULL)
+	if(crearConfiguracion())
 		salirConError("Fallo al leer el archivo de configuracion del planificador\n");
 	listos = list_create();
 
@@ -47,8 +45,8 @@ void inicializacion ()
 
 void conectarConCoordinador()
 {
-	char * IP = config_get_string_value(configuracion, IPCoord);
-	char * puerto = config_get_string_value(configuracion, PuertoCoord);
+	char * IP = obtenerDireccionCoordinador();
+	char * puerto = obtenerPuertoCoordinador();
 	socketCoord = crearSocketCliente(IP, puerto);
 	if(socketCoord == ERROR)
 		salirConError("Fallo al conectar planificador con coordinador\n");
@@ -64,7 +62,7 @@ void enviarHandshake(socket_t sock)
 
 void crearServerESI ()
 {
-	char * puerto = config_get_string_value(configuracion, Puerto);
+	char * puerto = obtenerPuerto();
 	socketServerESI = crearSocketServer(IPConexion, puerto);
 	if(socketServerESI == ERROR)
 		salirConError("Planificador no pudo crear el socket para conectarse con ESI\n");
@@ -136,7 +134,7 @@ ESI* crearESI (int sock)
 	ESI* unaESI = malloc (sizeof(ESI));
 	unaESI -> id = ESItotales;
 	ESItotales++;
-	unaESI -> estimacion = config_get_int_value(configuracion, Estimacion);
+	unaESI -> estimacion = obtenerEstimacionInicial();
 	//unaESI -> recursos = list_create();
 	unaESI -> socket = sock;
 	return unaESI;
@@ -155,8 +153,8 @@ enum comandos convertirComando(char* linea)
 
 void liberarRecursos()
 {
-	if(configuracion != NULL)
-		config_destroy(configuracion);
+	eliminarConfiguracion();
+
 	if(listos != NULL)
 		list_destroy(listos);
 	if(socketCoord != ERROR)
