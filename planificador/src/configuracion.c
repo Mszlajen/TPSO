@@ -45,9 +45,9 @@ enum t_algoritmo obtenerAlgoritmo()
 	char* sAlgort = config_get_string_value(configuracion, Algoritmo);
 	if(string_equals_ignore_case(sAlgort, "SJF-CD"))
 		resultado = srt;
-	if(string_equals_ignore_case(sAlgort, "SJF-SD"))
+	else if(string_equals_ignore_case(sAlgort, "SJF-SD"))
 		resultado = sjf;
-	if(string_equals_ignore_case(sAlgort, "HRRN"))
+	else if(string_equals_ignore_case(sAlgort, "HRRN"))
 		resultado = hrrn;
 	return resultado;
 }
