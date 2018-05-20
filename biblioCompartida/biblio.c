@@ -124,5 +124,6 @@ int recibirMensaje(socket_t sock, int tamMens, void** buffer)
 
 void cerrarSocket(socket_t sock)
 {
-	close(sock);
+	if(sock == ERROR)
+		close(sock);
 }
