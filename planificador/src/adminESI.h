@@ -5,7 +5,7 @@
 #include <biblio.h>
 
 typedef struct {
-	int id;
+	ESI_id id;
 	socket_t socket;
 	int estimacion;
 	int estimacionAnterior;
@@ -13,8 +13,7 @@ typedef struct {
 	t_list *recursos;
 }ESI;
 
-ESI* crearESI (socket_t);
-void registrarEjecucion();
-unsigned long int valorInstEjecutadas();
+ESI* crearESI (socket_t, int, unsigned long int);
+void destruirESI(ESI*);
 
 #endif /* ADMINESI_H_ */

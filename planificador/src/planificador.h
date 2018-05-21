@@ -16,10 +16,12 @@ enum comandos {pausa, bloquear, desbloquear, listar, kill, status, deadlock, sal
 
 void inicializacion();
 void conectarConCoordinador();
-void enviarHandshake(socket_t);
+int enviarEncabezado(socket_t, int);
+int enviarIdESI(socket_t, int);
 void crearServerESI();
 pthread_t crearHiloTerminal ();
 pthread_t crearHiloNuevasESI ();
+pthread_t crearHiloEjecucion ();
 
 enum comandos convertirComando(char *);
 void salirConError(char *);
@@ -27,6 +29,7 @@ void liberarRecursos();
 
 void terminal();
 void escucharPorESI ();
+void ejecucionDeESI ();
 
 
 

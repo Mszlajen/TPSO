@@ -1,13 +1,14 @@
-#include "ready.h"
+#include "colas.h"
 
 t_list * listos = NULL;
+ESI* enEjecucion;
 
 void listarParaEjecucion (ESI* nuevaESI)
 {
 	list_add(listos, nuevaESI);
 }
 
-ESI* ESIPrioratarioPorAlgoritmo(enum t_algoritmo algoritmo)
+ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo algoritmo)
 {
 	switch(algoritmo)
 	{
