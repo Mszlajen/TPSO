@@ -1,6 +1,6 @@
 #include "adminESI.h"
 
-ESI_id ESItotales = 0;
+id_t ESItotales = 0;
 
 ESI* crearESI (socket_t sock, int estimacionInicial, unsigned long int arribo)
 {

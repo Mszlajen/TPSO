@@ -58,6 +58,7 @@ void terminal()
 void ejecucionDeESI()
 {
 	ESI* enEjecucion;
+	consultaCoord * consulta = NULL;
 	while(!terminarEjecucion)
 	{
 		do
@@ -74,6 +75,7 @@ void ejecucionDeESI()
 			salirConError("Se cerro el coordinador.");
 		}
 		enviarEncabezado(enEjecucion -> socket, 7); //Enviar el aviso de ejecucion
+		consulta = recibirConsultaCoord();
 
 	}
 }
@@ -94,7 +96,7 @@ void escucharPorESI ()
 			error_show("Fallo en la conexion de ESI\n");
 			continue;
 		}
-		nuevaESI = crearESI(socketNuevaESI, obtenerEstimacionInicial());
+		nuevaESI = crearESI(socketNuevaESI, obtenerEstimacionInicial(), instruccionesEjecutadas);
 		if(!enviarIdESI(socketNuevaESI, nuevaESI -> id))
 			listarParaEjecucion(nuevaESI);
 		else
@@ -135,7 +137,7 @@ int enviarIdESI(socket_t sock, ESI_id id)
 {
 	header respuesta;
 	respuesta.protocolo = 6;
-	int tamEncabezado = sizeof(header), tamId = sizeof(ESI_id);
+	int tamEncabezado = sizeof(header), tamId = sizeof(id_t);
 	void* buffer = malloc(tamEncabezado + tamId);
 	memcpy(buffer, &respuesta, tamEncabezado);
 	memcpy(buffer + tamEncabezado, &id, tamId);
@@ -144,6 +146,44 @@ int enviarIdESI(socket_t sock, ESI_id id)
 	return resultado;
 }
 
+int enviarRespuestaConsultaCoord(socket_t coord, int respuesta)
+{
+	header encabezado;
+	encabezado.protocolo = 10;
+	void* buffer = malloc(sizeof(header) + sizeof(respuesta));
+	memcpy(buffer, &encabezado, sizeof(header));
+	memcpy(buffer + sizeof(header), &respuesta, sizeof(respuesta));
+	return enviarBuffer(coord, buffer, sizeof(buffer));
+}
+
+consultaCoord* recibirConsultaCoord()
+{
+	consultaCoord *consulta;
+	listen(socketCoord, 5);
+	header* encabezado;
+	recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado);
+	if(encabezado->protocolo != 9)
+		/*error*/;
+	free(encabezado);
+	id_t* esi_id;
+	recibirMensaje(socketCoord, sizeof(id_t), (void**) &esi_id);
+	int* tamInst;
+	recibirMensaje(socketCoord, sizeof(int), (void**) &tamInst);
+	t_esi_operacion *inst;
+	recibirMensaje(socketCoord, *tamInst, (void**) &inst);
+	consulta = malloc(sizeof(id_t) + *tamInst);
+	consulta -> esi_id = *esi_id;
+	consulta -> instruccion = *inst;
+	free(esi_id);
+	free(tamInst);
+	free(inst);
+	return consulta;
+}
+
+int procesarConsultaCoord(t_esi_operacion* consulta)
+{
+	return 0;
+}
 void crearServerESI ()
 {
 	char * puerto = obtenerPuerto();

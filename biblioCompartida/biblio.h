@@ -13,7 +13,8 @@
 #define EXITO 0
 
 typedef int socket_t;
-typedef int id_t;
+typedef int ESI_id;
+typedef int instancia_id;
 
 typedef struct {
 	uint8_t protocolo;
