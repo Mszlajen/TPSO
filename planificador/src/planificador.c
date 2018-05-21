@@ -1,12 +1,11 @@
 #include "planificador.h"
 #include "configuracion.h"
-
-t_list * listos = NULL;
+#include "ready.h"
+#include "adminESI.h"
 
 socket_t socketCoord = ERROR, socketServerESI = ERROR;
 
-int ESItotales, terminarEjecucion = 0;
-
+int terminarEjecucion = 0;
 /*
  * terminar ejecucion es una variable de Debuggeo
  * que se usa para terminar la ejecucion del planificador
@@ -39,7 +38,7 @@ void inicializacion ()
 {
 	if(crearConfiguracion())
 		salirConError("Fallo al leer el archivo de configuracion del planificador\n");
-	listos = list_create();
+	crearListaReady();
 
 }
 
@@ -124,20 +123,9 @@ void escucharPorESI ()
 			continue;
 		}
 		nuevaESI = crearESI(socketNuevaESI);
-		list_add(listos, nuevaESI);
+		listarParaEjecucion(nuevaESI);
 	}
 	pthread_exit(NULL);
-}
-
-ESI* crearESI (int sock)
-{
-	ESI* unaESI = malloc (sizeof(ESI));
-	unaESI -> id = ESItotales;
-	ESItotales++;
-	unaESI -> estimacion = obtenerEstimacionInicial();
-	//unaESI -> recursos = list_create();
-	unaESI -> socket = sock;
-	return unaESI;
 }
 
 enum comandos convertirComando(char* linea)
@@ -155,12 +143,10 @@ void liberarRecursos()
 {
 	eliminarConfiguracion();
 
-	if(listos != NULL)
-		list_destroy(listos);
-	if(socketCoord != ERROR)
-		cerrarSocket(socketCoord);
-	if(socketServerESI != ERROR)
-		cerrarSocket(socketServerESI);
+	cerrarListaReady();
+
+	cerrarSocket(socketCoord);
+	cerrarSocket(socketServerESI);
 }
 
 void salirConError(char * error)

@@ -14,14 +14,6 @@
 
 enum comandos {pausa, bloquear, desbloquear, listar, kill, status, deadlock, salir};
 
-typedef struct {
-	int id;
-	int socket;
-	int estimacion;
-	t_list *recursos;
-}ESI;
-
-
 void inicializacion();
 void conectarConCoordinador();
 void enviarHandshake(socket_t);
@@ -29,13 +21,13 @@ void crearServerESI();
 pthread_t crearHiloTerminal ();
 pthread_t crearHiloNuevasESI ();
 
-ESI* crearESI (int);
 enum comandos convertirComando(char *);
 void salirConError(char *);
+void liberarRecursos();
 
 void terminal();
 void escucharPorESI ();
-void liberarRecursos();
+
 
 
 #endif /* PLANIFICADOR_H_ */
