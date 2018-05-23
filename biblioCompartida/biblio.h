@@ -20,6 +20,8 @@ typedef struct {
 	uint8_t protocolo;
 } header;
 
+enum instruccion {get, set, store};
+
 void salir_agraciadamente(int);
 //-1 en error o fileDescriptor en exito
 socket_t crearSocketCliente(char *, char *);
