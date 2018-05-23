@@ -4,13 +4,14 @@ t_config * configuracion = NULL;
 
 int crearConfiguracion()
 {
-	configuracion = config_create(archivoConfig);
+	if(!configuracion)
+		configuracion = config_create(archivoConfig);
 	return configuracion? 0 : 1;
 }
 
 void eliminarConfiguracion()
 {
-	if(configuracion != NULL)
+	if(configuracion)
 		config_destroy(configuracion);
 }
 
