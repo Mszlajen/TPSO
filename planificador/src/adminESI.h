@@ -14,6 +14,9 @@ typedef struct {
 }ESI;
 
 ESI* crearESI (socket_t, int, unsigned long int);
+/*
+ * Antes de destruir hay que liberar sus recursos.
+ */
 void destruirESI(ESI*);
 
 #endif /* ADMINESI_H_ */

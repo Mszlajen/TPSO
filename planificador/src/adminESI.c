@@ -10,7 +10,7 @@ ESI* crearESI (socket_t sock, int estimacionInicial, unsigned long int arribo)
 	unaESI -> estimacion = estimacionInicial;
 	unaESI -> estimacionAnterior = 0;
 	unaESI -> arriboListos = arribo;
-	//unaESI -> recursos = list_create();
+	unaESI -> recursos = list_create();
 	unaESI -> socket = sock;
 	return unaESI;
 }
@@ -19,5 +19,6 @@ ESI* crearESI (socket_t sock, int estimacionInicial, unsigned long int arribo)
 void destruirESI(ESI* esi)
 {
 	close(esi -> socket);
+	list_destroy(esi -> recursos);
 	free(esi);
 }
