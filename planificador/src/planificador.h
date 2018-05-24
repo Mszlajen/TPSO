@@ -9,13 +9,15 @@
 #include <commons/error.h>
 #include <commons/string.h>
 #include <biblio.h>
-#include <parsi/parser.h>
+
+#include "adminESI.h"
 
 #define IPConexion "127.0.0.2"
 
 typedef struct {
-	id_t esi_id;
-	t_esi_operacion instruccion;
+	enum instruccion instr;
+	uint8_t tamClave;
+	char* clave;
 } consultaCoord;
 
 enum comandos {pausa, bloquear, desbloquear, listar, kill, status, deadlock, salir};
@@ -27,7 +29,7 @@ int enviarIdESI(socket_t, int);
 int enviarRespuestaConsultaCoord(socket_t, int);
 consultaCoord* recibirConsultaCoord();
 void crearServerESI();
-int procesarConsultaCoord(t_esi_operacion*);
+int procesarConsultaCoord(ESI*, consultaCoord*);
 pthread_t crearHiloTerminal ();
 pthread_t crearHiloNuevasESI ();
 pthread_t crearHiloEjecucion ();

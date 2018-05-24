@@ -11,6 +11,12 @@ void listarParaEjecucion (ESI* nuevaESI)
 	list_add(listos, nuevaESI);
 }
 
+void reservarClave(ESI* esi, char* clave)
+{
+	dictionary_put(tablaBloqueos, clave, esi);
+	agregarRecurso(esi, clave);
+}
+
 int ESIEstaBloqueadoPorClave(ESI* esi, char* clave)
 {
 	if(dictionary_has_key(colasBloqueados, clave))
@@ -22,25 +28,14 @@ int ESIEstaBloqueadoPorClave(ESI* esi, char* clave)
 //Algo fideo, revisar luego;
 int ESITieneClave(ESI* esi, char* clave)
 {
-	//Comprueba que alguien tenga es clave tomada
+	//Comprueba si alguien tiene la clave tomada
 	if(dictionary_has_key(tablaBloqueos, clave))
 	{
 		ESI* poseedor = dictionary_get(tablaBloqueos, clave);
 		//Comprueba que el que la tiene tomada es el que estoy preguntando
-		if(esi -> id == poseedor -> id)
-			return 0;
-		else
-		{
-			bloquearESI(esi, clave);
-			return 1;
-		}
+		return esi -> id == poseedor -> id;
 	}
-	else
-	{
-		//Le da la clave al ESI
-		dictionary_put(tablaBloqueos, clave, esi);
-		return 0;
-	}
+	else return 1;
 }
 
 void bloquearESI(ESI* esi, char* clave)
@@ -55,6 +50,18 @@ void bloquearESI(ESI* esi, char* clave)
 	}
 }
 
+int claveTomada (char* clave)
+{
+	return dictionary_has_key(tablaBloqueos, clave);
+}
+
+int claveTomadaPorESI (char* clave, ESI* esi)
+{
+	if(dictionary_has_key(tablaBloqueos, clave))
+		return ((ESI*) dictionary_get(tablaBloqueos, clave) ) -> id == esi -> id;
+	else
+		return 0;
+}
 /*
  * La función tiene el riesgo que si se finaliza el ESI en ejecución
  * el puntero enEjecucion queda con un valor de memoria sin permisos.
@@ -70,12 +77,12 @@ void finalizarESI(ESI* esi)
 
 void liberarRecursosDeESI(ESI* esi)
 {
-	list_iterate(esi -> recursos, liberarRecurso);
+	list_iterate(esi -> recursos, liberarClave);
 }
 
-void liberarRecurso(void* clave)
+void liberarClave(char* clave)
 {
-	dictionary_remove(tablaBloqueos, (char*) clave);
+	dictionary_remove(tablaBloqueos, clave);
 	if(dictionary_has_key(colasBloqueados, clave))
 	{
 		t_list* colaDeClave = dictionary_get(colasBloqueados, clave);

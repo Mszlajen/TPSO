@@ -1,10 +1,8 @@
 #include "planificador.h"
 #include "configuracion.h"
-#include "adminESI.h"
 #include "colas.h"
 
 socket_t socketCoord = ERROR, socketServerESI = ERROR;
-unsigned long int instruccionesEjecutadas = 0;
 
 int terminarEjecucion = 0;
 /*
@@ -77,6 +75,7 @@ void ejecucionDeESI()
 		enviarEncabezado(enEjecucion -> socket, 7); //Enviar el aviso de ejecucion
 		consulta = recibirConsultaCoord();
 
+
 	}
 }
 
@@ -96,7 +95,7 @@ void escucharPorESI ()
 			error_show("Fallo en la conexion de ESI\n");
 			continue;
 		}
-		nuevaESI = crearESI(socketNuevaESI, obtenerEstimacionInicial(), instruccionesEjecutadas);
+		nuevaESI = crearESI(socketNuevaESI, obtenerEstimacionInicial());
 		if(!enviarIdESI(socketNuevaESI, nuevaESI -> id))
 			listarParaEjecucion(nuevaESI);
 		else
@@ -158,31 +157,58 @@ int enviarRespuestaConsultaCoord(socket_t coord, int respuesta)
 
 consultaCoord* recibirConsultaCoord()
 {
-	consultaCoord *consulta;
 	listen(socketCoord, 5);
+	consultaCoord *consulta = malloc(sizeof(consultaCoord));
+
 	header* encabezado;
 	recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado);
 	if(encabezado->protocolo != 9)
 		/*error*/;
 	free(encabezado);
-	id_t* esi_id;
-	recibirMensaje(socketCoord, sizeof(id_t), (void**) &esi_id);
-	int* tamInst;
-	recibirMensaje(socketCoord, sizeof(int), (void**) &tamInst);
-	t_esi_operacion *inst;
-	recibirMensaje(socketCoord, *tamInst, (void**) &inst);
-	consulta = malloc(sizeof(id_t) + *tamInst);
-	consulta -> esi_id = *esi_id;
-	consulta -> instruccion = *inst;
-	free(esi_id);
-	free(tamInst);
-	free(inst);
+
+	enum instruccion *instr;
+	recibirMensaje(socketCoord, sizeof(enum instruccion), (void**) &instr);
+	consulta -> instr = *instr;
+	free(instr);
+
+	uint8_t *tamClave;
+	recibirMensaje(socketCoord, sizeof(uint8_t), (void**) &tamClave);
+	consulta -> tamClave = *tamClave;
+	free(tamClave);
+
+	recibirMensaje(socketCoord, consulta -> tamClave, (void**) &consulta -> clave);
+
 	return consulta;
 }
 
-int procesarConsultaCoord(t_esi_operacion* consulta)
+int procesarConsultaCoord(ESI* ejecutando, consultaCoord* consulta)
 {
-	return 0;
+	switch(consulta -> instr)
+	{
+	case get:
+		if(claveTomada(consulta -> clave))
+		{
+			bloquearESI(ejecutando, consulta -> clave);
+			return 0;
+		}
+		else
+		{
+			reservarClave(ejecutando, consulta -> clave);
+			return 1;
+		}
+
+	case set:
+		return claveTomadaPorESI(consulta -> clave, ejecutando);
+
+	case store:
+		if(claveTomadaPorESI(consulta -> clave, ejecutando))
+		{
+			liberarClave(consulta -> clave);
+			return 1;
+		}
+		else
+			return 0;
+	}
 }
 void crearServerESI ()
 {

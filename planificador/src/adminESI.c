@@ -45,6 +45,11 @@ void actualizarArribo(ESI* esi)
 	esi -> arriboListos = instruccionesEjecutadas;
 }
 
+void agregarRecurso(ESI* esi, char* clave)
+{
+	list_add(esi -> recursos, clave);
+}
+
 void destruirESI(ESI* esi)
 {
 	close(esi -> socket);
