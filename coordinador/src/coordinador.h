@@ -12,14 +12,17 @@
 #include <commons/collections/list.h>
 
 typedef struct {
-	int socket;
+	socket_t socket;
 	int idinstancia;
-	char * nombre;
+	char nombre[10];
 } Instancia;
 
 typedef struct {
-	int socket;
-	pthread_t hiloEsi;
+	socket_t socket;
+	enum instruccion instr;
+	void* clave;
+	void* valor;
+	// como estan definidos los resultados de ejecucion?
 } Esi;
 
 #define IPEscucha "127.0.0.2"
@@ -27,15 +30,15 @@ typedef struct {
 #define Puerto "Puerto"
 
 void hiloDeInstancia();
-void esESIoInstancia (int socketAceptado,struct sockaddr_in dir);
-int esperarYaceptar(int socketCoordinador, int colaMax,struct sockaddr_in* dir);
-int validarPlanificador (int socket);
+void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir);
+int esperarYaceptar(socket_t socketCoordinador, int colaMax,struct sockaddr_in* dir);
+int validarPlanificador (socket_t socket);
 void liberarRecursos();
 void salirConError(char * error);
 void inicializacion();
-void atenderEsi(int socket);
-void registrarEsi(int socket);
-void registrarInstancia(int socket,int* mensaje);
+void atenderEsi(socket_t socket);
+void registrarEsi(socket_t socket);
+void registrarInstancia(socket_t socket);
 
 
 

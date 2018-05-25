@@ -12,69 +12,36 @@
 t_config * configuracion = NULL;
 t_list * listaInstancias = NULL;
 t_list * listaEsi = NULL;
-/*
- * Comentario:
- *
- * Si igual lo van a hacer primero de todo
- * (porque se hace en la inicialización),
- * tambien pueden dar el valor inicial en la
- * creación de la variable
- *
- * [MATI]
- */
+fd_set readfds;
+
+socket_t  socketCoordinador;
+
 int cantInstancias;
-/*
- * Pregunta:
- *
- * ¿Esta variable para que la usan?
- * Acuerdense que el ID de los ESI
- * lo genera el Planificador si es
- * para eso.
- *
- * [MATI]
- */
-int cantEsi;
 
 int main(void) {
 
 	inicializacion();
 
-	struct sockaddr_in dirPlanificador,dirAceptado;
-	int socketPlanificador, socketAceptado,socketCoordinador;
-	int esPlanificador = 1;
+	struct sockaddr_in dirPlanificador;
+	socket_t socketPlanificador;
+	int esPlanificador;
 
 	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
 
-	/*
-	 * Si entiendo correctamente, este while se repite
-	 * hasta que se conecte el planificador, descartando
-	 * las conexiones que se puedan hacer antes.
-	 * Honestamente, no es la implementación que pense
-	 * para esto pero no está mal así que la pueden usar
-	 * si quieren pero con aclaraciones:
-	 * 1- Asegurar que se ejecute una iteración y despues
-	 * empezar a preguntar por la condición es exactamente
-	 * lo que hace do-while
-	 * 2-Por más que las conexiones anteriores no interesen
-	 * si llegamos a validar es que se creo un socket y por
-	 * lo tanto hay que cerrarlo en algún momento.
-	 * 2.2-Con 'en algún momento' me refiero a apenas saben
-	 * que no les sirve, en este caso.
-	 *
-	 * [MATI]
-	 */
-	while (esPlanificador) {
+	 do {
 		socketPlanificador = esperarYaceptar(socketCoordinador, 2 ,&dirPlanificador);
 		esPlanificador = validarPlanificador(socketPlanificador );
-	}
+	} while (esPlanificador);
 
 
+	 pthread_t hiloRecibeConexiones;
+	 //pthread_create(&hiloRecibeConexiones, NULL, (void*) recibirConexiones, NULL);
 
-	while (1)
-	{
-		socketAceptado = esperarYaceptar(socketCoordinador, 20 ,&dirAceptado);
-		esESIoInstancia(socketAceptado,dirAceptado);
-	}
+	 FD_ZERO(&readfds);
+
+	 pthread_t hiloEscuchaPorAcciones;
+	 //pthread_create(&hiloEscuchaPorAcciones, NULL, (void*) escucharPorAcciones, NULL);
+
 	//close(socketCoordinador);
 	exit(0);
 	/*
@@ -91,10 +58,51 @@ int main(void) {
 }
 
 
-void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
+
+void escucharPorAcciones () {
+
+	struct timeval tv;
+
+	tv.tv_sec = 2;
+	tv.tv_usec = 500000;
+	int ultimosock;
+	// debo inicializar ultimosock, con el socket de mayor valor (valor como int) que esta en la lista de Esi->socket, no se como hacerlo... xD
+
+	//list_iterate(&listaInstancias,setearReadfdsInstancia);
+	//list_iterate(&listaEsi,setearReadfdsEsi);
+
+	//como le mando la clausura al list iterate?
+
+	select(ultimosock,&readfds,NULL,NULL,&tv);
+	// debo revisar si los socket que quedaron en readfds son eso o instancia, si son instancia reviso si quieren compactar o si ya terminaron,
+	// si son esi reviso si me envian comandos
+
+}
+
+void setearReadfdsInstancia (Instancia instancia){
+	FD_SET(instancia.socket,&readfds);
+}
+
+void setearReadfdsEsi (Esi esi){
+	FD_SET(esi.socket,&readfds);
+}
+
+void recibirConexiones() {
+
+	socket_t socketAceptado;
+	struct sockaddr_in dirAceptado;
+
+	while (1)
+		{
+			socketAceptado = esperarYaceptar(socketCoordinador, 20 ,&dirAceptado);
+			esESIoInstancia(socketAceptado,dirAceptado);
+		}
+}
+
+void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 {
 
-	int* mensaje;
+	header* header = malloc(sizeof(header));
 	/*
 	 * El warning ya les dice que le están pasando un int**
 	 * cuando espera un void** así que por lo menos les falta
@@ -104,17 +112,20 @@ void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 	 *
 	 * [MATI]
 	 */
-	int estadoDellegada = recibirMensaje(socketAceptado,4,&mensaje);
+	int estadoDellegadaHeader = recibirMensaje(socketAceptado,1,(void *) header->protocolo);
 
-	switch(mensaje[0]){
+	switch(header->protocolo){
 
 	case 2:
-		registrarInstancia(socketAceptado,mensaje);
+		// hay que crear un modulo que revise si la instancia esta registrada o no y atienda respecto de este dato
+		// si no esta registrada, se registra, si lo esta y me habla es o por que termino de ejecutar o por que necesita compactar
+		free(header);
+		registrarInstancia(socketAceptado);
 		break;
 
 	case 3:
-
-		// aca ira la accion a realizarse en el caso de ser una ESI
+		free(header);
+		registrarEsi(socketAceptado);
 		break;
 
 	default:
@@ -134,35 +145,22 @@ void esESIoInstancia (int socketAceptado,struct sockaddr_in dir)
 	}
 }
 
-void atenderEsi(int socket){
 
-}
-
-void registrarEsi(int socket){
+void registrarEsi(socket_t socket){
 
 	Esi nuevaEsi;
 	nuevaEsi.socket = socket;
-	/*
-	 * ¿Cuál es el punto de asignar el valor de una
-	 * variable con basura a otra que tambien tiene basura?
-	 *
-	 * [MATI]
-	 */
-	pthread_t hiloEsi;
-	nuevaEsi.socket = socket;
-	nuevaEsi.hiloEsi = hiloEsi;
 
 	if (listaEsi == NULL)
 		{
 			listaEsi = list_create();
+			list_add(listaEsi,&nuevaEsi);
 		}
 	else
 		{
-			cantEsi = list_add(listaEsi,&nuevaEsi);
+			list_add(listaEsi,&nuevaEsi);
 		}
 	/*
-	 * El cuarto parametro de pthread_create es void*
-	 * así que falta el casteo.
 	 *
 	 * [MATI]
 	 *
@@ -171,29 +169,30 @@ void registrarEsi(int socket){
 	 * de resolverlo que crear un hilo por ESI.
 	 * https://github.com/sisoputnfrba/foro/issues/1012
 	 */
-	pthread_create(&nuevaEsi.hiloEsi, NULL, (void*) atenderEsi, socket);
 }
 
-void registrarInstancia(int socket,int* mensaje)
+void registrarInstancia(socket_t socket)
 {
-
+	int tamMensj;
+	int estadoDellegada;
 	Instancia instanciaRecibida;
-	instanciaRecibida.socket = socket;
-	/*
-	 * El warning en si les dice que le pasan
-	 * un puntero de puntero en lugar de un int
-	 * en el tercer parametro. Ahora:
-	 * Entiendo que intentan copiar el nombre
-	 * de la instancia en el struct que almacena
-	 * la información pero instanciaRecibida.nombre
-	 * es un puntero que va a apuntar a un espacio
-	 * de memoria (porque a este punto no lo hace
-	 * todavia). Revisen bien esto.
-	 *
-	 * [MATI]
-	 */
-	memcpy(&instanciaRecibida.nombre,(&mensaje) + 5,(&mensaje)+1);
+
+	do {
+		estadoDellegada = recibirMensaje(socket,4,(void *) &tamMensj );
+	} while (estadoDellegada);
+
+	char * nombre = malloc(tamMensj);
+
+
+	do {
+			estadoDellegada = recibirMensaje(socket,tamMensj,(void *) nombre );
+		} while (estadoDellegada);
+
+	strcpy(instanciaRecibida.nombre , nombre);
 	instanciaRecibida.idinstancia = cantInstancias;
+	instanciaRecibida.socket = socket;
+
+	free(nombre);
 
 	if (listaInstancias == NULL)
 		{
@@ -204,62 +203,32 @@ void registrarInstancia(int socket,int* mensaje)
 		{
 			cantInstancias = list_add(listaInstancias,&instanciaRecibida);
 		}
-	/*
-	 * Esto ya lo mencione en otro comentario pero
-	 * lo repito más claro:
-	 * 		Está mal usar un tipo de dato (por más
-	 * 		que sea el mismo) cuando hay otro definido
-	 * 		en la biblioteca compartida.
-	 *
-	 * [MATI]
-	 */
-	uint8_t protocolo = 5;
-	int copiar;
-	int * buffer = malloc(13);
 
-	/*
-	 * Relacionado al anterior.
-	 * Muchos tamaños hardcodeados.
-	 * ¿Qué pasa si en un momento nos damos
-	 * cuenta de un byte no alcanza y usamos
-	 * otro tipo de dato?
-	 *
-	 * [MATI]
-	 */
-	memcpy(buffer,&protocolo,1);
+	header header;
+	header.protocolo = 5;
+	int cantEntradas = config_get_int_value(configuracion, "CantEntradas");
+	int tamEntradas = config_get_int_value(configuracion, "TamEntradas");
+	int * buffer = malloc(sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
 
-	copiar = instanciaRecibida.idinstancia;
-	memcpy(buffer+1,&copiar,4);
 
-	copiar = config_get_int_value(configuracion, "CantEntradas");
-	memcpy(buffer+5,&copiar,4);
+	memcpy(buffer , &header.protocolo , sizeof(header) );
+	memcpy(buffer+sizeof(header) , &instanciaRecibida.idinstancia , sizeof(int) );
+	memcpy(buffer+sizeof(int) , &cantEntradas , sizeof(cantEntradas) );
+	memcpy(buffer+sizeof(cantEntradas) , &tamEntradas , sizeof(tamEntradas) );
 
-	copiar = config_get_int_value(configuracion, "TamEntradas");
-	memcpy(buffer+9,&copiar,4);
+	int estado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
 
-	int estado = enviarBuffer (instanciaRecibida.socket, buffer, 13);
 
-	/*
-	 * Tenemos en la commons una función hecha para imprimir errores,
-	 * si no la quieren usar alguna vez porque la alternativa es más
-	 * facil (como acá que hay que imprimir el nombre), está bien
-	 * pero usen el mismo formato.
-	 *
-	 * [MATI]
-	 */
-	if (estado != 0) {printf ("no se pudo enviar informacion de entradas a la instancia %s",instanciaRecibida.nombre ); }
+	if (estado != 0)
+	{
+		error_show ("no se pudo enviar informacion de entradas a la instancia %s",instanciaRecibida.nombre );
+	}
+
+	free(buffer);
 }
 
-/*
- * Más de lo mismo:
- * Es verdad que lo sockets son datos
- * de tipo int pero para ayudar a evitar
- * errores humanos tenemos definido el
- * tipo socket_t
- *
- * [MATI]
- */
-int esperarYaceptar(int socketCoordinador, int colaMax,struct sockaddr_in* dir)
+
+int esperarYaceptar(socket_t socketCoordinador, int colaMax,struct sockaddr_in* dir)
 {
 	unsigned int tam;
 	listen(socketCoordinador , colaMax);
@@ -267,38 +236,28 @@ int esperarYaceptar(int socketCoordinador, int colaMax,struct sockaddr_in* dir)
 	return socket;
 	}
 
-int validarPlanificador (int socket) {
+int validarPlanificador (socket_t socket) {
 	header* handshake = NULL;
 	int estadoDellegada;
 	uint8_t correcto = 1;
-	/*
-	 * Lo mismo que puse en el recibirMensaje anterior
-	 * sobre el tercer parametro.
-	 * En este caso el unico puede que hacer un casteo
-	 * de void** lo arregle y deje todo funcionando y
-	 * lindo.
-	 *
-	 * [MATI]
-	 */
-	estadoDellegada = recibirMensaje(socket,sizeof(header),&handshake);
-	/*
-	 * Primer if:
-	 * 		1- El formato if(condicion)intrucciones funciona cuando
-	 * 		es algo chico (if(v > 0) v++; por ejemplo) sino complica
-	 * 		la lectura.
-	 * 		2- Vease lo que escribi más arriba de la función para
-	 * 		imprimir errores.
-	 * Segundo if:
-	 * 		No está "mal" pero si su idea era acortar espacio/comprimir
-	 * 		podian no usar las llaves o mucho mejor, sacar el if y hacer
-	 * 		return del operador ternario (?:)
-	 *
-	 * [MATI]
-	 */
-	if (estadoDellegada != 0){ printf ("no se pudo recibir header de planificador."); return 1; }
-	if (handshake->protocolo != correcto){ return 1; } else {return 0;}
-}
 
+	estadoDellegada = recibirMensaje(socket,sizeof(header),&handshake);
+	if (estadoDellegada != 0)
+	{
+		error_show ("no se pudo recibir header de planificador.");
+		return 1;
+	}
+
+	if (handshake->protocolo != correcto)
+	{
+		close(socket);
+		return 1;
+	}
+	else
+	{
+		return 0;
+	}
+}
 
 void liberarRecursos()
 {
