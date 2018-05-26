@@ -57,6 +57,7 @@
 						<tool command="gcc" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" id="cdt.managedbuild.tool.gnu.c.compiler.exe.debug.258976802.1558727825" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.exe.debug.258976802">
 							<option id="gnu.c.compiler.option.include.paths.68706907" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
 								<listOptionValue builtIn="false" value="&quot;${workspace_loc:/biblioCompartida}&quot;"/>
+								<listOptionValue builtIn="false" value="pthread"/>
 							</option>
 							<option id="gnu.c.compiler.option.include.files.1822707832" name="Include files (-include)" superClass="gnu.c.compiler.option.include.files" useByScannerDiscovery="false"/>
 							<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.646889773" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
