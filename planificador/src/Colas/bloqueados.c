@@ -30,7 +30,7 @@ int ESITieneClave(ESI* esi, char* clave)
 	else return 1;
 }
 
-void bloquearESI(ESI* esi, char* clave)
+void colocarEnColaESI(ESI* esi, char* clave)
 {
 	if(dictionary_has_key(colasBloqueados, clave))
 		list_add((t_list*) dictionary_get(colasBloqueados, clave), esi);

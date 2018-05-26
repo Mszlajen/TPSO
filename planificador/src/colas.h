@@ -9,6 +9,7 @@
 
 void liberarRecursosDeESI(ESI*);
 void finalizarESI(ESI*);
+void bloquearESI(ESI*, char*);
 
 
 #endif /* COLAS_H_ */

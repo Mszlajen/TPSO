@@ -6,7 +6,6 @@
 #include <commons/collections/list.h>
 #include <biblio.h>
 #include "../adminESI.h"
-#include "ready.h"
 
 int ESIEstaBloqueadoPorClave(ESI*, char*);
 //Devuelve true si la tiene
@@ -20,5 +19,5 @@ ESI* liberarClave(char*);
 void crearColasBloqueados();
 void cerrarColasBloqueados();
 int ESIEstaEnLista(ESI*, t_list*);
-void bloquearESI(ESI*, char*);
+void colocarEnColaESI(ESI*, char*);
 #endif /* COLAS_BLOQUEADOS_H_ */

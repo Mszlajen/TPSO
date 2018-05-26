@@ -18,3 +18,9 @@ void liberarRecursosDeESI(ESI* esi)
 		 list_remove(esi->recursos, 0);
 	}
 }
+
+void bloquearESI(ESI* esi, char* clave)
+{
+	colocarEnColaESI(esi, clave);
+	quitarESIEjecutando(esi);
+}
