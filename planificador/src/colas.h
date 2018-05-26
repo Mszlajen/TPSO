@@ -6,7 +6,8 @@
 #include "Colas/finalizados.h"
 #include "Colas/ready.h"
 
-
+void inicializarColas();
+void cerrarColas();
 void liberarRecursosDeESI(ESI*);
 void finalizarESI(ESI*);
 void bloquearESI(ESI*, char*);

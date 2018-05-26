@@ -1,5 +1,19 @@
 #include "colas.h"
 
+void inicializarColas()
+{
+	crearColasBloqueados();
+	crearListaFinalizados();
+	crearListaReady();
+}
+
+void cerrarColas()
+{
+	cerrarColasBloqueados();
+	cerrarListaFinalizados();
+	cerrarListaReady();
+}
+
 void finalizarESI(ESI* esi)
 {
 	liberarRecursosDeESI(esi);

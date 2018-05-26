@@ -48,6 +48,7 @@ void crearListaReady()
 {
 	if(!listos)
 		listos = list_create();
+
 }
 
 void cerrarListaReady()
