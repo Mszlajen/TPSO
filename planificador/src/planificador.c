@@ -5,14 +5,6 @@
 socket_t socketCoord = ERROR, socketServerESI = ERROR;
 
 int enPausa = 0;
-/*
- * terminar ejecucion es una variable de Debuggeo
- * que se usa para terminar la ejecucion del planificador
- * dandole valor 1, sin embargo, actualmente es posible
- * que se necesite conectar un ESI antes de que finalice
- * realmente la ejecucion.
- */
-
 
 int main(void) {
 	inicializacion();
@@ -36,17 +28,27 @@ int main(void) {
 
 void terminal()
 {
+	char *linea, **palabras;
 	while(1)
 	{
-		char * linea = readline("Comando:");
+		linea = readline("Comando:");
 		//Aca va a ir el procesamiento para ver si es una instrucción
 		//y su procesamiento correspondiente
-		switch(convertirComando(linea))
+		palabras = string_split(linea, " ");
+		switch(convertirComando(palabras[0]))
 		{
+		case pausar:
+			enPausa = 1;
+			break;
+		case continuar:
+			enPausa = 0;
+			break;
+
 		default:
 			system(linea);
 		}
 		free(linea);
+		string_iterate_lines(palabras, free);
 	}
 }
 
@@ -78,7 +80,7 @@ void ejecucionDeESI()
 		resultadoConsulta = procesarConsultaCoord(enEjecucion, consulta);
 		enviarRespuestaConsultaCoord(socketCoord, resultadoConsulta);
 
-		mensRecibido = recibirMensaje(enEjecucion -> socket, sizeof(resultado_t), resultadoEjecucion);
+		mensRecibido = recibirMensaje(enEjecucion -> socket, sizeof(resultado_t), (void**) &resultadoEjecucion);
 		if(!mensRecibido || !(*resultadoEjecucion))
 			finalizarESI(enEjecucion);
 		else
@@ -117,8 +119,8 @@ void escucharPorESI ()
 void inicializacion ()
 {
 	if(crearConfiguracion())
-		salirConError("Fallo al leer el archivo de configuracion del planificador\n");
-	crearListaReady();
+		salirConError("Fallo al leer el archivo de configuracion del planificador.\n");
+	inicializarColas();
 
 }
 
@@ -274,12 +276,17 @@ pthread_t crearHiloEjecucion()
 
 enum comandos convertirComando(char* linea)
 {
-	/*
-	 * Para hacer despues.
-	 * (Basicamente una secuencia de if)
-	 */
-	if(string_equals_ignore_case(linea, "salir"))
-		return salir;
+	if(string_equals_ignore_case(linea, "pausar"))
+		return pausar;
+	else if(string_equals_ignore_case(linea, "continuar"))
+		return continuar;
+	else if(string_equals_ignore_case(linea, "bloquear"))
+		return bloquear;
+	else if(string_equals_ignore_case(linea, "desbloquear"))
+		return desbloquear;
+	else if(string_equals_ignore_case(linea, "listar"))
+		return desbloquear;
+
 	return -1;
 }
 
@@ -287,7 +294,7 @@ void liberarRecursos()
 {
 	eliminarConfiguracion();
 
-	cerrarListaReady();
+	cerrarColas();
 
 	cerrarSocket(socketCoord);
 	cerrarSocket(socketServerESI);

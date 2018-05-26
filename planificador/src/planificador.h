@@ -22,7 +22,7 @@ typedef struct {
 
 typedef uint8_t resultado_t;
 
-enum comandos {pausa, bloquear, desbloquear, listar, kill, status, deadlock, salir};
+enum comandos {pausar, continuar, bloquear, desbloquear, listar, kill, status, deadlock, salir};
 
 void inicializacion();
 void conectarConCoordinador();
