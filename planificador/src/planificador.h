@@ -20,13 +20,15 @@ typedef struct {
 	char* clave;
 } consultaCoord;
 
+typedef uint8_t resultado_t;
+
 enum comandos {pausa, bloquear, desbloquear, listar, kill, status, deadlock, salir};
 
 void inicializacion();
 void conectarConCoordinador();
 int enviarEncabezado(socket_t, int);
 int enviarIdESI(socket_t, int);
-int enviarRespuestaConsultaCoord(socket_t, int);
+int enviarRespuestaConsultaCoord(socket_t, uint8_t);
 consultaCoord* recibirConsultaCoord();
 void crearServerESI();
 int procesarConsultaCoord(ESI*, consultaCoord*);

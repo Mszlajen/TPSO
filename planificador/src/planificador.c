@@ -4,7 +4,7 @@
 
 socket_t socketCoord = ERROR, socketServerESI = ERROR;
 
-int terminarEjecucion = 0;
+int enPausa = 0;
 /*
  * terminar ejecucion es una variable de Debuggeo
  * que se usa para terminar la ejecucion del planificador
@@ -36,16 +36,13 @@ int main(void) {
 
 void terminal()
 {
-	while(!terminarEjecucion)
+	while(1)
 	{
 		char * linea = readline("Comando:");
 		//Aca va a ir el procesamiento para ver si es una instrucción
 		//y su procesamiento correspondiente
 		switch(convertirComando(linea))
 		{
-		case salir:
-			terminarEjecucion = 1;
-			break ;
 		default:
 			system(linea);
 		}
@@ -57,7 +54,9 @@ void ejecucionDeESI()
 {
 	ESI* enEjecucion;
 	consultaCoord * consulta = NULL;
-	while(!terminarEjecucion)
+	resultado_t resultadoConsulta, *resultadoEjecucion = NULL;
+	int8_t mensRecibido;
+	while(!enPausa)
 	{
 		do
 		{
@@ -70,12 +69,21 @@ void ejecucionDeESI()
 		if(seDesconectoSocket(socketCoord))
 		{
 			//Avisar a los ESI que tienen que morirse.
-			salirConError("Se cerro el coordinador.");
+			salirConError("Se desconecto el coordinador.");
 		}
+
 		enviarEncabezado(enEjecucion -> socket, 7); //Enviar el aviso de ejecucion
+
 		consulta = recibirConsultaCoord();
+		resultadoConsulta = procesarConsultaCoord(enEjecucion, consulta);
+		enviarRespuestaConsultaCoord(socketCoord, resultadoConsulta);
 
-
+		mensRecibido = recibirMensaje(enEjecucion -> socket, sizeof(resultado_t), resultadoEjecucion);
+		if(!mensRecibido || !(*resultadoEjecucion))
+			finalizarESI(enEjecucion);
+		else
+			ejecutarInstruccion(enEjecucion);
+		free(resultadoEjecucion);
 	}
 }
 
@@ -85,7 +93,7 @@ void escucharPorESI ()
 	struct sockaddr_storage infoDirr;
 	socklen_t size_infoDirr = sizeof(struct sockaddr_storage);
 	ESI* nuevaESI;
-	while(!terminarEjecucion)
+	while(1)
 	{
 		socketNuevaESI = ERROR;
 		listen(socketServerESI, 5);
@@ -145,7 +153,7 @@ int enviarIdESI(socket_t sock, ESI_id id)
 	return resultado;
 }
 
-int enviarRespuestaConsultaCoord(socket_t coord, int respuesta)
+int enviarRespuestaConsultaCoord(socket_t coord, uint8_t respuesta)
 {
 	header encabezado;
 	encabezado.protocolo = 10;
@@ -183,33 +191,53 @@ consultaCoord* recibirConsultaCoord()
 
 int procesarConsultaCoord(ESI* ejecutando, consultaCoord* consulta)
 {
+	int resultado;
 	switch(consulta -> instr)
 	{
 	case get:
+		/*
+		 * Si un ESI pide una clave que ya tiene tomada
+		 * hace un deadlock consigo mismo.
+		 */
 		if(claveTomada(consulta -> clave))
 		{
 			bloquearESI(ejecutando, consulta -> clave);
-			return 0;
+			resultado = 0;
 		}
 		else
 		{
 			reservarClave(ejecutando, consulta -> clave);
-			return 1;
+			resultado = 1;
 		}
+		break;
 
 	case set:
-		return claveTomadaPorESI(consulta -> clave, ejecutando);
+		if(claveTomadaPorESI(consulta -> clave, ejecutando))
+		{
+			resultado = 1;
+		}
+		else
+		{
+			resultado = 0;
+		}
+		break;
 
 	case store:
 		if(claveTomadaPorESI(consulta -> clave, ejecutando))
 		{
 			liberarClave(consulta -> clave);
-			return 1;
+			resultado = 1;
 		}
 		else
-			return 0;
+		{
+			resultado = 0;
+		}
+		break;
 	}
+	free(consulta);
+	return resultado;
 }
+
 void crearServerESI ()
 {
 	char * puerto = obtenerPuerto();
