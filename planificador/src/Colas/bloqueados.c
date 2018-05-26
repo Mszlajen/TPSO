@@ -58,6 +58,12 @@ int claveTomadaPorESI (char* clave, ESI* esi)
 ESI* liberarClave(char* clave)
 {
 	dictionary_remove(tablaBloqueos, clave);
+
+	return desbloquearESIDeClave(clave);
+}
+
+ESI* desbloquearESIDeClave(char* clave)
+{
 	ESI* desbloqueado = NULL;
 	if(dictionary_has_key(colasBloqueados, clave))
 	{
@@ -67,7 +73,6 @@ ESI* liberarClave(char* clave)
 	}
 	return desbloqueado;
 }
-
 void crearColasBloqueados()
 {
 	if(!colasBloqueados)

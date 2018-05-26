@@ -44,6 +44,8 @@ void terminal();
 void escucharPorESI ();
 void ejecucionDeESI ();
 
+void comandoBloquear(char**);
+void comandoDesbloquear(char**);
 
 
 #endif /* PLANIFICADOR_H_ */

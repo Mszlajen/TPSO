@@ -16,6 +16,7 @@ int claveTomada (char*);
 int claveTomadaPorESI (char*, ESI*);
 void reservarClave(ESI*, char*);
 ESI* liberarClave(char*);
+ESI* desbloquearESIDeClave(char*);
 void crearColasBloqueados();
 void cerrarColasBloqueados();
 int ESIEstaEnLista(ESI*, t_list*);

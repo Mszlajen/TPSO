@@ -44,25 +44,18 @@ void terminal()
 			enPausa = 0;
 			break;
 		case bloquear:
-			id_t IDparaBloquear = atoi(palabras[2]);
-			ESI* ESIParaBloquear = NULL;
-			if(!IDparaBloquear)
-			{
-				show_error("El parametro ID no es valido.\n");
-				break;
-			}
-			if(!(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
-			{
-				show_error("El ESI no se encuentra en un estado bloqueable o no existe.\n");
-				break;
-			}
-			bloquearESI(ESIParaBloquear);
+			comandoBloquear(palabras);
+			break;
+		case desbloquear:
+			comandoDesbloquear(palabras);
+			break;
+		case listar:
 			break;
 		default:
 			system(linea);
 		}
 		free(linea);
-		string_iterate_lines(palabras, free);
+		string_iterate_lines(palabras, free );
 	}
 }
 
@@ -128,6 +121,34 @@ void escucharPorESI ()
 			error_show("Fallo en la conexion de ESI\n");
 		}
 	}
+}
+
+void comandoBloquear(char** palabras)
+{
+	id_t IDparaBloquear = atoi(palabras[2]);
+	ESI* ESIParaBloquear = NULL;
+	if(!IDparaBloquear)
+	{
+		error_show("El parametro ID no es valido.\n");
+		return;
+	}
+	if(!(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
+	{
+		error_show("El ESI no se encuentra en un estado bloqueable o no existe.\n");
+		return;
+	}
+	bloquearESI(ESIParaBloquear, palabras[1]);
+}
+
+void comandoDesbloquear(char** palabras)
+{
+	ESI* ESIDesbloqueado = desbloquearESIDeClave(palabras[1]);
+	if(!ESIDesbloqueado)
+	{
+		error_show("No hay ESI bloqueados para esa clave.\n");
+		return;
+	}
+	listarParaEjecucion(ESIDesbloqueado);
 }
 
 void inicializacion ()
@@ -299,9 +320,9 @@ enum comandos convertirComando(char* linea)
 	else if(string_equals_ignore_case(linea, "desbloquear"))
 		return desbloquear;
 	else if(string_equals_ignore_case(linea, "listar"))
-		return desbloquear;
-
-	return -1;
+		return listar;
+	else
+		return -1;
 }
 
 void liberarRecursos()
