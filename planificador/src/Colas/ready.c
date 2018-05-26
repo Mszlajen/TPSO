@@ -10,13 +10,19 @@ void listarParaEjecucion (ESI* nuevaESI)
 
 ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo algoritmo)
 {
+	resultadoAlgoritmo res;
 	switch(algoritmo)
 	{
 	case sjf:
 		if(enEjecucion)
 			return enEjecucion;
 		else
-			return encontrarPorSJF();
+		{
+			res = encontrarPorSJF();
+			list_remove(listos, res.indice);
+			enEjecucion = res.paraEjecutar;
+			return res.paraEjecutar;
+		}
 	case srt:
 	case hrrn:
 	default: //Devuelve siempre FCFS
@@ -26,16 +32,36 @@ ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo algoritmo)
 	}
 }
 
-ESI* encontrarPorSJF()
+int ESIEnReady(ESI_id idESI)
 {
-	ESI* proximoAEjecutar = list_get(listos, 0);
+	int esESIporId(void* esi)
+		{
+			return ((ESI*) esi) -> id == idESI;
+		}
+	int resultado = 0;
+
+	if(enEjecucion)
+		resultado = esESIporId(enEjecucion);
+	if(!resultado)
+		resultado = list_any_satisfy(listos, esESIporId);
+	return resultado;
+}
+
+resultadoAlgoritmo encontrarPorSJF()
+{
+	resultadoAlgoritmo res;
+	res.paraEjecutar = list_get(listos, 0);
+	res.indice = 0;
 	void compararESI(void* esi)
 	{
-		if(((ESI*) esi) -> estimacion < proximoAEjecutar -> estimacion)
-			proximoAEjecutar = (ESI*) esi;
+		if(((ESI*) esi) -> estimacion < res.paraEjecutar -> estimacion)
+		{
+			res.paraEjecutar = (ESI*) esi;
+			res.indice++;
+		}
 	}
 	list_iterate(listos, compararESI);
-	return proximoAEjecutar;
+	return res;
 }
 
 void quitarESIEjecutando(ESI* esi)
@@ -56,5 +82,3 @@ void cerrarListaReady()
 	if(listos)
 		list_destroy(listos);
 }
-
-
