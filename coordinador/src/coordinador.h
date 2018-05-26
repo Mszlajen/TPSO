@@ -53,6 +53,12 @@ void inicializacion();
 void atenderEsi(socket_t socket);
 void registrarEsi(socket_t socket);
 void registrarInstancia(socket_t socket);
+void escucharPorAcciones ();
+void setearReadfdsInstancia (Instancia instancia);
+void setearReadfdsEsi (Esi esi);
+void recibirConexiones();
+
+
 
 
 

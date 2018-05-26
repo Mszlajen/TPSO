@@ -157,6 +157,7 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 		 *
 		 * [MATI]
 		 */
+
 		free(header);
 		registrarInstancia(socketAceptado);
 		break;
