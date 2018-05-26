@@ -50,12 +50,13 @@ void terminal()
 			comandoDesbloquear(palabras);
 			break;
 		case listar:
+			comandoListar(palabras);
 			break;
 		default:
 			system(linea);
 		}
 		free(linea);
-		string_iterate_lines(palabras, free );
+		string_iterate_lines(palabras, free);
 	}
 }
 
@@ -129,12 +130,12 @@ void comandoBloquear(char** palabras)
 	ESI* ESIParaBloquear = NULL;
 	if(!IDparaBloquear)
 	{
-		error_show("El parametro ID no es valido.\n");
+		printf("El parametro ID no es valido.\n");
 		return;
 	}
 	if(!(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
 	{
-		error_show("El ESI no se encuentra en un estado bloqueable o no existe.\n");
+		printf("El ESI no se encuentra en un estado bloqueable o no existe.\n");
 		return;
 	}
 	bloquearESI(ESIParaBloquear, palabras[1]);
@@ -145,10 +146,26 @@ void comandoDesbloquear(char** palabras)
 	ESI* ESIDesbloqueado = desbloquearESIDeClave(palabras[1]);
 	if(!ESIDesbloqueado)
 	{
-		error_show("No hay ESI bloqueados para esa clave.\n");
+		printf("No hay ESI bloqueados para esa clave.\n");
 		return;
 	}
 	listarParaEjecucion(ESIDesbloqueado);
+}
+
+void comandoListar(char** palabras)
+{
+	void imprimirID(void* id)
+	{
+		printf("%i", * (int*) id);
+	}
+	t_list* listaDeID = listarID(palabras[1]);
+	if(!listaDeID)
+	{
+		printf("No hay ESI bloqueados con esa clave.\n");
+		return;
+	}
+	list_iterate(listaDeID, imprimirID);
+	list_destroy_and_destroy_elements(listaDeID, free);
 }
 
 void inicializacion ()

@@ -21,4 +21,5 @@ void crearColasBloqueados();
 void cerrarColasBloqueados();
 int ESIEstaEnLista(ESI*, t_list*);
 void colocarEnColaESI(ESI*, char*);
+t_list* listarID(char*);
 #endif /* COLAS_BLOQUEADOS_H_ */

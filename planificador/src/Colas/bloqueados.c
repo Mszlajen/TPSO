@@ -73,6 +73,23 @@ ESI* desbloquearESIDeClave(char* clave)
 	}
 	return desbloqueado;
 }
+
+t_list* listarID(char *clave)
+{
+	void* convertirESIaID(void* esi)
+	{
+		ESI_id *id = malloc(sizeof(ESI_id));
+		*id = ((ESI*) esi) -> id;
+		return (void*) id;
+	}
+	t_list* listaDeID = NULL;
+	if(!dictionary_has_key(colasBloqueados, clave))
+		return listaDeID;
+	listaDeID = list_map(dictionary_get(colasBloqueados, clave), convertirESIaID);
+	return listaDeID;
+
+}
+
 void crearColasBloqueados()
 {
 	if(!colasBloqueados)

@@ -46,6 +46,7 @@ void ejecucionDeESI ();
 
 void comandoBloquear(char**);
 void comandoDesbloquear(char**);
+void comandoListar(char**);
 
 
 #endif /* PLANIFICADOR_H_ */
