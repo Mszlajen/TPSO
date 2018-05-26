@@ -43,7 +43,21 @@ void terminal()
 		case continuar:
 			enPausa = 0;
 			break;
-
+		case bloquear:
+			id_t IDparaBloquear = atoi(palabras[2]);
+			ESI* ESIParaBloquear = NULL;
+			if(!IDparaBloquear)
+			{
+				show_error("El parametro ID no es valido.\n");
+				break;
+			}
+			if(!(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
+			{
+				show_error("El ESI no se encuentra en un estado bloqueable o no existe.\n");
+				break;
+			}
+			bloquearESI(ESIParaBloquear);
+			break;
 		default:
 			system(linea);
 		}

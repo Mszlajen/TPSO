@@ -18,7 +18,7 @@ void listarParaEjecucion(ESI*);
 resultadoAlgoritmo encontrarPorSJF();
 //Si el parametro está ejecutando, lo remueve del controlador de Ready
 void quitarESIEjecutando(ESI*);
-int ESIEnReady(ESI_id);
+ESI* ESIEnReady(ESI_id);
 
 void crearListaReady();
 void cerrarListaReady();

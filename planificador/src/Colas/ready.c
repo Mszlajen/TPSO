@@ -32,18 +32,18 @@ ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo algoritmo)
 	}
 }
 
-int ESIEnReady(ESI_id idESI)
+ESI* ESIEnReady(ESI_id idESI)
 {
 	int esESIporId(void* esi)
 		{
 			return ((ESI*) esi) -> id == idESI;
 		}
-	int resultado = 0;
+	ESI* resultado = NULL;
 
-	if(enEjecucion)
-		resultado = esESIporId(enEjecucion);
+	if(enEjecucion && esESIporId(enEjecucion))
+		resultado = enEjecucion;
 	if(!resultado)
-		resultado = list_any_satisfy(listos, esESIporId);
+		resultado = list_find(listos, esESIporId);
 	return resultado;
 }
 

@@ -7,7 +7,7 @@ id_t ESItotales = 0;
 ESI* crearESI (socket_t sock, int estimacionInicial)
 {
 	ESI* unaESI = malloc (sizeof(ESI));
-	unaESI -> id = ESItotales;
+	unaESI -> id = ESItotales + 1;
 	ESItotales++;
 	unaESI -> estimacion = estimacionInicial;
 	unaESI -> ultimaEstimacion = estimacionInicial;
