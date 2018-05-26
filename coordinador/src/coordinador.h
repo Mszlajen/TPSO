@@ -14,15 +14,29 @@
 typedef struct {
 	socket_t socket;
 	int idinstancia;
+	/*El nombre sigue definido en diez caracteres
+	 * maximo cuando no tiene limite limite definido
+	 * [MATI]
+	 */
 	char nombre[10];
 } Instancia;
 
 typedef struct {
 	socket_t socket;
 	enum instruccion instr;
+	/*
+	 * La clave y el valor son cadenas de caracteres,
+	 * usar void* te lo va a complicar a la larga.
+	 * [MATI]
+	 */
 	void* clave;
 	void* valor;
 	// como estan definidos los resultados de ejecucion?
+	/*
+	 * No lo definimos, lo pueden proponer ustedes y lo
+	 * anotan en el archivo de protocolo.
+	 * [MATI]
+	 */
 } Esi;
 
 #define IPEscucha "127.0.0.2"
