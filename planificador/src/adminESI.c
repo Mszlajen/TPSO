@@ -50,9 +50,20 @@ void agregarRecurso(ESI* esi, char* clave)
 	list_add(esi -> recursos, clave);
 }
 
+void borrarRecursosESI(ESI* esi)
+{
+	list_iterate(esi -> recursos, free);
+}
+
 void destruirESI(ESI* esi)
 {
 	close(esi -> socket);
 	list_destroy(esi -> recursos);
 	free(esi);
+}
+
+void removedorESI(ESI* esi, t_list* lista)
+{
+	list_iterate(lista, borrarRecursosESI);
+	destruirESI(esi);
 }

@@ -79,6 +79,15 @@ void crearListaReady()
 
 void cerrarListaReady()
 {
+	void removedorESIListos(void* esi)
+	{
+		removedorESI((ESI*) esi, listos);
+	}
+
 	if(listos)
-		list_destroy(listos);
+	{
+		list_destroy_and_destroy_elements(listos, removedorESIListos);
+		if(enEjecucion)
+			free(enEjecucion);
+	}
 }

@@ -18,6 +18,8 @@ ESI* crearESI (socket_t, int);
  * Antes de destruir hay que liberar sus recursos.
  */
 void destruirESI(ESI*);
+void borrarRecursosESI(ESI*);
+void removedorESI(ESI*, t_list* lista);
 
 void actualizarEstimacion(ESI*);
 void recalcularEstimacion(ESI*, int);

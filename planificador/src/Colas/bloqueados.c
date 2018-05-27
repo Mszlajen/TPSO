@@ -98,8 +98,24 @@ void crearColasBloqueados()
 
 void cerrarColasBloqueados()
 {
+	void removerBloqueados(void* lista)
+	{
+		list_iterate((t_list*) lista, borrarRecursosESI);
+		list_iterate((t_list*) lista, destruirESI);
+		list_destroy((t_list*) lista);
+	}
+
 	if(colasBloqueados)
-		dictionary_destroy(colasBloqueados);
+	{
+		dictionary_destroy_and_destroy_elements(colasBloqueados, removerBloqueados);
+		/*
+		 * No hace falta destruir los datos en la tabla
+		 * porque necesariamente tienen que estar en la
+		 * cola de Ready o en una cola de Bloqueados y
+		 * por lo tanto son borrados ahí.
+		 */
+		dictionary_destroy(tablaBloqueos);
+	}
 }
 
 int ESIEstaEnLista(ESI* esi, t_list * lista)
