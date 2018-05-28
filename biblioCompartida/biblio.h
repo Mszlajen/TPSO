@@ -21,7 +21,7 @@ typedef struct {
 } header;
 
 enum instruccion {get, set, store};
-enum tiposDeIntruccion {bloqueante, liberadora, noDefinido};
+enum tipoDeInstruccion {bloqueante, liberadora, noDefinido};
 
 void salir_agraciadamente(int);
 //-1 en error o fileDescriptor en exito
