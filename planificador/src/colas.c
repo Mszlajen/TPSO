@@ -12,12 +12,15 @@ void cerrarColas()
 	cerrarColasBloqueados();
 	cerrarListaFinalizados();
 	cerrarListaReady();
+	cerrarEjecutando();
 }
 
 void finalizarESI(ESI* esi)
 {
 	liberarRecursosDeESI(esi);
 	agregarAFinalizadosESI(esi);
+	if(esESIEnEjecucion(esi->id))
+		quitarESIEjecutando(esi);
 	destruirESI(esi);
 }
 
@@ -36,5 +39,32 @@ void liberarRecursosDeESI(ESI* esi)
 void bloquearESI(ESI* esi, char* clave)
 {
 	colocarEnColaESI(esi, clave);
-	quitarESIEjecutando(esi);
+	if(esESIEnEjecucion(esi->id))
+		quitarESIEjecutando(esi);
+}
+
+ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo algoritmo)
+{
+	ESI* paraEjecutar;
+	switch(algoritmo)
+	{
+	case sjf:
+		if((paraEjecutar = ESIEjecutando()))
+			return paraEjecutar;
+		else
+		{
+			ponerESIAEjecutar(encontrarPorSJF());
+			return ESIEjecutando();
+		}
+	case srt:
+	case hrrn:
+	default: //Devuelve FCFS
+		if((paraEjecutar = ESIEjecutando()))
+			return paraEjecutar;
+		else
+		{
+			ponerESIAEjecutar(encontrarPorFCFS());
+			return ESIEjecutando();
+		}
+	}
 }

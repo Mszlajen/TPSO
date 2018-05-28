@@ -25,6 +25,7 @@ typedef uint8_t resultado_t;
 enum comandos {pausar, continuar, bloquear, desbloquear, listar, kill, status, deadlock, salir};
 
 void inicializacion();
+void bloquearClavesConfiguracion();
 void conectarConCoordinador();
 int enviarEncabezado(socket_t, int);
 int enviarIdESI(socket_t, int);

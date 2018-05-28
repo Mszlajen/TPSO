@@ -15,6 +15,7 @@ int claveTomada (char*);
 //Devuelve true si esta tomada
 int claveTomadaPorESI (char*, ESI*);
 void reservarClave(ESI*, char*);
+void reservarClaveSinESI(char*);
 ESI* liberarClave(char*);
 ESI* desbloquearESIDeClave(char*);
 void crearColasBloqueados();

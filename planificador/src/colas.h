@@ -5,9 +5,11 @@
 #include "Colas/bloqueados.h"
 #include "Colas/finalizados.h"
 #include "Colas/ready.h"
+#include "Colas/ejecutando.h"
 
 void inicializarColas();
 void cerrarColas();
+ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo);
 void liberarRecursosDeESI(ESI*);
 void finalizarESI(ESI*);
 void bloquearESI(ESI*, char*);

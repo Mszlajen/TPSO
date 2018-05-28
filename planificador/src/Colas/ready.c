@@ -1,73 +1,44 @@
 #include "ready.h"
 
 t_list * listos = NULL;
-ESI* enEjecucion = NULL;
 
 void listarParaEjecucion (ESI* nuevaESI)
 {
 	list_add(listos, nuevaESI);
 }
 
-ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo algoritmo)
-{
-	resultadoAlgoritmo res;
-	switch(algoritmo)
-	{
-	case sjf:
-		if(enEjecucion)
-			return enEjecucion;
-		else
-		{
-			res = encontrarPorSJF();
-			list_remove(listos, res.indice);
-			enEjecucion = res.paraEjecutar;
-			return res.paraEjecutar;
-		}
-	case srt:
-	case hrrn:
-	default: //Devuelve siempre FCFS
-		enEjecucion = list_get(listos, 0);
-		list_remove(listos, 0);
-		return enEjecucion;
-	}
-}
-
 ESI* ESIEnReady(ESI_id idESI)
 {
-	int esESIporId(void* esi)
+	bool esESIporId(void* esi)
 		{
 			return ((ESI*) esi) -> id == idESI;
 		}
-	ESI* resultado = NULL;
-
-	if(enEjecucion && esESIporId(enEjecucion))
-		resultado = enEjecucion;
-	if(!resultado)
-		resultado = list_find(listos, esESIporId);
-	return resultado;
+	return list_find(listos, esESIporId);
 }
 
-resultadoAlgoritmo encontrarPorSJF()
+ESI* encontrarPorFCFS()
 {
-	resultadoAlgoritmo res;
-	res.paraEjecutar = list_get(listos, 0);
+	ESI* res = list_get(listos, 0);
+	list_remove(listos, 0);
+	return res;
+}
+
+ESI* encontrarPorSJF()
+{
+	posicionESI res;
+	res.esi = list_get(listos, 0);
 	res.indice = 0;
 	void compararESI(void* esi)
 	{
-		if(((ESI*) esi) -> estimacion < res.paraEjecutar -> estimacion)
+		if(((ESI*) esi) -> estimacion < res.esi -> estimacion)
 		{
-			res.paraEjecutar = (ESI*) esi;
+			res.esi = (ESI*) esi;
 			res.indice++;
 		}
 	}
 	list_iterate(listos, compararESI);
-	return res;
-}
-
-void quitarESIEjecutando(ESI* esi)
-{
-	if(enEjecucion == esi)
-		enEjecucion = NULL;
+	list_remove(listos, res.indice);
+	return res.esi;
 }
 
 void crearListaReady()
@@ -87,7 +58,5 @@ void cerrarListaReady()
 	if(listos)
 	{
 		list_destroy_and_destroy_elements(listos, removedorESIListos);
-		if(enEjecucion)
-			free(enEjecucion);
 	}
 }

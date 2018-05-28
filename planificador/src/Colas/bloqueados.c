@@ -8,6 +8,10 @@ void reservarClave(ESI* esi, char* clave)
 	dictionary_put(tablaBloqueos, clave, esi);
 	agregarRecurso(esi, clave);
 }
+void reservarClaveSinESI(char *clave)
+{
+	dictionary_put(tablaBloqueos, clave, NULL);
+}
 
 int ESIEstaBloqueadoPorClave(ESI* esi, char* clave)
 {
@@ -68,8 +72,11 @@ ESI* desbloquearESIDeClave(char* clave)
 	if(dictionary_has_key(colasBloqueados, clave))
 	{
 		t_list* colaDeClave = dictionary_get(colasBloqueados, clave);
-		desbloqueado = list_get(colaDeClave, 0);
-		list_remove(colaDeClave, 0);
+		if(!list_is_empty(colaDeClave))
+		{
+			desbloqueado = list_get(colaDeClave, 0);
+			list_remove(colaDeClave, 0);
+		}
 	}
 	return desbloqueado;
 }

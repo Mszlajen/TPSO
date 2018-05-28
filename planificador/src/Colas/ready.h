@@ -8,16 +8,16 @@
 #include "../configuracion.h"
 
 typedef struct {
-	ESI* paraEjecutar;
+	ESI* esi;
 	int indice;
-}resultadoAlgoritmo;
+}posicionESI;
 
-ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo);
 void listarParaEjecucion(ESI*);
 
-resultadoAlgoritmo encontrarPorSJF();
-//Si el parametro está ejecutando, lo remueve del controlador de Ready
-void quitarESIEjecutando(ESI*);
+/*Los algoritmos quitan al ESI de la cola*/
+ESI* encontrarPorFCFS();
+ESI* encontrarPorSJF();
+
 ESI* ESIEnReady(ESI_id);
 
 void crearListaReady();
