@@ -4,7 +4,7 @@
 
 socket_t socketCoord = ERROR, socketServerESI = ERROR;
 
-int enPausa = 0;
+pthread_mutex_t enPausa;
 
 pthread_mutex_t mReady, mBloqueados, mFinalizados;
 
@@ -40,10 +40,10 @@ void terminal()
 		switch(convertirComando(palabras[0]))
 		{
 		case pausar:
-			enPausa = 1;
+			pthread_mutex_lock(&enPausa);
 			break;
 		case continuar:
-			enPausa = 0;
+			pthread_mutex_unlock(&enPausa);
 			break;
 		case bloquear:
 			comandoBloquear(palabras);
@@ -68,8 +68,9 @@ void ejecucionDeESI()
 	consultaCoord * consulta = NULL;
 	resultado_t resultadoConsulta, *resultadoEjecucion = NULL;
 	int8_t mensRecibido;
-	while(!enPausa)
+	while(1)
 	{
+		pthread_mutex_lock(&enPausa);
 		pthread_mutex_lock(&mReady);
 		do
 		{
@@ -98,6 +99,7 @@ void ejecucionDeESI()
 		else
 			ejecutarInstruccion(enEjecucion);
 		free(resultadoEjecucion);
+		pthread_mutex_unlock(&enPausa);
 	}
 }
 
@@ -197,6 +199,7 @@ void inicializacion ()
 	if(crearConfiguracion())
 		salirConError("Fallo al leer el archivo de configuracion del planificador.\n");
 	inicializarColas();
+	pthread_mutex_init(&enPausa, NULL);
 	pthread_mutex_init(&mReady, NULL);
 	pthread_mutex_init(&mBloqueados, NULL);
 	pthread_mutex_init(&mFinalizados, NULL);
