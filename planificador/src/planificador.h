@@ -15,7 +15,7 @@
 #define IPConexion "127.0.0.2"
 
 typedef struct {
-	enum instruccion instr;
+	enum tipoDeInstruccion tipo;
 	uint8_t tamClave;
 	char* clave;
 } consultaCoord;

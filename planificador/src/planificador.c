@@ -8,6 +8,8 @@ pthread_mutex_t enPausa;
 
 pthread_mutex_t mReady, mBloqueados, mFinalizados;
 
+pthread_mutex_t mSocketCoord;
+
 int main(void) {
 	inicializacion();
 
@@ -71,6 +73,7 @@ void ejecucionDeESI()
 	while(1)
 	{
 		pthread_mutex_lock(&enPausa);
+		pthread_mutex_lock(&mSocketCoord);
 		pthread_mutex_lock(&mReady);
 		do
 		{
@@ -92,12 +95,13 @@ void ejecucionDeESI()
 		consulta = recibirConsultaCoord();
 		resultadoConsulta = procesarConsultaCoord(enEjecucion, consulta);
 		enviarRespuestaConsultaCoord(socketCoord, resultadoConsulta);
+		pthread_mutex_unlock(&mSocketCoord);
 
 		mensRecibido = recibirMensaje(enEjecucion -> socket, sizeof(resultado_t), (void**) &resultadoEjecucion);
+		ejecutarInstruccion(enEjecucion);
+		//Este if puede cambiar una vez se defina que es lo que devuelve el ESI.
 		if(!mensRecibido || !(*resultadoEjecucion))
 			finalizarESI(enEjecucion);
-		else
-			ejecutarInstruccion(enEjecucion);
 		free(resultadoEjecucion);
 		pthread_mutex_unlock(&enPausa);
 	}
@@ -203,6 +207,7 @@ void inicializacion ()
 	pthread_mutex_init(&mReady, NULL);
 	pthread_mutex_init(&mBloqueados, NULL);
 	pthread_mutex_init(&mFinalizados, NULL);
+	pthread_mutex_init(&mSocketCoord, NULL);
 
 }
 
@@ -258,10 +263,10 @@ consultaCoord* recibirConsultaCoord()
 		/*error*/;
 	free(encabezado);
 
-	enum instruccion *instr;
-	recibirMensaje(socketCoord, sizeof(enum instruccion), (void**) &instr);
-	consulta -> instr = *instr;
-	free(instr);
+	enum tipoDeInstruccion *tipo;
+	recibirMensaje(socketCoord, sizeof(enum tipoDeInstruccion), (void**) &tipo);
+	consulta -> tipo = *tipo;
+	free(tipo);
 
 	uint8_t *tamClave;
 	recibirMensaje(socketCoord, sizeof(uint8_t), (void**) &tamClave);
@@ -276,9 +281,9 @@ consultaCoord* recibirConsultaCoord()
 int procesarConsultaCoord(ESI* ejecutando, consultaCoord* consulta)
 {
 	int resultado;
-	switch(consulta -> instr)
+	switch(consulta -> tipo)
 	{
-	case get:
+	case bloqueante:
 		/*
 		 * Si un ESI pide una clave que ya tiene tomada
 		 * hace un deadlock consigo mismo.
@@ -299,20 +304,16 @@ int procesarConsultaCoord(ESI* ejecutando, consultaCoord* consulta)
 		pthread_mutex_unlock(&mBloqueados);
 		break;
 
-	case set:
+	case noDefinido:
 		pthread_mutex_lock(&mBloqueados);
 		if(claveTomadaPorESI(consulta -> clave, ejecutando))
-		{
 			resultado = 1;
-		}
 		else
-		{
 			resultado = 0;
-		}
 		pthread_mutex_unlock(&mBloqueados);
 		break;
 
-	case store:
+	case liberadora:
 		pthread_mutex_lock(&mBloqueados);
 		if(claveTomadaPorESI(consulta -> clave, ejecutando))
 		{
@@ -326,9 +327,7 @@ int procesarConsultaCoord(ESI* ejecutando, consultaCoord* consulta)
 			resultado = 1;
 		}
 		else
-		{
 			resultado = 0;
-		}
 		pthread_mutex_unlock(&mBloqueados);
 		break;
 	}
@@ -386,6 +385,11 @@ enum comandos convertirComando(char* linea)
 		return -1;
 }
 
+
+/*
+ * Falta sincronizar el cierre de la colas y
+ * liberar los hilos.
+ */
 void liberarRecursos()
 {
 	eliminarConfiguracion();
@@ -395,6 +399,7 @@ void liberarRecursos()
 	pthread_mutex_destroy(&mReady);
 	pthread_mutex_destroy(&mBloqueados);
 	pthread_mutex_destroy(&mFinalizados);
+	pthread_mutex_destroy(&mSocketCoord);
 
 	cerrarSocket(socketCoord);
 	cerrarSocket(socketServerESI);
