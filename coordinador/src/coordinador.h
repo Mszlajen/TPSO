@@ -45,7 +45,7 @@ typedef struct {
 
 void hiloDeInstancia();
 void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir);
-int esperarYaceptar(socket_t socketCoordinador, int colaMax,struct sockaddr_in* dir);
+int esperarYaceptar(socket_t socketCoordinador,struct sockaddr_in* dir);
 int validarPlanificador (socket_t socket);
 void liberarRecursos();
 void salirConError(char * error);
