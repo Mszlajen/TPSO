@@ -69,6 +69,11 @@ void escucharPorAcciones () {
 	//me rindo, podria mandar un mail a los ayudantes por que no se como le tengo que mandar el segundo parametro
 	//list_iterate(&listaInstancias,(void *) setearReadfdsInstancia);
 	//list_iterate(&listaEsi,(void *) setearReadfdsEsi);
+	/*
+	 * Revise los test ahí hay funciones de varios parametros (en la parte de orden superior)
+	 * Y si no alcanza esto: https://github.com/sisoputnfrba/foro/issues/1089
+	 * [MATI]
+	 */
 
 	select(socketInstanciaMax + 1,&readfds,NULL,NULL,NULL);
 	// debo revisar si los socket que quedaron en readfds son esi o instancia, si son instancia reviso si quieren compactar o si ya terminaron,
