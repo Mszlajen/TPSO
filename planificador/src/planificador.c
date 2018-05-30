@@ -153,25 +153,38 @@ void comandoBloquear(char** palabras)
 		return;
 	}
 
-	if((esESIEjecutando = esESIEnEjecucion(IDparaBloquear)))
+	if(esESIEnEjecucion(IDparaBloquear))
 	{
-		ESIParaBloquear = ESIEjecutando();
 		pthread_mutex_lock(&mESIEjecutando);
+		/*
+		 * Si el ESI a bloquear es el que se está ejecutando pueden pasar dos cosas:
+		 * 1- No está ejecutando ninguna instrucción por lo tanto el mutex es tomado
+		 * inmediatamente y el if siguiente es innecesario.
+		 * 2- Está ejecutando una instrucción por lo tanto el mutex bloquea el hilo
+		 * y en el intermedio hasta su liberación el pudo haber terminado su ejecución
+		 * o bloquearse y hay que comprobar que siga siendo el que ejecuta.
+		 */
+		if((esESIEjecutando = esESIEnEjecucion(IDparaBloquear)))
+			ESIParaBloquear = ESIEjecutando();
+		else
+			pthread_mutex_unlock(&mESIEjecutando);
 	}
-
+	pthread_mutex_lock(&mBloqueados);
 	pthread_mutex_lock(&mReady);
 	if(!esESIEjecutando && !(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
 	{
 		printf("El ESI no se encuentra en ready, ejecutando o no existe.\n");
 		pthread_mutex_unlock(&mReady);
+		pthread_mutex_unlock(&mBloqueados);
 		return;
 	}
 
-	pthread_mutex_lock(&mBloqueados);
+
 	bloquearESI(ESIParaBloquear, palabras[1]);
-	pthread_mutex_unlock(&mBloqueados);
 
 	pthread_mutex_unlock(&mReady);
+
+	pthread_mutex_unlock(&mBloqueados);
 
 	if(esESIEjecutando)
 		pthread_mutex_unlock(&mESIEjecutando);
