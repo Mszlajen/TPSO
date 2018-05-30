@@ -10,10 +10,26 @@ void listarParaEjecucion (ESI* nuevaESI)
 ESI* ESIEnReady(ESI_id idESI)
 {
 	bool esESIporId(void* esi)
-		{
-			return ((ESI*) esi) -> id == idESI;
-		}
+	{
+		return ((ESI*) esi) -> id == idESI;
+	}
 	return list_find(listos, esESIporId);
+}
+
+void quitarESIDeReady(ESI_id idAQuitar)
+{
+	int indiceActual = 0, indice = -1;
+	void encontrarIndice(void * esi)
+	{
+		if(idAQuitar != ((ESI*) esi) ->id)
+			indiceActual++;
+		else
+			indice = indiceActual;
+
+	}
+	list_iterate(listos, encontrarIndice);
+	if(indice != -1)
+		list_remove(listos, indice);
 }
 
 ESI* encontrarPorFCFS()

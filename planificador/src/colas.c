@@ -21,6 +21,10 @@ void finalizarESI(ESI* esi)
 	agregarAFinalizadosESI(esi);
 	if(esESIEnEjecucion(esi->id))
 		quitarESIEjecutando(esi);
+	else if(ESIEnReady(esi -> id))
+		quitarESIDeReady(esi -> id);
+	else
+		quitarESIDeBloqueados(esi -> id);
 	destruirESI(esi);
 }
 

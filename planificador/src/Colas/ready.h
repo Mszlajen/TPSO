@@ -20,6 +20,8 @@ ESI* encontrarPorSJF();
 
 ESI* ESIEnReady(ESI_id);
 
+void quitarESIDeReady(ESI_id);
+
 void crearListaReady();
 void cerrarListaReady();
 #endif /* READY_H_ */

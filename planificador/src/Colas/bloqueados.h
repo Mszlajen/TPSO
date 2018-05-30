@@ -8,16 +8,14 @@
 #include "../adminESI.h"
 
 int ESIEstaBloqueadoPorClave(ESI*, char*);
-//Devuelve true si la tiene
 int ESITieneClave(ESI*, char*);
-//Devuelve true si esta tomada
 int claveTomada (char*);
-//Devuelve true si esta tomada
 int claveTomadaPorESI (char*, ESI*);
 void reservarClave(ESI*, char*);
 void reservarClaveSinESI(char*);
 ESI* liberarClave(char*);
 ESI* desbloquearESIDeClave(char*);
+void quitarESIDeBloqueados(ESI_id);
 void crearColasBloqueados();
 void cerrarColasBloqueados();
 int ESIEstaEnLista(ESI*, t_list*);

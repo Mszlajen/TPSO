@@ -104,7 +104,19 @@ void ejecucionDeESI()
 		ejecutarInstruccion(enEjecucion);
 		//Este if puede cambiar una vez se defina que es lo que devuelve el ESI.
 		if(!mensRecibido || !(*resultadoEjecucion))
+		{
+			/*
+			 * Dado que no se en que cola está al final de su ejecución finalizar ESI
+			 * lo busca en todas las colas y por lo tanto requiere que no se modifiquen
+			 * en el entretiempo.
+			 */
+			pthread_mutex_lock(&mBloqueados);
+			pthread_mutex_lock(&mReady);
 			finalizarESI(enEjecucion);
+			pthread_mutex_unlock(&mBloqueados);
+			pthread_mutex_unlock(&mReady);
+		}
+
 		free(resultadoEjecucion);
 		pthread_mutex_unlock(&mESIEjecutando);
 		pthread_mutex_unlock(&enPausa);
@@ -198,7 +210,7 @@ void comandoDesbloquear(char** palabras)
 	if(!ESIDesbloqueado)
 	{
 		printf("No hay ESI bloqueados para esa clave o no existe.\n");
-		pthread_mutex_unlock(&mBloqueados); //Buscar mejor solucion para liberacion de mutex
+		pthread_mutex_unlock(&mBloqueados);
 		return;
 	}
 	pthread_mutex_unlock(&mBloqueados);

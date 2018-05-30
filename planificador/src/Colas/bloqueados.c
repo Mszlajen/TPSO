@@ -81,6 +81,36 @@ ESI* desbloquearESIDeClave(char* clave)
 	return desbloqueado;
 }
 
+void quitarESIDeBloqueados(ESI_id idAQuitar)
+{
+	t_list * colaConESI = NULL;
+	int indiceActual = 0, indice = -1, indiceAQuitar;
+
+	void encontrarIndice(void * esi)
+	{
+		if(idAQuitar != ((ESI*) esi) ->id)
+			indiceActual++;
+		else
+			indice = indiceActual;
+	}
+	void encontrarClaveConESI(char* clave, void* colaClave)
+	{
+		list_iterate((t_list*) colaClave, encontrarIndice);
+		if(indice != -1)
+		{
+			colaConESI = (t_list*) colaClave;
+			indiceAQuitar = indice;
+		}
+		indiceActual = 0;
+		indice = -1;
+	}
+
+	dictionary_iterator(colasBloqueados, encontrarClaveConESI);
+	if(colaConESI)
+		list_remove(colaConESI, indiceAQuitar);
+
+}
+
 t_list* listarID(char *clave)
 {
 	void* convertirESIaID(void* esi)
