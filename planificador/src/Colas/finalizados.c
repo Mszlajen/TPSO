@@ -22,5 +22,7 @@ void crearListaFinalizados()
 void cerrarListaFinalizados()
 {
 	if(finalizados)
-		list_destroy(finalizados);
+	{
+		list_destroy_and_destroy_elements(finalizados, free);
+	}
 }

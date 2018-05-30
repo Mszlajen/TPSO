@@ -17,30 +17,35 @@ fd_set readfds;
 socket_t  socketCoordinador;
 
 int cantInstancias;
+int socketInstanciaMax = 0;
 
 int main(void) {
-
-	inicializacion();
 
 	struct sockaddr_in dirPlanificador;
 	socket_t socketPlanificador;
 	int esPlanificador;
+	pthread_t hiloRecibeConexiones;
+	pthread_t hiloEscuchaPorAcciones;
+
+	inicializacion();
+
+
 
 	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
 
 	 do {
-		socketPlanificador = esperarYaceptar(socketCoordinador, 2 ,&dirPlanificador);
+		socketPlanificador = esperarYaceptar(socketCoordinador ,&dirPlanificador);
 		esPlanificador = validarPlanificador(socketPlanificador );
 	} while (esPlanificador);
 
 
-	 pthread_t hiloRecibeConexiones;
-	 //pthread_create(&hiloRecibeConexiones, NULL, (void*) recibirConexiones, NULL);
+
+	 pthread_create(&hiloRecibeConexiones, NULL, (void*) recibirConexiones, NULL);
 
 	 FD_ZERO(&readfds);
 
-	 pthread_t hiloEscuchaPorAcciones;
-	 //pthread_create(&hiloEscuchaPorAcciones, NULL, (void*) escucharPorAcciones, NULL);
+
+	 pthread_create(&hiloEscuchaPorAcciones, NULL, (void*) escucharPorAcciones, NULL);
 
 	//close(socketCoordinador);
 	exit(0);
@@ -61,35 +66,12 @@ int main(void) {
 
 void escucharPorAcciones () {
 
-	/*
-	 * El ultimo parametro de select recibe un tiempo de salida,
-	 * es decir, un tiempo para cortar el bloqueo del hilo si no
-	 * llego nada, cosa que no necesitamos aca y se puede anular
-	 * pasando un puntero nulo (NULL)
-	 *
-	 * [MATI]
-	 */
-	struct timeval tv;
+	//me rindo, podria mandar un mail a los ayudantes por que no se como le tengo que mandar el segundo parametro
+	//list_iterate(&listaInstancias,(void *) setearReadfdsInstancia);
+	//list_iterate(&listaEsi,(void *) setearReadfdsEsi);
 
-	tv.tv_sec = 2;
-	tv.tv_usec = 500000;
-	int ultimosock;
-	// debo inicializar ultimosock, con el socket de mayor valor (valor como int) que esta en la lista de Esi->socket, no se como hacerlo... xD
-	/*
-	 * Manera sencilla es la misma de siempre, revisa la lista un
-	 * valor por vez guardando el mayor.
-	 * Metodo dos actualiza el valor cada vez que habras otro socket.
-	 *
-	 * [MATI]
-	 */
-
-	//list_iterate(&listaInstancias,setearReadfdsInstancia);
-	//list_iterate(&listaEsi,setearReadfdsEsi);
-
-	//como le mando la clausura al list iterate?
-
-	select(ultimosock,&readfds,NULL,NULL,&tv);
-	// debo revisar si los socket que quedaron en readfds son eso o instancia, si son instancia reviso si quieren compactar o si ya terminaron,
+	select(socketInstanciaMax + 1,&readfds,NULL,NULL,NULL);
+	// debo revisar si los socket que quedaron en readfds son esi o instancia, si son instancia reviso si quieren compactar o si ya terminaron,
 	// si son esi reviso si me envian comandos
 
 }
@@ -100,6 +82,8 @@ void escucharPorAcciones () {
  *
  * [MATI]
  */
+
+//las puse por que segun entendi, el list_iterate tiene que recibir una funcion que recibe elementos de la lista
 void setearReadfdsInstancia (Instancia instancia){
 	FD_SET(instancia.socket,&readfds);
 }
@@ -115,7 +99,7 @@ void recibirConexiones() {
 
 	while (1)
 		{
-			socketAceptado = esperarYaceptar(socketCoordinador, 20 ,&dirAceptado);
+			socketAceptado = esperarYaceptar(socketCoordinador ,&dirAceptado);
 			esESIoInstancia(socketAceptado,dirAceptado);
 		}
 }
@@ -135,18 +119,13 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 	 * 		recibido.
 	 *
 	 * [MATI]
-	 *
-	 * PD: En general, esto aplica a todos los usos de recibirMensaje
-	 * porque tienen una cosa u otra mal.
 	 */
-	header* header = malloc(sizeof(header));
-	int estadoDellegadaHeader = recibirMensaje(socketAceptado,1,(void *) header->protocolo);
+	header* header;
+	int estadoDellegadaHeader = recibirMensaje(socketAceptado,1,(void *) &header);
 
 	switch(header->protocolo){
 
 	case 2:
-		// hay que crear un modulo que revise si la instancia esta registrada o no y atienda respecto de este dato
-		// si no esta registrada, se registra, si lo esta y me habla es o por que termino de ejecutar o por que necesita compactar
 		/*
 		 * Si el header que te llego dice protocolo = 2 es una instancia que nueva
 		 * que se está conectando y no puede ser otra cosa (porque el numero de
@@ -158,12 +137,14 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 		 * [MATI]
 		 */
 
+
 		free(header);
+
+
 		registrarInstancia(socketAceptado);
 		break;
 
 	case 3:
-		free(header);
 		registrarEsi(socketAceptado);
 		break;
 
@@ -189,26 +170,10 @@ void registrarEsi(socket_t socket){
 
 	Esi nuevaEsi;
 	nuevaEsi.socket = socket;
-
-	/*
-	 * Mi recomendación es que creen todas la estructuras
-	 * en la inicialización. El codigo va a ser mas ordenado,
-	 * el gasto de extra de memoria es despreciable y son
-	 * estructuras que podes estar seguro que las vas a usar.
-	 *
-	 * [MATI]
-	 *
-	 * PD: Lo mismo aplica para registrarInstancia.
-	 */
-	if (listaEsi == NULL)
-		{
-			listaEsi = list_create();
-			list_add(listaEsi,&nuevaEsi);
-		}
-	else
-		{
-			list_add(listaEsi,&nuevaEsi);
-		}
+	list_add(listaEsi,&nuevaEsi);
+	if (nuevaEsi.socket > socketInstanciaMax) {
+		socketInstanciaMax = nuevaEsi.socket;
+	}
 	/*
 	 *
 	 * [MATI]
@@ -222,7 +187,7 @@ void registrarEsi(socket_t socket){
 
 void registrarInstancia(socket_t socket)
 {
-	int tamMensj;
+	int * tamMensj = NULL;
 	int estadoDellegada;
 	Instancia instanciaRecibida;
 
@@ -230,28 +195,19 @@ void registrarInstancia(socket_t socket)
 		estadoDellegada = recibirMensaje(socket,4,(void *) &tamMensj );
 	} while (estadoDellegada);
 
-	char * nombre = malloc(tamMensj);
+	char * nombre = NULL;
 
 
 	do {
-			estadoDellegada = recibirMensaje(socket,tamMensj,(void *) nombre );
+			estadoDellegada = recibirMensaje(socket,*tamMensj,(void *) &nombre );
 		} while (estadoDellegada);
 
 	strcpy(instanciaRecibida.nombre , nombre);
 	instanciaRecibida.idinstancia = cantInstancias;
 	instanciaRecibida.socket = socket;
 
-	free(nombre);
+	cantInstancias = list_add(listaInstancias,&instanciaRecibida);
 
-	if (listaInstancias == NULL)
-		{
-			listaInstancias = list_create();
-			cantInstancias = list_add(listaInstancias,&instanciaRecibida);
-		}
-	else
-		{
-			cantInstancias = list_add(listaInstancias,&instanciaRecibida);
-		}
 
 	header header;
 	header.protocolo = 5;
@@ -284,16 +240,10 @@ void registrarInstancia(socket_t socket)
 	free(buffer);
 }
 
-/*
- * El maximo de cola es un valor irrelevante para nosotros
- * lo podes hardcodear si queres achicar la funcion.
- *
- * [MATI]
- */
-int esperarYaceptar(socket_t socketCoordinador, int colaMax,struct sockaddr_in* dir)
+int esperarYaceptar(socket_t socketCoordinador,struct sockaddr_in* dir)
 {
 	unsigned int tam;
-	listen(socketCoordinador , colaMax);
+	listen(socketCoordinador , 5);
 	int socket = accept(socketCoordinador, (void*)&dir, &tam);
 	return socket;
 	}
@@ -301,29 +251,15 @@ int esperarYaceptar(socket_t socketCoordinador, int colaMax,struct sockaddr_in* 
 int validarPlanificador (socket_t socket) {
 	header* handshake = NULL;
 	int estadoDellegada;
-	/*
-	 * Aparte de lo que dije más arriba de los numeros
-	 * y los booleanos en C, no hace falta crear una
-	 * variable para comparar un uint8_t, este tipo
-	 * sigue siendo un numero solo que un int normal
-	 * solo que es independiente del S.O.
-	 *
-	 * [MATI]
-	 *
-	 * PD: Si estoy mandando cualquiera y lo hiciste
-	 * para no hardcodear, genial pero un define y
-	 * otro nombre serian mejor.
-	 */
-	uint8_t correcto = 1;
 
-	estadoDellegada = recibirMensaje(socket,sizeof(header),&handshake);
+	estadoDellegada = recibirMensaje(socket,sizeof(header),(void*) &handshake);
 	if (estadoDellegada != 0)
 	{
 		error_show ("no se pudo recibir header de planificador.");
 		return 1;
 	}
 
-	if (handshake->protocolo != correcto)
+	if (handshake->protocolo != 1)
 	{
 		close(socket);
 		return 1;
@@ -360,5 +296,6 @@ void inicializacion()
 	if(configuracion == NULL)
 		salirConError("Fallo al leer el archivo de configuracion del coordinador\n");
 	cantInstancias = 0;
-
+	listaEsi = list_create();
+	listaInstancias = list_create();
 }

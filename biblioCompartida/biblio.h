@@ -21,6 +21,7 @@ typedef struct {
 } header;
 
 enum instruccion {get, set, store};
+enum tipoDeInstruccion {bloqueante, liberadora, noDefinido};
 
 void salir_agraciadamente(int);
 //-1 en error o fileDescriptor en exito
@@ -41,7 +42,8 @@ int enviarBuffer (socket_t, void*, int);
  * que se va a redireccionar a un buffer
  * en memoria creado por la funcion.
  *
- * -1 en error o 0 en exito
+ * -1 en error, 0 en exito o 1 si se cerro
+ * el socket mientras recibia.
  */
 int recibirMensaje (socket_t, int, void**);
 

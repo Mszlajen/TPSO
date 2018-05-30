@@ -73,11 +73,7 @@ void usarPuertoTapado (socket_t sock)
 
 int enviarHeader (socket_t sock, header head)
 {
-	int tamHeader = sizeof(header);
-	void * buffer = malloc(tamHeader);
-	memcpy(buffer, &head, tamHeader);
-	int resultado = enviarBuffer(sock, buffer, tamHeader);
-	free(buffer);
+	int resultado = enviarBuffer(sock, &head, sizeof(header));
 	return resultado;
 }
 
@@ -112,11 +108,15 @@ int recibirMensaje(socket_t sock, int tamMens, void** buffer)
 	int bytesRecibidos = recv(sock, *buffer, tamMens, 0);
 	if(bytesRecibidos == ERROR)
 		return ERROR;
+	if(!bytesRecibidos)
+		return 1;
 	int resultRecv;
 	while(bytesRecibidos != tamMens)
 	{
 		if((resultRecv = recv(sock, *buffer + bytesRecibidos, tamMens - bytesRecibidos, 0)) == ERROR)
 			return ERROR;
+		if(!resultRecv)
+			return 1;
 		bytesRecibidos += resultRecv;
 	}
 	return EXITO;

@@ -13,7 +13,7 @@
 #define Estimacion "Estimacion"
 #define IPCoord "IPCoord"
 #define PuertoCoord "PuertoCoord"
-#define ClavesBloq "ClavesBloq"
+#define ClavesBloq "ClavesBloqueadas"
 
 enum t_algoritmo {sjf, srt, hrrn};
 
@@ -25,5 +25,6 @@ char* obtenerPuertoCoordinador();
 float obtenerAlfa();
 int obtenerEstimacionInicial();
 enum t_algoritmo obtenerAlgoritmo();
+char* obtenerBloqueosConfiguracion();
 
 #endif /* CONFIGURACION_H_ */

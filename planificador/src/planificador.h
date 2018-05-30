@@ -15,18 +15,21 @@
 #define IPConexion "127.0.0.2"
 
 typedef struct {
-	enum instruccion instr;
+	enum tipoDeInstruccion tipo;
 	uint8_t tamClave;
 	char* clave;
 } consultaCoord;
 
-enum comandos {pausa, bloquear, desbloquear, listar, kill, status, deadlock, salir};
+typedef uint8_t resultado_t;
+
+enum comandos {pausar, continuar, bloquear, desbloquear, listar, kill, status, deadlock, salir};
 
 void inicializacion();
+void bloquearClavesConfiguracion();
 void conectarConCoordinador();
 int enviarEncabezado(socket_t, int);
 int enviarIdESI(socket_t, int);
-int enviarRespuestaConsultaCoord(socket_t, int);
+int enviarRespuestaConsultaCoord(socket_t, uint8_t);
 consultaCoord* recibirConsultaCoord();
 void crearServerESI();
 int procesarConsultaCoord(ESI*, consultaCoord*);
@@ -42,6 +45,9 @@ void terminal();
 void escucharPorESI ();
 void ejecucionDeESI ();
 
+void comandoBloquear(char**);
+void comandoDesbloquear(char**);
+void comandoListar(char**);
 
 
 #endif /* PLANIFICADOR_H_ */

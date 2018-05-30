@@ -53,3 +53,8 @@ enum t_algoritmo obtenerAlgoritmo()
 	return resultado;
 }
 
+char* obtenerBloqueosConfiguracion()
+{
+	return config_get_string_value(configuracion, ClavesBloq);
+}
+

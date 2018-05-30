@@ -7,7 +7,7 @@ id_t ESItotales = 0;
 ESI* crearESI (socket_t sock, int estimacionInicial)
 {
 	ESI* unaESI = malloc (sizeof(ESI));
-	unaESI -> id = ESItotales;
+	unaESI -> id = ESItotales + 1;
 	ESItotales++;
 	unaESI -> estimacion = estimacionInicial;
 	unaESI -> ultimaEstimacion = estimacionInicial;
@@ -50,9 +50,20 @@ void agregarRecurso(ESI* esi, char* clave)
 	list_add(esi -> recursos, clave);
 }
 
+void borrarRecursosESI(ESI* esi)
+{
+	list_iterate(esi -> recursos, free);
+}
+
 void destruirESI(ESI* esi)
 {
 	close(esi -> socket);
 	list_destroy(esi -> recursos);
 	free(esi);
+}
+
+void removedorESI(ESI* esi, t_list* lista)
+{
+	list_iterate(lista, borrarRecursosESI);
+	destruirESI(esi);
 }

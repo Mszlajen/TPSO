@@ -8,6 +8,10 @@ void reservarClave(ESI* esi, char* clave)
 	dictionary_put(tablaBloqueos, clave, esi);
 	agregarRecurso(esi, clave);
 }
+void reservarClaveSinESI(char *clave)
+{
+	dictionary_put(tablaBloqueos, clave, NULL);
+}
 
 int ESIEstaBloqueadoPorClave(ESI* esi, char* clave)
 {
@@ -30,7 +34,7 @@ int ESITieneClave(ESI* esi, char* clave)
 	else return 1;
 }
 
-void bloquearESI(ESI* esi, char* clave)
+void colocarEnColaESI(ESI* esi, char* clave)
 {
 	if(dictionary_has_key(colasBloqueados, clave))
 		list_add((t_list*) dictionary_get(colasBloqueados, clave), esi);
@@ -58,14 +62,39 @@ int claveTomadaPorESI (char* clave, ESI* esi)
 ESI* liberarClave(char* clave)
 {
 	dictionary_remove(tablaBloqueos, clave);
+
+	return desbloquearESIDeClave(clave);
+}
+
+ESI* desbloquearESIDeClave(char* clave)
+{
 	ESI* desbloqueado = NULL;
 	if(dictionary_has_key(colasBloqueados, clave))
 	{
 		t_list* colaDeClave = dictionary_get(colasBloqueados, clave);
-		desbloqueado = list_get(colaDeClave, 0);
-		list_remove(colaDeClave, 0);
+		if(!list_is_empty(colaDeClave))
+		{
+			desbloqueado = list_get(colaDeClave, 0);
+			list_remove(colaDeClave, 0);
+		}
 	}
 	return desbloqueado;
+}
+
+t_list* listarID(char *clave)
+{
+	void* convertirESIaID(void* esi)
+	{
+		ESI_id *id = malloc(sizeof(ESI_id));
+		*id = ((ESI*) esi) -> id;
+		return (void*) id;
+	}
+	t_list* listaDeID = NULL;
+	if(!dictionary_has_key(colasBloqueados, clave))
+		return listaDeID;
+	listaDeID = list_map(dictionary_get(colasBloqueados, clave), convertirESIaID);
+	return listaDeID;
+
 }
 
 void crearColasBloqueados()
@@ -76,8 +105,24 @@ void crearColasBloqueados()
 
 void cerrarColasBloqueados()
 {
+	void removerBloqueados(void* lista)
+	{
+		list_iterate((t_list*) lista, borrarRecursosESI);
+		list_iterate((t_list*) lista, destruirESI);
+		list_destroy((t_list*) lista);
+	}
+
 	if(colasBloqueados)
-		dictionary_destroy(colasBloqueados);
+	{
+		dictionary_destroy_and_destroy_elements(colasBloqueados, removerBloqueados);
+		/*
+		 * No hace falta destruir los datos en la tabla
+		 * porque necesariamente tienen que estar en la
+		 * cola de Ready o en una cola de Bloqueados y
+		 * por lo tanto son borrados ahí.
+		 */
+		dictionary_destroy(tablaBloqueos);
+	}
 }
 
 int ESIEstaEnLista(ESI* esi, t_list * lista)

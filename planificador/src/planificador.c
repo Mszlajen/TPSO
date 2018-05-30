@@ -4,18 +4,16 @@
 
 socket_t socketCoord = ERROR, socketServerESI = ERROR;
 
-int terminarEjecucion = 0;
-/*
- * terminar ejecucion es una variable de Debuggeo
- * que se usa para terminar la ejecucion del planificador
- * dandole valor 1, sin embargo, actualmente es posible
- * que se necesite conectar un ESI antes de que finalice
- * realmente la ejecucion.
- */
+pthread_mutex_t enPausa;
 
+pthread_mutex_t mReady, mBloqueados, mFinalizados, mESIEjecutando;
+
+pthread_mutex_t mSocketCoord;
 
 int main(void) {
 	inicializacion();
+
+	bloquearClavesConfiguracion();
 
 	conectarConCoordinador();
 
@@ -36,20 +34,35 @@ int main(void) {
 
 void terminal()
 {
-	while(!terminarEjecucion)
+	char *linea, **palabras;
+	while(1)
 	{
-		char * linea = readline("Comando:");
+		linea = readline("Comando:");
 		//Aca va a ir el procesamiento para ver si es una instrucción
 		//y su procesamiento correspondiente
-		switch(convertirComando(linea))
+		palabras = string_split(linea, " ");
+		switch(convertirComando(palabras[0]))
 		{
-		case salir:
-			terminarEjecucion = 1;
-			break ;
+		case pausar:
+			pthread_mutex_lock(&enPausa);
+			break;
+		case continuar:
+			pthread_mutex_unlock(&enPausa);
+			break;
+		case bloquear:
+			comandoBloquear(palabras);
+			break;
+		case desbloquear:
+			comandoDesbloquear(palabras);
+			break;
+		case listar:
+			comandoListar(palabras);
+			break;
 		default:
 			system(linea);
 		}
 		free(linea);
+		string_iterate_lines(palabras, free);
 	}
 }
 
@@ -57,8 +70,14 @@ void ejecucionDeESI()
 {
 	ESI* enEjecucion;
 	consultaCoord * consulta = NULL;
-	while(!terminarEjecucion)
+	resultado_t resultadoConsulta, *resultadoEjecucion = NULL;
+	int8_t mensRecibido;
+	while(1)
 	{
+		pthread_mutex_lock(&enPausa);
+
+		pthread_mutex_lock(&mESIEjecutando);
+		pthread_mutex_lock(&mReady);
 		do
 		{
 			enEjecucion = seleccionarESIPorAlgoritmo(obtenerAlgoritmo());
@@ -66,16 +85,29 @@ void ejecucionDeESI()
 				finalizarESI(enEjecucion);
 			else
 				break;
-		}while(1); //Está un poco spaghetti, revisar luego.
+		}while(1);
+		pthread_mutex_unlock(&mReady);
+		pthread_mutex_lock(&mSocketCoord);
 		if(seDesconectoSocket(socketCoord))
 		{
 			//Avisar a los ESI que tienen que morirse.
-			salirConError("Se cerro el coordinador.");
+			salirConError("Se desconecto el coordinador.");
 		}
 		enviarEncabezado(enEjecucion -> socket, 7); //Enviar el aviso de ejecucion
+
 		consulta = recibirConsultaCoord();
+		resultadoConsulta = procesarConsultaCoord(enEjecucion, consulta);
+		enviarRespuestaConsultaCoord(socketCoord, resultadoConsulta);
+		pthread_mutex_unlock(&mSocketCoord);
 
-
+		mensRecibido = recibirMensaje(enEjecucion -> socket, sizeof(resultado_t), (void**) &resultadoEjecucion);
+		ejecutarInstruccion(enEjecucion);
+		//Este if puede cambiar una vez se defina que es lo que devuelve el ESI.
+		if(!mensRecibido || !(*resultadoEjecucion))
+			finalizarESI(enEjecucion);
+		free(resultadoEjecucion);
+		pthread_mutex_unlock(&mESIEjecutando);
+		pthread_mutex_unlock(&enPausa);
 	}
 }
 
@@ -85,7 +117,7 @@ void escucharPorESI ()
 	struct sockaddr_storage infoDirr;
 	socklen_t size_infoDirr = sizeof(struct sockaddr_storage);
 	ESI* nuevaESI;
-	while(!terminarEjecucion)
+	while(1)
 	{
 		socketNuevaESI = ERROR;
 		listen(socketServerESI, 5);
@@ -97,7 +129,11 @@ void escucharPorESI ()
 		}
 		nuevaESI = crearESI(socketNuevaESI, obtenerEstimacionInicial());
 		if(!enviarIdESI(socketNuevaESI, nuevaESI -> id))
+		{
+			pthread_mutex_lock(&mReady);
 			listarParaEjecucion(nuevaESI);
+			pthread_mutex_unlock(&mReady);
+		}
 		else
 		{
 			destruirESI(nuevaESI);
@@ -106,12 +142,99 @@ void escucharPorESI ()
 	}
 }
 
+void comandoBloquear(char** palabras)
+{
+	id_t IDparaBloquear = atoi(palabras[2]);
+	ESI* ESIParaBloquear = NULL;
+	uint8_t esESIEjecutando;
+	if(!IDparaBloquear)
+	{
+		printf("El parametro ID no es valido.\n");
+		return;
+	}
+
+	if((esESIEjecutando = esESIEnEjecucion(IDparaBloquear)))
+	{
+		ESIParaBloquear = ESIEjecutando();
+		pthread_mutex_lock(&mESIEjecutando);
+	}
+
+	pthread_mutex_lock(&mReady);
+	if(!esESIEjecutando && !(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
+	{
+		printf("El ESI no se encuentra en ready, ejecutando o no existe.\n");
+		pthread_mutex_unlock(&mReady);
+		return;
+	}
+
+	pthread_mutex_lock(&mBloqueados);
+	bloquearESI(ESIParaBloquear, palabras[1]);
+	pthread_mutex_unlock(&mBloqueados);
+
+	pthread_mutex_unlock(&mReady);
+
+	if(esESIEjecutando)
+		pthread_mutex_unlock(&mESIEjecutando);
+
+}
+
+void comandoDesbloquear(char** palabras)
+{
+	pthread_mutex_lock(&mBloqueados);
+	ESI* ESIDesbloqueado = desbloquearESIDeClave(palabras[1]);
+	if(!ESIDesbloqueado)
+	{
+		printf("No hay ESI bloqueados para esa clave o no existe.\n");
+		pthread_mutex_unlock(&mBloqueados); //Buscar mejor solucion para liberacion de mutex
+		return;
+	}
+	pthread_mutex_unlock(&mBloqueados);
+
+	pthread_mutex_lock(&mReady);
+	listarParaEjecucion(ESIDesbloqueado);
+	pthread_mutex_unlock(&mReady);
+}
+
+void comandoListar(char** palabras)
+{
+	void imprimirID(void* id)
+	{
+		printf("%i", * (ESI_id*) id);
+	}
+	t_list* listaDeID;
+
+	pthread_mutex_lock(&mBloqueados);
+	listaDeID = listarID(palabras[1]);
+	if(!listaDeID)
+	{
+		printf("No hay ESI bloqueados con esa clave.\n");
+		return;
+	}
+	list_iterate(listaDeID, imprimirID);
+	pthread_mutex_unlock(&mBloqueados);
+
+	list_destroy_and_destroy_elements(listaDeID, free);
+}
+
 void inicializacion ()
 {
 	if(crearConfiguracion())
-		salirConError("Fallo al leer el archivo de configuracion del planificador\n");
-	crearListaReady();
+		salirConError("Fallo al leer el archivo de configuracion del planificador.\n");
+	inicializarColas();
+	pthread_mutex_init(&enPausa, NULL);
+	pthread_mutex_init(&mReady, NULL);
+	pthread_mutex_init(&mBloqueados, NULL);
+	pthread_mutex_init(&mFinalizados, NULL);
+	pthread_mutex_init(&mESIEjecutando, NULL);
+	pthread_mutex_init(&mSocketCoord, NULL);
 
+}
+
+void bloquearClavesConfiguracion()
+{
+	char** claves = string_split(obtenerBloqueosConfiguracion(), ",");
+	string_iterate_lines(claves, reservarClaveSinESI);
+	string_iterate_lines(claves, free);
 }
 
 void conectarConCoordinador()
@@ -145,7 +268,7 @@ int enviarIdESI(socket_t sock, ESI_id id)
 	return resultado;
 }
 
-int enviarRespuestaConsultaCoord(socket_t coord, int respuesta)
+int enviarRespuestaConsultaCoord(socket_t coord, uint8_t respuesta)
 {
 	header encabezado;
 	encabezado.protocolo = 10;
@@ -166,10 +289,10 @@ consultaCoord* recibirConsultaCoord()
 		/*error*/;
 	free(encabezado);
 
-	enum instruccion *instr;
-	recibirMensaje(socketCoord, sizeof(enum instruccion), (void**) &instr);
-	consulta -> instr = *instr;
-	free(instr);
+	enum tipoDeInstruccion *tipo;
+	recibirMensaje(socketCoord, sizeof(enum tipoDeInstruccion), (void**) &tipo);
+	consulta -> tipo = *tipo;
+	free(tipo);
 
 	uint8_t *tamClave;
 	recibirMensaje(socketCoord, sizeof(uint8_t), (void**) &tamClave);
@@ -183,33 +306,61 @@ consultaCoord* recibirConsultaCoord()
 
 int procesarConsultaCoord(ESI* ejecutando, consultaCoord* consulta)
 {
-	switch(consulta -> instr)
+	int resultado;
+	switch(consulta -> tipo)
 	{
-	case get:
+	case bloqueante:
+		/*
+		 * Si un ESI pide una clave que ya tiene tomada
+		 * hace un deadlock consigo mismo.
+		 */
+		pthread_mutex_lock(&mBloqueados);
 		if(claveTomada(consulta -> clave))
 		{
+			pthread_mutex_lock(&mReady);
 			bloquearESI(ejecutando, consulta -> clave);
-			return 0;
+			pthread_mutex_unlock(&mReady);
+			resultado = 0;
 		}
 		else
 		{
 			reservarClave(ejecutando, consulta -> clave);
-			return 1;
+			resultado = 1;
 		}
+		pthread_mutex_unlock(&mBloqueados);
+		break;
 
-	case set:
-		return claveTomadaPorESI(consulta -> clave, ejecutando);
+	case noDefinido:
+		pthread_mutex_lock(&mBloqueados);
+		if(claveTomadaPorESI(consulta -> clave, ejecutando))
+			resultado = 1;
+		else
+			resultado = 0;
+		pthread_mutex_unlock(&mBloqueados);
+		break;
 
-	case store:
+	case liberadora:
+		pthread_mutex_lock(&mBloqueados);
 		if(claveTomadaPorESI(consulta -> clave, ejecutando))
 		{
-			liberarClave(consulta -> clave);
-			return 1;
+			ESI* ESILiberado = liberarClave(consulta -> clave);
+			if(ESILiberado)
+			{
+				pthread_mutex_lock(&mReady);
+				listarParaEjecucion(ESILiberado);
+				pthread_mutex_unlock(&mReady);
+			}
+			resultado = 1;
 		}
 		else
-			return 0;
+			resultado = 0;
+		pthread_mutex_unlock(&mBloqueados);
+		break;
 	}
+	free(consulta);
+	return resultado;
 }
+
 void crearServerESI ()
 {
 	char * puerto = obtenerPuerto();
@@ -246,20 +397,37 @@ pthread_t crearHiloEjecucion()
 
 enum comandos convertirComando(char* linea)
 {
-	/*
-	 * Para hacer despues.
-	 * (Basicamente una secuencia de if)
-	 */
-	if(string_equals_ignore_case(linea, "salir"))
-		return salir;
-	return -1;
+	if(string_equals_ignore_case(linea, "pausar"))
+		return pausar;
+	else if(string_equals_ignore_case(linea, "continuar"))
+		return continuar;
+	else if(string_equals_ignore_case(linea, "bloquear"))
+		return bloquear;
+	else if(string_equals_ignore_case(linea, "desbloquear"))
+		return desbloquear;
+	else if(string_equals_ignore_case(linea, "listar"))
+		return listar;
+	else
+		return -1;
 }
 
+
+/*
+ * Falta sincronizar el cierre de la colas y
+ * liberar los hilos.
+ */
 void liberarRecursos()
 {
 	eliminarConfiguracion();
 
-	cerrarListaReady();
+	cerrarColas();
+
+	pthread_mutex_destroy(&mReady);
+	pthread_mutex_destroy(&mBloqueados);
+	pthread_mutex_destroy(&mFinalizados);
+	pthread_mutex_destroy(&mESIEjecutando);
+	pthread_mutex_destroy(&mSocketCoord);
+	pthread_mutex_destroy(&enPausa);
 
 	cerrarSocket(socketCoord);
 	cerrarSocket(socketServerESI);

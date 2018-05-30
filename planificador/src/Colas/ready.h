@@ -7,8 +7,18 @@
 #include "../adminESI.h"
 #include "../configuracion.h"
 
-ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo);
+typedef struct {
+	ESI* esi;
+	int indice;
+}posicionESI;
+
 void listarParaEjecucion(ESI*);
+
+/*Los algoritmos quitan al ESI de la cola*/
+ESI* encontrarPorFCFS();
+ESI* encontrarPorSJF();
+
+ESI* ESIEnReady(ESI_id);
 
 void crearListaReady();
 void cerrarListaReady();
