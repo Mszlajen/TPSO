@@ -44,7 +44,6 @@ int main(void) {
 
 	 FD_ZERO(&readfds);
 
-
 	 pthread_create(&hiloEscuchaPorAcciones, NULL, (void*) escucharPorAcciones, NULL);
 
 	//close(socketCoordinador);
@@ -66,34 +65,69 @@ int main(void) {
 
 void escucharPorAcciones () {
 
-	//me rindo, podria mandar un mail a los ayudantes por que no se como le tengo que mandar el segundo parametro
-	//list_iterate(&listaInstancias,(void *) setearReadfdsInstancia);
-	//list_iterate(&listaEsi,(void *) setearReadfdsEsi);
-	/*
-	 * Revise los test ahí hay funciones de varios parametros (en la parte de orden superior)
-	 * Y si no alcanza esto: https://github.com/sisoputnfrba/foro/issues/1089
-	 * [MATI]
-	 */
+	list_iterate(listaInstancias,(void*) setearReadfdsInstancia);
+	list_iterate(listaEsi,(void*) setearReadfdsEsi);
 
 	select(socketInstanciaMax + 1,&readfds,NULL,NULL,NULL);
 	// debo revisar si los socket que quedaron en readfds son esi o instancia, si son instancia reviso si quieren compactar o si ya terminaron,
 	// si son esi reviso si me envian comandos
 
+	list_iterate(listaInstancias, (void*) escucharReadfdsInstancia);
+	list_iterate(listaEsi, (void*) escucharReadfdsEsi);
+
 }
 
-/*
- * No sé que vas a hacer con estas dos funciones
- * pero me da que es exceso de delegación
- *
- * [MATI]
- */
 
-//las puse por que segun entendi, el list_iterate tiene que recibir una funcion que recibe elementos de la lista
-void setearReadfdsInstancia (Instancia instancia){
+void escucharReadfdsInstancia (Instancia  instancia) {
+	header * header;
+
+	if (FD_ISSET(instancia.socket, &readfds))
+	{
+		recibirMensaje(instancia.socket,1,(void *) &header);
+		// tengo que revisar si quieren compactar o si ya terminaron
+		if(header->protocolo == 12){
+			// debo enviar un mensaje a la esi correspondiente que se ejecuto la instruccion
+		}
+	}
+}
+
+void escucharReadfdsEsi (Esi esi) {
+	header * header;
+	enum instruccion * instr = NULL;
+		//char* clave;
+		//char* valor;
+
+		if (FD_ISSET(esi.socket, &readfds))
+		{
+			recibirMensaje(esi.socket,1,(void *) &header);
+			if (header->protocolo == 8){
+
+				int estadoDellegada;
+
+				do {
+					estadoDellegada = recibirMensaje(esi.socket,sizeof(enum instruccion),(void *) &instr );
+				} while (estadoDellegada);
+
+				esi.instr = *instr;
+
+				switch(esi.instr){
+				case get:
+					break;
+				case set:
+					break;
+				case store:
+					break;
+				}
+			}
+			//queda inicializar la clave y el valor del esi, luego seguir lo indicado en el diagrama
+		}
+}
+
+void setearReadfdsInstancia (Instancia  instancia){
 	FD_SET(instancia.socket,&readfds);
 }
 
-void setearReadfdsEsi (Esi esi){
+void setearReadfdsEsi (Esi  esi){
 	FD_SET(esi.socket,&readfds);
 }
 
@@ -141,11 +175,6 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 		 *
 		 * [MATI]
 		 */
-
-
-		free(header);
-
-
 		registrarInstancia(socketAceptado);
 		break;
 
@@ -179,15 +208,6 @@ void registrarEsi(socket_t socket){
 	if (nuevaEsi.socket > socketInstanciaMax) {
 		socketInstanciaMax = nuevaEsi.socket;
 	}
-	/*
-	 *
-	 * [MATI]
-	 *
-	 * PD: Antes de que sigan este camino los invito
-	 * a que vean esto piensen si no hay otra manera
-	 * de resolverlo que crear un hilo por ESI.
-	 * https://github.com/sisoputnfrba/foro/issues/1012
-	 */
 }
 
 void registrarInstancia(socket_t socket)
@@ -228,15 +248,6 @@ void registrarInstancia(socket_t socket)
 
 	int estado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
 
-	/*
-	 * No hay problema si lo dejas así
-	 * pero si queres tenerlo en mente
-	 * acordate que los valor numericos
-	 * cuentan como booleanos en C
-	 * (0 = false, diferente de 0 = true)
-	 *
-	 * [MATI]
-	 */
 	if (estado != 0)
 	{
 		error_show ("no se pudo enviar informacion de entradas a la instancia %s",instanciaRecibida.nombre );

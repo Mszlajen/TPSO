@@ -18,7 +18,7 @@ typedef struct {
 	 * maximo cuando no tiene limite limite definido
 	 * [MATI]
 	 */
-	char nombre[10];
+	char* nombre;
 } Instancia;
 
 typedef struct {
@@ -29,8 +29,8 @@ typedef struct {
 	 * usar void* te lo va a complicar a la larga.
 	 * [MATI]
 	 */
-	void* clave;
-	void* valor;
+	char* clave;
+	char* valor;
 	// como estan definidos los resultados de ejecucion?
 	/*
 	 * No lo definimos, lo pueden proponer ustedes y lo
@@ -56,7 +56,10 @@ void registrarInstancia(socket_t socket);
 void escucharPorAcciones ();
 void setearReadfdsInstancia (Instancia instancia);
 void setearReadfdsEsi (Esi esi);
+void escucharReadfdsInstancia (Instancia  instancia);
+void escucharReadfdsEsi (Esi esi);
 void recibirConexiones();
+
 
 
 
