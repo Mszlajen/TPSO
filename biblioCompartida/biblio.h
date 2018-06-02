@@ -13,8 +13,14 @@
 #define EXITO 0
 
 typedef int socket_t;
-typedef int ESI_id;
-typedef int instancia_id;
+typedef int32_t ESI_id;
+typedef int32_t instancia_id;
+//No creo que necesitemos más de 255 entradas de 255 caracteres...
+typedef uint8_t tamEntradas_t;
+typedef uint8_t cantEntradas_t;
+//Tampoco creo que le den un nombre a una instancia de más de 255 caracteres...
+typedef uint8_t tamNombreInstancia_t;
+
 
 typedef struct {
 	uint8_t protocolo;
