@@ -24,6 +24,8 @@ char* obtenerPuertoCoordinador();
 char* obtenerPuntoDeMontaje();
 int obtenerIntervaloDeDump();
 enum algoritmoReemplazo obtenerAlgoritmoReemplazo();
+// Devuelve un nuevo string independiente de la configuracion.
+char* obtenerDireccionArchivoID();
 
 void destruirConfiguracion();
 #endif /* CONFIGURACION_H_ */

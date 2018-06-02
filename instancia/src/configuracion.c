@@ -50,3 +50,8 @@ enum algoritmoReemplazo obtenerAlgoritmoReemplazo()
 	else
 		return Circular;
 }
+
+char* obtenerDireccionArchivoID()
+{
+	return string_from_format("%s%s", obtenerPuntoDeMontaje(), "ID");
+}
