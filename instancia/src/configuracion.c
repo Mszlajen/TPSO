@@ -55,3 +55,8 @@ char* obtenerDireccionArchivoID()
 {
 	return string_from_format("%s%s", obtenerPuntoDeMontaje(), "ID");
 }
+
+char* obtenerDireccionArchivoMontaje(char* nombreArchivo)
+{
+	return string_from_format("%s%s", obtenerPuntoDeMontaje(), nombreArchivo);
+}

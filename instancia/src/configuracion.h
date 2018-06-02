@@ -26,6 +26,8 @@ int obtenerIntervaloDeDump();
 enum algoritmoReemplazo obtenerAlgoritmoReemplazo();
 // Devuelve un nuevo string independiente de la configuracion.
 char* obtenerDireccionArchivoID();
+// Devuelve un nuevo string independiente de la configuracion.
+char* obtenerDireccionArchivoMontaje(char*);
 
 void destruirConfiguracion();
 #endif /* CONFIGURACION_H_ */
