@@ -20,13 +20,15 @@ typedef uint8_t tamEntradas_t;
 typedef uint8_t cantEntradas_t;
 //Tampoco creo que le den un nombre a una instancia de más de 255 caracteres...
 typedef uint8_t tamNombreInstancia_t;
+typedef uint8_t tamClave_t;
+typedef uint8_t tamValor_t;
 
 
 typedef struct {
 	uint8_t protocolo;
 } header;
 
-enum instruccion {get, set, store};
+enum instruccion {get, set, store, compactacion};
 enum tipoDeInstruccion {bloqueante, liberadora, noDefinido};
 
 void salir_agraciadamente(int);
