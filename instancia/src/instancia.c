@@ -31,6 +31,12 @@ void inicializar(char* dirConfig)
 	recibirRespuestaHandshake();
 	tablaDeEntradas = malloc(cantidadEntradas * tamanioEntradas);
 	tablaDeControl = malloc(sizeof(infoEntrada) * cantidadEntradas);
+	int i;
+	for(i = 0; i < cantidadEntradas; i++)
+	{
+		tablaDeControl[i].clave = NULL;
+		tablaDeControl[i].tiempoUltimoUso = 0;
+	}
 }
 
 void dump()
