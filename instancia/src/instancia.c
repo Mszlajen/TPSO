@@ -1,6 +1,6 @@
 #include "instancia.h"
 
-char** tablaDeEntradas = NULL;
+char* tablaDeEntradas = NULL;
 t_dictionary* infoClaves = NULL;
 infoEntrada* tablaDeControl = NULL;
 instancia_id ID = ERROR;
@@ -197,7 +197,7 @@ void instruccionStore(instruccion_t* instruccion)
 			memcpy(clave -> mappeado,
 					tablaDeEntradas[clave -> entradaInicial + i * tamanioEntradas],
 					min(tamanioEntradas, tamClavePendiente));
-			tablaDeControl[clave -> entradaInicial + i * sizeof(infoEntrada)].tiempoUltimoUso = 0;
+			tablaDeControl[clave -> entradaInicial + i].tiempoUltimoUso = 0;
 			tamClavePendiente -= tamanioEntradas;
 		}
 		/*
@@ -249,8 +249,8 @@ void registrarNuevaClave(char* clave, char* valor, tamValor_t tamValor)
 	int i;
 	for(i = 0; tamValorRestante > 0; i++)
 	{
-		tablaDeControl[posicion + i * sizeof(infoEntrada)].clave = string_duplicate(clave);
-		tablaDeControl[posicion + i * sizeof(infoEntrada)].tiempoUltimoUso = 0;
+		tablaDeControl[posicion + i].clave = string_duplicate(clave);
+		tablaDeControl[posicion + i].tiempoUltimoUso = 0;
 		memcpy(tablaDeEntradas[posicion + i * tamanioEntradas],
 				valor + i * tamanioEntradas,
 				min(tamValorRestante, tamanioEntradas));
@@ -273,7 +273,7 @@ void reemplazarValorMayorTamanio(char* clave, infoClave* informacionClave, char*
 	cantEntradas_t cantEntradasClave = tamValorACantEntradas(informacionClave -> tamanio);
 	for(i = 0; i < cantEntradasClave; i++)
 	{
-		tablaDeControl[informacionClave -> entradaInicial + i * sizeof(infoEntrada)].clave=NULL;
+		tablaDeControl[informacionClave -> entradaInicial + i].clave=NULL;
 	}
 	destruirMappeado(informacionClave);
 	fclose(informacionClave -> archivo); //¿Hace falta serar el archivo o gasto tiempo innecesariamente?
@@ -291,7 +291,7 @@ void reemplazarValorIgualTamanio(char* clave, infoClave* informacionClave, char*
 		memcpy(tablaDeEntradas[informacionClave -> entradaInicial + i * tamanioEntradas],
 				valor + i * tamanioEntradas,
 				min(tamValorRestante, tamanioEntradas));
-		tablaDeControl[informacionClave -> entradaInicial + i * sizeof(infoEntrada)].tiempoUltimoUso = 0;
+		tablaDeControl[informacionClave -> entradaInicial + i].tiempoUltimoUso = 0;
 		tamValorRestante -= tamanioEntradas;
 	}
 
@@ -309,7 +309,7 @@ void reemplazarValorMenorTamanio(char* clave, infoClave* informacionClave, char*
 		memcpy(tablaDeEntradas[informacionClave -> entradaInicial + i * tamanioEntradas],
 				valor + i * tamanioEntradas,
 				min(tamValorRestante, tamanioEntradas));
-		tablaDeControl[informacionClave -> entradaInicial + i * sizeof(infoEntrada)].tiempoUltimoUso = 0;
+		tablaDeControl[informacionClave -> entradaInicial + i].tiempoUltimoUso = 0;
 		tamValorRestante -= tamanioEntradas;
 	}
 
@@ -318,7 +318,7 @@ void reemplazarValorMenorTamanio(char* clave, infoClave* informacionClave, char*
 	tamValorRestante = informacionClave -> tamanio - tamValor;
 	for(i = 0; tamValorRestante > 0; i++)
 	{
-		tablaDeControl[finNuevaClave + i * tamanioEntradas].clave = NULL;
+		tablaDeControl[finNuevaClave + i].clave = NULL;
 		tamValorRestante -= tamanioEntradas;
 	}
 
