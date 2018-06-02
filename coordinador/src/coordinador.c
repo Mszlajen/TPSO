@@ -231,11 +231,22 @@ void registrarInstancia(socket_t socket)
 	instanciaRecibida.idinstancia = cantInstancias;
 	instanciaRecibida.socket = socket;
 
+	/*
+	 * No puedo decir que no sea así pero, están seguros de que list_add
+	 * devuelve la cantidad de elemento en la lista? porque para mi debe
+	 * devolver si se pudo agregar el elemento.
+	 * [MATI]
+	 */
 	cantInstancias = list_add(listaInstancias,&instanciaRecibida);
 
 
 	header header;
 	header.protocolo = 5;
+	/*
+	 * Defini para el tipo para tamaño y cantidad de entradas en la biblio
+	 * (Lo acabo de hacer, para asegurar que este tpdp en el mismo tipo)
+	 * [MATI]
+	 */
 	int cantEntradas = config_get_int_value(configuracion, "CantEntradas");
 	int tamEntradas = config_get_int_value(configuracion, "TamEntradas");
 	int * buffer = malloc(sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
