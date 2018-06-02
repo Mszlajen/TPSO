@@ -49,22 +49,39 @@ void bloquearESI(ESI* esi, char* clave)
 
 ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo algoritmo)
 {
-	ESI* paraEjecutar;
 	switch(algoritmo)
 	{
 	case sjf:
-		if((paraEjecutar = ESIEjecutando()))
-			return paraEjecutar;
+		if(ESIEjecutando())
+			return ESIEjecutando();
 		else
 		{
 			ponerESIAEjecutar(encontrarPorSJF());
 			return ESIEjecutando();
 		}
 	case srt:
+		//Está hecho fideo, arreglar.
+		if(ESIEjecutando())
+		{
+			if(!getFlagNuevos())
+				return ESIEjecutando();
+			else
+			{
+				listarParaEjecucion(ESIEjecutando());
+				quitarESIEjecutando();
+				ponerESIAEjecutar(encontrarPorSJF());
+				return ESIEjecutando();
+			}
+		}
+		else
+		{
+			ponerESIAEjecutar(encontrarPorSJF());
+			return ESIEjecutando();
+		}
 	case hrrn:
 	default: //Devuelve FCFS
-		if((paraEjecutar = ESIEjecutando()))
-			return paraEjecutar;
+		if(ESIEjecutando())
+			return ESIEjecutando();
 		else
 		{
 			ponerESIAEjecutar(encontrarPorFCFS());

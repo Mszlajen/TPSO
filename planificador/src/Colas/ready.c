@@ -1,9 +1,11 @@
 #include "ready.h"
 
 t_list * listos = NULL;
+uint8_t flagNuevos = 0;
 
 void listarParaEjecucion (ESI* nuevaESI)
 {
+	flagNuevos = 1;
 	list_add(listos, nuevaESI);
 }
 
@@ -55,6 +57,15 @@ ESI* encontrarPorSJF()
 	list_iterate(listos, compararESI);
 	list_remove(listos, res.indice);
 	return res.esi;
+}
+void setFlagNuevos(uint8_t valor)
+{
+	flagNuevos = valor;
+}
+
+uint8_t getFlagNuevos()
+{
+	return flagNuevos;
 }
 
 void crearListaReady()
