@@ -236,6 +236,24 @@ void registrarNuevaClave(char* clave, char* valor, tamValor_t tamValor)
 	free(dirArchivo);
 
 	cantEntradas_t posicion = encontrarEspacioLibreConsecutivo(tamValor);
+	if(posicion == cantidadEntradas)
+	{
+		do
+		{
+			if(haySuficienteEspacio(tamValor))
+			{
+				//Compactacion
+				posicion = encontrarEspacioLibreConsecutivo(tamValor);
+				break;
+			}
+			else
+				algoritmoDeReemplazo();
+		}while(1);
+		/*
+		 * Reemplaza claves hasta tener espacio suficiente para guardar la clave.
+		 * Falta hacer que si la clave reemplazada quedo consecutiva al espacio libre NO llame la compactacion.
+		 */
+	}
 
 	nuevaClave -> entradaInicial = posicion;
 	nuevaClave -> tamanio = tamValor;
@@ -269,7 +287,7 @@ void actualizarValorMayorTamanio(char* clave, infoClave* informacionClave, char*
 		tablaDeControl[informacionClave -> entradaInicial + i].clave=NULL;
 	}
 	destruirMappeado(informacionClave);
-	fclose(informacionClave -> archivo); //¿Hace falta serar el archivo o gasto tiempo innecesariamente?
+	fclose(informacionClave -> archivo); //¿Hace falta cerrar el archivo o gasto tiempo innecesariamente?
 	free(informacionClave);
 
 	registrarNuevaClave(clave, valor, tamValor);
