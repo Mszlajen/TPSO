@@ -13,22 +13,7 @@
 
 typedef struct {
 	socket_t socket;
-	int idinstancia;
-	/*El nombre sigue definido en diez caracteres
-	 * maximo cuando no tiene limite limite definido
-	 * [MATI]
-	 */
-	char* nombre;
-} Instancia;
-
-typedef struct {
-	socket_t socket;
 	enum instruccion instr;
-	/*
-	 * La clave y el valor son cadenas de caracteres,
-	 * usar void* te lo va a complicar a la larga.
-	 * [MATI]
-	 */
 	char* clave;
 	char* valor;
 	// como estan definidos los resultados de ejecucion?
@@ -38,6 +23,15 @@ typedef struct {
 	 * [MATI]
 	 */
 } Esi;
+
+
+typedef struct {
+	socket_t socket;
+	int idinstancia;
+	char* nombre;
+	Esi * esiTrabajando;
+	int ocupada;
+} Instancia;
 
 #define IPEscucha "127.0.0.2"
 #define archivoConfig "coordinador.config"
@@ -54,6 +48,10 @@ void atenderEsi(socket_t socket);
 void registrarEsi(socket_t socket);
 void registrarInstancia(socket_t socket);
 void escucharPorAcciones ();
+void tratarGet(Esi * esi);
+void tratarSet(Esi * esi);
+void tratarStore(Esi * esi);
+int consultarPorClaveTomada(Esi esi);
 void setearReadfdsInstancia (Instancia instancia);
 void setearReadfdsEsi (Esi esi);
 void escucharReadfdsInstancia (Instancia  instancia);

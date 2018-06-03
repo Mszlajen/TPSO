@@ -13,7 +13,9 @@ t_config * configuracion = NULL;
 t_list * listaInstancias = NULL;
 t_list * listaEsi = NULL;
 fd_set readfds;
+t_dictionary * tablaDeClaves = NULL;
 
+socket_t  socketPlanificador;
 socket_t  socketCoordinador;
 
 int cantInstancias;
@@ -22,14 +24,11 @@ int socketInstanciaMax = 0;
 int main(void) {
 
 	struct sockaddr_in dirPlanificador;
-	socket_t socketPlanificador;
 	int esPlanificador;
 	pthread_t hiloRecibeConexiones;
 	pthread_t hiloEscuchaPorAcciones;
 
 	inicializacion();
-
-
 
 	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
 
@@ -83,7 +82,7 @@ void escucharReadfdsInstancia (Instancia  instancia) {
 
 	if (FD_ISSET(instancia.socket, &readfds))
 	{
-		recibirMensaje(instancia.socket,1,(void *) &header);
+		recibirMensaje(instancia.socket,sizeof(header),(void *) &header);
 		// tengo que revisar si quieren compactar o si ya terminaron
 		if(header->protocolo == 12){
 			// debo enviar un mensaje a la esi correspondiente que se ejecuto la instruccion
@@ -96,13 +95,13 @@ void escucharReadfdsEsi (Esi esi) {
 	enum instruccion * instr = NULL;
 		//char* clave;
 		//char* valor;
+	int estadoDellegada;
+
 
 		if (FD_ISSET(esi.socket, &readfds))
 		{
-			recibirMensaje(esi.socket,1,(void *) &header);
+			recibirMensaje(esi.socket,sizeof(header),(void *) &header);
 			if (header->protocolo == 8){
-
-				int estadoDellegada;
 
 				do {
 					estadoDellegada = recibirMensaje(esi.socket,sizeof(enum instruccion),(void *) &instr );
@@ -112,8 +111,10 @@ void escucharReadfdsEsi (Esi esi) {
 
 				switch(esi.instr){
 				case get:
+					tratarGet(&esi);
 					break;
 				case set:
+					tratarSet(&esi);
 					break;
 				case store:
 					break;
@@ -123,12 +124,190 @@ void escucharReadfdsEsi (Esi esi) {
 		}
 }
 
+void tratarGet(Esi * esi){
+	tamClave_t * tamClave = NULL;
+	header header;
+	header.protocolo = 11;
+
+	int estadoDellegada;
+	do {
+		estadoDellegada = recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
+	} while (estadoDellegada);
+
+	do {
+		estadoDellegada = recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
+	} while (estadoDellegada);
+
+	if( dictionary_has_key(&tablaDeClaves, esi->clave) ){
+		header.protocolo = 15;
+		int * buffer = malloc(sizeof(header) + *tamClave + sizeof(int));
+
+		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer+sizeof(header) , tamClave , sizeof(int));
+		memcpy(buffer+sizeof(header)+sizeof(int), &esi->clave , *tamClave );
+
+		int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + *tamClave + sizeof(int) );
+
+		if (estado != 0)
+			{
+				error_show ("no se pudo informar de operacion get al planificador");
+			}
+
+	} else {
+		// es el algoritmo quien decide como distribuir las claves, aun no esta implementado
+		// se debe comunicar al planificador por esta nueva clave
+		// dictionary_put(&tablaDeClaves, esi->clave, &instancia);
+	}
+}
+
+void tratarStore(Esi * esi) {
+	tamClave_t * tamClave = NULL;
+	header header;
+	header.protocolo = 11;
+
+	int estadoDellegada;
+	do {
+		estadoDellegada = recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
+	} while (estadoDellegada);
+
+	do {
+		estadoDellegada = recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
+	} while (estadoDellegada);
+
+	if( consultarPorClaveTomada(*esi) == 1){
+
+		//instancia = algoritmoPedirInstancia(); aca tendria que pedir una instancia para poder enviarle el mensaje pero aun no esta el algoritmo
+		int * buffer = malloc(sizeof(header) + sizeof(int) + *tamClave + sizeof(int));
+		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(int) );
+		memcpy(buffer+sizeof(header)+sizeof(int) , tamClave , sizeof(int) );
+		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int), &esi->clave , *tamClave );
+
+		/*
+		int estado = enviarBuffer (instancia.socket , buffer , sizeof(header) + sizeof(enum instrucion) + *tamClave + sizeof(int) );
+
+		if (estado != 0)
+		{
+			error_show ("no se pudo enviar store a la instancia: %s",instancia.nombre );
+		}
+		*/
+		//instancia.ocupada = 0;
+		free(buffer);
+		buffer = malloc(sizeof(header) + sizeof(int) + *tamClave);
+		header.protocolo = 16;
+		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer+sizeof(header) , tamClave , sizeof(int) );
+		memcpy(buffer+sizeof(header)+sizeof(int), &esi->clave , *tamClave );
+
+		int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + *tamClave );
+
+		if (estado != 0)
+		{
+			error_show ("no se pudo informar de operacion store al planificador ");
+		}
+
+	}else{
+		// aca va el caso donde se hace store de una clave no tomada
+	}
+
+}
+
+void tratarSet(Esi * esi){
+	tamClave_t * tamClave = NULL;
+	tamValor_t * tamValor = NULL;
+	header header;
+	header.protocolo = 11;
+
+	int estadoDellegada;
+	do {
+		estadoDellegada = recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
+	} while (estadoDellegada);
+
+	estadoDellegada = 1;
+
+	do {
+		estadoDellegada = recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
+	} while (estadoDellegada);
+
+	estadoDellegada = 1;
+
+	do {
+		estadoDellegada = recibirMensaje(esi->socket,sizeof(tamValor_t),(void *) &tamValor );
+	} while (estadoDellegada);
+
+	estadoDellegada = 1;
+
+	do {
+		estadoDellegada = recibirMensaje(esi->socket,*tamValor,(void *) &esi->valor);
+	} while (estadoDellegada);
+
+	if( consultarPorClaveTomada(*esi) != 0){
+		//instancia = algoritmoPedirInstancia(); aca tendria que pedir una instancia para poder enviarle el mensaje pero aun no esta el algoritmo
+		int * buffer = malloc(sizeof(header) + sizeof(int) + *tamClave + *tamValor + sizeof(int) * 2);
+		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(int) );
+		memcpy(buffer+sizeof(header)+sizeof(int) , tamClave , sizeof(int) );
+		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int), &esi->clave , *tamClave );
+		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int)+*tamClave , tamValor , sizeof(int) );
+		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int)*2+*tamClave , &esi->valor , *tamValor );
+
+		/*
+		int estado = enviarBuffer (instancia.socket , buffer , sizeof(header) + sizeof(enum instrucion) + *tamClave + *tamValor + sizeof(int) * 2);
+
+		if (estado != 0)
+		{
+			error_show ("no se pudo enviar instruccion a la instancia: %s",instancia.nombre );
+		}
+		*/
+		//instancia.ocupada = 0;
+		free(buffer);
+	}else{
+		// aca va el caso en que la clave no pertenece al esi
+	}
+
+}
+
 void setearReadfdsInstancia (Instancia  instancia){
 	FD_SET(instancia.socket,&readfds);
 }
 
 void setearReadfdsEsi (Esi  esi){
 	FD_SET(esi.socket,&readfds);
+}
+
+
+int consultarPorClaveTomada(Esi esi){
+	header header;
+	header.protocolo = 9;
+	tamClave_t  tamClave = sizeof(esi.clave);
+	int estadoDellegada;
+
+	int * buffer = malloc(sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
+	memcpy(buffer , &header.protocolo , sizeof(header) );
+	memcpy(buffer+sizeof(header) , &esi.instr , sizeof(int) );
+	memcpy(buffer+sizeof(header) + sizeof(int)  , &tamClave, sizeof(int) );
+	memcpy(buffer+sizeof(header) + sizeof(int) + sizeof(int)  , &esi.clave, tamClave );
+
+	int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
+
+	if (estado != 0)
+	{
+		error_show ("no se pudo preguntar al planificador si la clave esta asignada al esi ");
+	}
+
+	do {
+		estadoDellegada = recibirMensaje(socketPlanificador,sizeof(header) + sizeof(int),(void *) &buffer);
+		} while (estadoDellegada);
+
+	if (*buffer == 0){
+		free(buffer);
+		return 0;
+	} else {
+		free(buffer);
+		return 1;
+	}
+
+
 }
 
 void recibirConexiones() {
@@ -142,6 +321,7 @@ void recibirConexiones() {
 			esESIoInstancia(socketAceptado,dirAceptado);
 		}
 }
+
 
 void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 {
@@ -181,6 +361,9 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 	case 3:
 		registrarEsi(socketAceptado);
 		break;
+	case 4:
+		// una instancia se reconecta
+		break;
 
 	default:
 
@@ -204,6 +387,8 @@ void registrarEsi(socket_t socket){
 
 	Esi nuevaEsi;
 	nuevaEsi.socket = socket;
+	nuevaEsi.clave = NULL;
+	nuevaEsi.valor = NULL;
 	list_add(listaEsi,&nuevaEsi);
 	if (nuevaEsi.socket > socketInstanciaMax) {
 		socketInstanciaMax = nuevaEsi.socket;
@@ -215,6 +400,7 @@ void registrarInstancia(socket_t socket)
 	int * tamMensj = NULL;
 	int estadoDellegada;
 	Instancia instanciaRecibida;
+	instanciaRecibida.esiTrabajando = NULL;
 
 	do {
 		estadoDellegada = recibirMensaje(socket,4,(void *) &tamMensj );
@@ -242,20 +428,15 @@ void registrarInstancia(socket_t socket)
 
 	header header;
 	header.protocolo = 5;
-	/*
-	 * Defini para el tipo para tamaño y cantidad de entradas en la biblio
-	 * (Lo acabo de hacer, para asegurar que este tpdp en el mismo tipo)
-	 * [MATI]
-	 */
-	int cantEntradas = config_get_int_value(configuracion, "CantEntradas");
-	int tamEntradas = config_get_int_value(configuracion, "TamEntradas");
+	cantEntradas_t cantEntradas = config_get_int_value(configuracion, "CantEntradas");
+	tamEntradas_t tamEntradas = config_get_int_value(configuracion, "TamEntradas");
 	int * buffer = malloc(sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
 
 
 	memcpy(buffer , &header.protocolo , sizeof(header) );
 	memcpy(buffer+sizeof(header) , &instanciaRecibida.idinstancia , sizeof(int) );
-	memcpy(buffer+sizeof(int) , &cantEntradas , sizeof(cantEntradas) );
-	memcpy(buffer+sizeof(cantEntradas) , &tamEntradas , sizeof(tamEntradas) );
+	memcpy(buffer+sizeof(header)+sizeof(int) , &cantEntradas , sizeof(cantEntradas) );
+	memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(cantEntradas) , &tamEntradas , sizeof(tamEntradas) );
 
 	int estado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
 
@@ -325,4 +506,5 @@ void inicializacion()
 	cantInstancias = 0;
 	listaEsi = list_create();
 	listaInstancias = list_create();
+	tablaDeClaves = dictionary_create();
 }
