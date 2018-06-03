@@ -127,9 +127,19 @@ void escucharReadfdsEsi (Esi esi) {
 void tratarGet(Esi * esi){
 	tamClave_t * tamClave = NULL;
 	header header;
+	/*
+	 * ¿Para que le asignas un valor al protocolo si despues
+	 * lo vas a cambiar sin usarlo?
+	 * [MATI]
+	 */
 	header.protocolo = 11;
 
 	int estadoDellegada;
+	/*
+	 * No entiendo, si hay un error o se cierra el socket te quedas repitiendo infinitamente
+	 * la función
+	 * [MATI]
+	 */
 	do {
 		estadoDellegada = recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
 	} while (estadoDellegada);
@@ -137,7 +147,12 @@ void tratarGet(Esi * esi){
 	do {
 		estadoDellegada = recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
 	} while (estadoDellegada);
-
+	/*
+	 * ¡Lean las advertencias!
+	 *
+	 * tablaDeClaves es un puntero a diccionario.
+	 * [MATI]
+	 */
 	if( dictionary_has_key(&tablaDeClaves, esi->clave) ){
 		header.protocolo = 15;
 		int * buffer = malloc(sizeof(header) + *tamClave + sizeof(int));
@@ -148,6 +163,12 @@ void tratarGet(Esi * esi){
 
 		int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + *tamClave + sizeof(int) );
 
+		/*
+		 * Si fallo el envio del mensaje (por la razon que sea), ¿qué haces?
+		 * Ahora mismo seguis con la ejecución como si nada y está mal
+		 * porque es un error fatal.
+		 * [MATI]
+		 */
 		if (estado != 0)
 			{
 				error_show ("no se pudo informar de operacion get al planificador");
@@ -206,6 +227,11 @@ void tratarStore(Esi * esi) {
 			error_show ("no se pudo informar de operacion store al planificador ");
 		}
 
+		/*
+		 * ¿Para qué le avisas devuelta al planificador del store si ya lo hiciste
+		 * cuando le consultaste por el estado de la clave?
+		 */
+
 	}else{
 		// aca va el caso donde se hace store de una clave no tomada
 	}
@@ -243,6 +269,11 @@ void tratarSet(Esi * esi){
 
 	if( consultarPorClaveTomada(*esi) != 0){
 		//instancia = algoritmoPedirInstancia(); aca tendria que pedir una instancia para poder enviarle el mensaje pero aun no esta el algoritmo
+		/*
+		 * No pedis la instancia todo el tiempo solo la primera vez que se hace SET de esa clave,
+		 * de la segunda para adelante tenes la instancia en la tablaDeClaves
+		 * [MATI]
+		 */
 		int * buffer = malloc(sizeof(header) + sizeof(int) + *tamClave + *tamValor + sizeof(int) * 2);
 		memcpy(buffer , &header.protocolo , sizeof(header) );
 		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(int) );
@@ -267,6 +298,12 @@ void tratarSet(Esi * esi){
 
 }
 
+/*
+ * Esto es exceso de delegación.
+ * Escribis exactamente la misma cantidad de caracteres
+ * llamando a la funcion y no te aporta nada.
+ * [MATI]
+ */
 void setearReadfdsInstancia (Instancia  instancia){
 	FD_SET(instancia.socket,&readfds);
 }
@@ -282,6 +319,14 @@ int consultarPorClaveTomada(Esi esi){
 	tamClave_t  tamClave = sizeof(esi.clave);
 	int estadoDellegada;
 
+	/*
+	 * ¿Qué son todos esos int que aparecen?
+	 * [MATI]
+	 *
+	 * PD: Si no se entendio mi sarcasmo, les estoy diciendo
+	 * que lo arreglen de una manera que se entienda que es
+	 * cada cosa.
+	 */
 	int * buffer = malloc(sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
 	memcpy(buffer , &header.protocolo , sizeof(header) );
 	memcpy(buffer+sizeof(header) , &esi.instr , sizeof(int) );
@@ -417,12 +462,6 @@ void registrarInstancia(socket_t socket)
 	instanciaRecibida.idinstancia = cantInstancias;
 	instanciaRecibida.socket = socket;
 
-	/*
-	 * No puedo decir que no sea así pero, están seguros de que list_add
-	 * devuelve la cantidad de elemento en la lista? porque para mi debe
-	 * devolver si se pudo agregar el elemento.
-	 * [MATI]
-	 */
 	cantInstancias = list_add(listaInstancias,&instanciaRecibida);
 
 
@@ -440,6 +479,14 @@ void registrarInstancia(socket_t socket)
 
 	int estado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
 
+	/*
+	 * Devuelta, algo falla y la ejecucion sigue como si nada.
+	 * Eso está MAL.
+	 * Si algo falla ¿porque falla? y ¿Qué hago para manejar ese error?
+	 * Imprimir el error no está mal (de hecho está perfecto) pero antes
+	 * de eso programa tiene que saber manejar el error.
+	 * [MATI]
+	 */
 	if (estado != 0)
 	{
 		error_show ("no se pudo enviar informacion de entradas a la instancia %s",instanciaRecibida.nombre );

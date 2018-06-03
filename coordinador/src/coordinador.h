@@ -16,12 +16,6 @@ typedef struct {
 	enum instruccion instr;
 	char* clave;
 	char* valor;
-	// como estan definidos los resultados de ejecucion?
-	/*
-	 * No lo definimos, lo pueden proponer ustedes y lo
-	 * anotan en el archivo de protocolo.
-	 * [MATI]
-	 */
 } Esi;
 
 
