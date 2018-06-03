@@ -56,6 +56,7 @@ void actualizarValorMenorTamanio(char*, infoClave*, char*, tamValor_t);
 void reemplazoCircular();
 
 void almacenarID();
+void enviarResultadoEjecucion(enum resultadoEjecucion);
 cantEntradas_t tamValorACantEntradas(tamValor_t);
 //Devuelve 0 en exito, ERROR si fallo
 int crearMappeado(infoClave*);

@@ -1,6 +1,6 @@
 #include "instancia.h"
 
-char* tablaDeEntradas = NULL;
+char** tablaDeEntradas = NULL;
 t_dictionary* infoClaves = NULL;
 infoEntrada* tablaDeControl = NULL;
 instancia_id ID = ERROR;
@@ -29,13 +29,17 @@ void inicializar(char* dirConfig)
 	infoClaves = dictionary_create();
 	conectarConCoordinador();
 	recibirRespuestaHandshake();
-	tablaDeEntradas = malloc(cantidadEntradas * tamanioEntradas);
+	tablaDeEntradas = malloc(cantidadEntradas * sizeof(char*));
 	tablaDeControl = malloc(sizeof(infoEntrada) * cantidadEntradas);
 	int i;
 	for(i = 0; i < cantidadEntradas; i++)
 	{
 		tablaDeControl[i].clave = NULL;
 		tablaDeControl[i].tiempoUltimoUso = 0;
+	}
+	for(i = 0; i < cantidadEntradas; i++)
+	{
+		tablaDeEntradas = malloc(tamanioEntradas * sizeof(char));
 	}
 }
 
@@ -146,7 +150,7 @@ instruccion_t* recibirInstruccionCoordinador()
 	header* encabezado;
 	recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado);
 	if(encabezado->protocolo != 11)
-		/*error*/;
+	{	/*error*/ }
 	free(encabezado);
 
 	enum tipoDeInstruccion *tipo;
@@ -183,6 +187,7 @@ void instruccionSet(instruccion_t* instruccion)
 	{
 		registrarNuevaClave(instruccion -> clave, instruccion -> valor, instruccion -> tamValor);
 	}
+	enviarResultadoEjecucion(exito);
 }
 
 void instruccionStore(instruccion_t* instruccion)
@@ -200,15 +205,11 @@ void instruccionStore(instruccion_t* instruccion)
 			tablaDeControl[clave -> entradaInicial + i].tiempoUltimoUso = 0;
 			tamClavePendiente -= tamanioEntradas;
 		}
-		/*
-		 * Setear valor de respuesta exitoso
-		 */
+		enviarResultadoEjecucion(exito);
 	}
 	else
 	{
-		/*
-		 * Informar de Error de Clave no Identificada al coordinador
-		 */
+		enviarResultadoEjecucion(fallo);
 	}
 }
 
@@ -384,6 +385,14 @@ void reemplazoCircular()
 
 	destruirClave(tablaDeControl[punteroReemplazo].clave);
 	tablaDeControl[punteroReemplazo].clave = NULL;
+}
+
+void enviarResultadoEjecucion(enum resultadoEjecucion res)
+{
+	void* buffer = malloc(sizeof(header) + sizeof(enum resultadoEjecucion));
+	((header*) buffer) -> protocolo = 12;
+	*((enum resultadoEjecucion*) buffer + sizeof(header)) = res;
+	enviarBuffer(socketCoord, buffer, sizeof(header) + sizeof(enum resultadoEjecucion));
 }
 
 void incrementarUltimoUsoEntradas()
