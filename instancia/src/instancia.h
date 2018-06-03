@@ -46,16 +46,22 @@ void instruccionStore(instruccion_t*);
 void actualizarValorDeClave(char*, char*, tamValor_t);
 void registrarNuevaClave(char*, char*, tamValor_t);
 
-cantEntradas_t encontrarEspacioLibre(tamValor_t);
-void reemplazarValorMayorTamanio(char*, infoClave*, char*, tamValor_t);
-void reemplazarValorIgualTamanio(char*, infoClave*, char*, tamValor_t);
-void reemplazarValorMenorTamanio(char*, infoClave*, char*, tamValor_t);
+cantEntradas_t encontrarEspacioLibreConsecutivo(tamValor_t);
+int haySuficienteEspacio(tamValor_t);
+void algoritmoDeReemplazo();
+void actualizarValorMayorTamanio(char*, infoClave*, char*, tamValor_t);
+void actualizarValorIgualTamanio(char*, infoClave*, char*, tamValor_t);
+void actualizarValorMenorTamanio(char*, infoClave*, char*, tamValor_t);
+
+void reemplazoCircular();
 
 void almacenarID();
 cantEntradas_t tamValorACantEntradas(tamValor_t);
 //Devuelve 0 en exito, ERROR si fallo
 int crearMappeado(infoClave*);
 int destruirMappeado(infoClave*);
+void destruirClave(char*);
+void incrementarPunteroReemplazo();
 int min (int, int);
 void salirConError(char*);
 #endif /* INSTANCIA_H_ */

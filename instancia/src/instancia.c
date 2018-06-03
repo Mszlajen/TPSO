@@ -5,7 +5,7 @@ t_dictionary* infoClaves = NULL;
 infoEntrada* tablaDeControl = NULL;
 instancia_id ID = ERROR;
 tamEntradas_t tamanioEntradas;
-cantEntradas_t cantidadEntradas;
+cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
 socket_t socketCoord = ERROR;
 
 int main(int argc, char** argv) {
@@ -219,11 +219,11 @@ void actualizarValorDeClave(char* clave, char* valor, tamValor_t tamValor)
 	cantEntradas_t entradasUsadas = tamValorACantEntradas(informacionClave -> tamanio);
 	if(entradasNecesarias > entradasUsadas)
 	{
-		reemplazarValorMayorTamanio(clave, informacionClave, valor, tamValor);
+		actualizarValorMayorTamanio(clave, informacionClave, valor, tamValor);
 	}
 	else
 	{
-		reemplazarValorMenorTamanio(clave, informacionClave, valor, tamValor);
+		actualizarValorMenorTamanio(clave, informacionClave, valor, tamValor);
 	}
 }
 
@@ -235,7 +235,7 @@ void registrarNuevaClave(char* clave, char* valor, tamValor_t tamValor)
 	nuevaClave -> archivo = fopen(dirArchivo, "w");
 	free(dirArchivo);
 
-	cantEntradas_t posicion = encontrarEspacioLibre(tamValor);
+	cantEntradas_t posicion = encontrarEspacioLibreConsecutivo(tamValor);
 
 	nuevaClave -> entradaInicial = posicion;
 	nuevaClave -> tamanio = tamValor;
@@ -254,16 +254,13 @@ void registrarNuevaClave(char* clave, char* valor, tamValor_t tamValor)
 	}
 	dictionary_put(infoClaves, clave, nuevaClave);
 }
+
 /*
- * Las tres funciones repiten logica.
- * Si alcanza el tiempo revisar y modular.
- */
-/*
- * Si quiero reemplazar el valor de una clave por otro que requiere más entradas
+ * Si quiero actualizar el valor de una clave por otro que requiere más entradas
  * elimino la información de esa Clave y le busco un lugar como si fuera una clave
  * nueva.
  */
-void reemplazarValorMayorTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
+void actualizarValorMayorTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
 {
 	int i;
 	cantEntradas_t cantEntradasClave = tamValorACantEntradas(informacionClave -> tamanio);
@@ -278,7 +275,7 @@ void reemplazarValorMayorTamanio(char* clave, infoClave* informacionClave, char*
 	registrarNuevaClave(clave, valor, tamValor);
 }
 
-void reemplazarValorMenorTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
+void actualizarValorMenorTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
 {
 	tamValor_t tamValorRestante = tamValor;
 	cantEntradas_t entradasRestantes = tamValorACantEntradas(tamValor);
@@ -293,7 +290,11 @@ void reemplazarValorMenorTamanio(char* clave, infoClave* informacionClave, char*
 		tamValorRestante -= tamanioEntradas;
 	}
 
-	//Libero las entradas sobrantes
+	/*
+	 * Libero las entradas sobrantes.
+	 * En caso de que requiera la misma cantidad de entradas no va a entrar al for
+	 * haciendo que la función sirva para ese caso tambien.
+	 */
 	cantEntradas_t finNuevaClave = informacionClave -> entradaInicial + tamValorACantEntradas(tamValor);
 	entradasRestantes = tamValorACantEntradas(informacionClave -> tamanio) - tamValorACantEntradas(tamValor);
 	for(i = 0; entradasRestantes > i; i++)
@@ -304,7 +305,7 @@ void reemplazarValorMenorTamanio(char* clave, infoClave* informacionClave, char*
 	crearMappeado(informacionClave);
 }
 
-cantEntradas_t encontrarEspacioLibre(tamValor_t tamValor)
+cantEntradas_t encontrarEspacioLibreConsecutivo(tamValor_t tamValor)
 {
 	cantEntradas_t entradasNecesarias = tamValorACantEntradas(tamValor);
 	cantEntradas_t libresConsecutivos = 0;
@@ -317,6 +318,54 @@ cantEntradas_t encontrarEspacioLibre(tamValor_t tamValor)
 			libresConsecutivos++;
 	}
 	return i==cantidadEntradas? cantidadEntradas : i - libresConsecutivos;
+}
+
+int haySuficienteEspacio(tamValor_t espacioRequerido)
+{
+	cantEntradas_t entradasRequeridas = tamValorACantEntradas(espacioRequerido);
+	cantEntradas_t entradasDisponibles = 0;
+	int i;
+	for(i = 0; i < cantidadEntradas; i++)
+	{
+		if(!tablaDeControl[i].clave)
+			entradasDisponibles++;
+	}
+	return entradasRequeridas <= entradasDisponibles;
+}
+
+void algoritmoDeReemplazo()
+{
+	switch(obtenerAlgoritmoReemplazo())
+	{
+	case Circular:
+		reemplazoCircular();
+		break;
+	case LRU:
+	case BSU:
+		break;
+	}
+}
+
+void reemplazoCircular()
+{
+	infoClave* claveAReemplazar;
+	do
+	{
+		if(dictionary_has_key(infoClaves, tablaDeControl[punteroReemplazo].clave))
+			claveAReemplazar = dictionary_get(infoClaves, tablaDeControl[punteroReemplazo].clave);
+		else
+		{
+			incrementarPunteroReemplazo();
+			break;
+		}
+
+		if(claveAReemplazar -> tamanio < tamanioEntradas)
+			break;
+		incrementarPunteroReemplazo();
+	}while(1); //Asumo que va a existir al menos una clave con valor atomica para reemplazar.
+
+	destruirClave(tablaDeControl[punteroReemplazo].clave);
+	tablaDeControl[punteroReemplazo].clave = NULL;
 }
 
 void incrementarUltimoUsoEntradas()
@@ -343,6 +392,18 @@ cantEntradas_t tamValorACantEntradas(tamValor_t v)
 	return (cantEntradas_t) v / tamanioEntradas + v % tamanioEntradas? 1 : 0;
 }
 
+void destruirClave(char* nombreClave)
+{
+	infoClave* claveADestruir = dictionary_get(infoClaves, nombreClave);
+	dictionary_remove(infoClaves, nombreClave);
+	destruirMappeado(claveADestruir);
+	fclose(claveADestruir->archivo);
+	char* dirArchivo = string_from_format("%s%s", obtenerPuntoDeMontaje(), nombreClave);
+	remove(dirArchivo);
+	free(dirArchivo);
+	free(claveADestruir);
+}
+
 int crearMappeado(infoClave* clave)
 {
 	clave -> mappeado = mmap(NULL, clave -> tamanio, PROT_WRITE, MAP_PRIVATE, (int) (clave -> archivo), 0);
@@ -354,6 +415,13 @@ int destruirMappeado(infoClave* clave)
 	int resultado = munmap(clave -> mappeado, clave -> tamanio);
 	clave -> mappeado = NULL;
 	return resultado;
+}
+
+void incrementarPunteroReemplazo()
+{
+	punteroReemplazo++;
+	if(punteroReemplazo == cantidadEntradas)
+		punteroReemplazo = 0;
 }
 
 int min (int primerValor, int segundoValor)
