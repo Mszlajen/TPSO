@@ -221,10 +221,6 @@ void actualizarValorDeClave(char* clave, char* valor, tamValor_t tamValor)
 	{
 		reemplazarValorMayorTamanio(clave, informacionClave, valor, tamValor);
 	}
-	else if(entradasNecesarias == entradasUsadas)
-	{
-		reemplazarValorIgualTamanio(clave, informacionClave, valor, tamValor);
-	}
 	else
 	{
 		reemplazarValorMenorTamanio(clave, informacionClave, valor, tamValor);
@@ -282,29 +278,13 @@ void reemplazarValorMayorTamanio(char* clave, infoClave* informacionClave, char*
 	registrarNuevaClave(clave, valor, tamValor);
 }
 
-void reemplazarValorIgualTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
-{
-	tamValor_t tamValorRestante = tamValor;
-	int i;
-	for(i = 0; tamValorRestante > 0; i++)
-	{
-		memcpy(tablaDeEntradas[informacionClave -> entradaInicial + i * tamanioEntradas],
-				valor + i * tamanioEntradas,
-				min(tamValorRestante, tamanioEntradas));
-		tablaDeControl[informacionClave -> entradaInicial + i].tiempoUltimoUso = 0;
-		tamValorRestante -= tamanioEntradas;
-	}
-
-	destruirMappeado(informacionClave);
-	informacionClave -> tamanio = tamValor;
-	crearMappeado(informacionClave);
-}
 void reemplazarValorMenorTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
 {
 	tamValor_t tamValorRestante = tamValor;
+	cantEntradas_t entradasRestantes = tamValorACantEntradas(tamValor);
 	int i;
 	//Coloco el nuevo valor en la tabla de entradas;
-	for(i = 0; tamValorRestante > 0; i++)
+	for(i = 0; entradasRestantes > i; i++)
 	{
 		memcpy(tablaDeEntradas[informacionClave -> entradaInicial + i * tamanioEntradas],
 				valor + i * tamanioEntradas,
@@ -315,12 +295,9 @@ void reemplazarValorMenorTamanio(char* clave, infoClave* informacionClave, char*
 
 	//Libero las entradas sobrantes
 	cantEntradas_t finNuevaClave = informacionClave -> entradaInicial + tamValorACantEntradas(tamValor);
-	tamValorRestante = informacionClave -> tamanio - tamValor;
-	for(i = 0; tamValorRestante > 0; i++)
-	{
+	entradasRestantes = tamValorACantEntradas(informacionClave -> tamanio) - tamValorACantEntradas(tamValor);
+	for(i = 0; entradasRestantes > i; i++)
 		tablaDeControl[finNuevaClave + i].clave = NULL;
-		tamValorRestante -= tamanioEntradas;
-	}
 
 	destruirMappeado(informacionClave);
 	informacionClave -> tamanio = tamValor;
