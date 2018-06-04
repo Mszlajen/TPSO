@@ -11,6 +11,8 @@ int main(int argc, char **argv) {
 
 	conectarConPlanificador();
 
+	esperarAvisoPlanificador();
+
 	puts("Salio todo bien\n");
 	liberarRecursos();
 	exit(0);
@@ -78,3 +80,24 @@ void liberarRecursos()
 	if(socketPlan != ERROR)
 		cerrarSocket(socketPlan);
 }
+
+
+void esperarAvisoPlanificador()
+{
+	listen(socketPlan, 5);
+}
+
+//leer siguiente instruccion
+
+void enviarInstruccionCoord()
+{
+	enviarProtocolo(socketCoord, 8);
+}
+
+int enviarProtocolo(socket_t sock, int protocolo)
+{
+	header handshake;
+	handshake.protocolo = protocolo;
+	return enviarHeader(sock, handshake);
+}
+
