@@ -153,7 +153,12 @@ void tratarGet(Esi * esi){
 			enviado = enviarBuffer (socketPlanificador , buffer , sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
 		}
 		free(buffer);
-	} else {
+	}
+
+	else
+
+	{
+		//comunico de get a la instancia
 		Instancia * instancia = algoritmoUsado();
 		dictionary_put(tablaDeClaves, esi->clave, &instancia);
 		header.protocolo = 11;
@@ -170,7 +175,7 @@ void tratarGet(Esi * esi){
 			}
 		free(buffer);
 
-
+		//comunico de get al planificador
 
 		buffer = malloc(sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
 
@@ -186,6 +191,7 @@ void tratarGet(Esi * esi){
 			enviado = enviarBuffer (socketPlanificador , buffer , sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
 		}
 		free(buffer);
+
 	}
 }
 
@@ -193,6 +199,7 @@ void tratarStore(Esi * esi) {
 	tamClave_t * tamClave = NULL;
 	header header;
 	header.protocolo = 11;
+
 
 	recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
 
@@ -215,6 +222,7 @@ void tratarStore(Esi * esi) {
 			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 		}
 		free(buffer);
+
 
 	}else{
 		// aca va el caso donde se hace store de una clave no tomada
@@ -253,6 +261,7 @@ void tratarSet(Esi * esi){
 			error_show("no se pudo comunicar el store a la instancia, volviendo a intentar");
 			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 			}
+
 		free(buffer);
 	}else{
 		// aca va el caso en que la clave no pertenece al esi
@@ -266,7 +275,6 @@ void tratarSet(Esi * esi){
  * llamando a la funcion y no te aporta nada.
  * [MATI]
  */
-
 // lo hago por que segun entiendo, el list_iterate espera una clausura que recibe instancias y hace algo
 // FD_SET segun entiendo recibe mas de un parametro, por eso no puedo mandar a FD_SET como la clausura que espera el iterate
 // y entonces es que hago esta delegacion para que sirva como un adaptador entre lo que quiero y lo que espera el list_iterate
@@ -298,6 +306,7 @@ int consultarPorClaveTomada(Esi esi){
 	memcpy(buffer+sizeof(header) , &tipo, sizeof(enum tipoDeInstruccion) );
 	memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion)  , &tamClave, sizeof(int) );
 	memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion)+sizeof(int)  , &esi.clave, tamClave );
+
 
 	int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
 
@@ -412,6 +421,7 @@ void registrarInstancia(socket_t socket)
 	Instancia instanciaRecibida;
 	instanciaRecibida.esiTrabajando = NULL;
 	int enviado;
+
 	char * nombre = NULL;
 
 	recibirMensaje(socket,4,(void *) &tamMensj );
@@ -436,6 +446,7 @@ void registrarInstancia(socket_t socket)
 	memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(cantEntradas) , &tamEntradas , sizeof(tamEntradas) );
 
 	enviado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
+
 
 	while(enviado != 0){
 		error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
