@@ -109,4 +109,3 @@ int enviarProtocolo(socket_t sock, int protocolo)
 	handshake.protocolo = protocolo;
 	return enviarHeader(sock, handshake);
 }
-
