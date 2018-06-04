@@ -8,6 +8,8 @@ tamEntradas_t tamanioEntradas;
 cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
 socket_t socketCoord = ERROR;
 
+int terminoEjecucion = 0;
+
 int main(int argc, char** argv) {
 	inicializar(argv[1]);
 
@@ -19,6 +21,7 @@ int main(int argc, char** argv) {
 	pthread_join(hiloProcesamiento, NULL);
 	//pthread_join(hiloDump, NULL);
 
+	liberarRecursosGlobales();
 	exit(0);
 }
 
@@ -46,7 +49,7 @@ void dump()
 void procesamientoInstrucciones()
 {
 	instruccion_t* instruc;
-	while(1)
+	while(!terminoEjecucion)
 	{
 		instruc = recibirInstruccionCoordinador();
 		switch(instruc -> tipo)
@@ -418,12 +421,17 @@ void destruirClave(char* nombreClave)
 {
 	infoClave* claveADestruir = dictionary_get(infoClaves, nombreClave);
 	dictionary_remove(infoClaves, nombreClave);
-	destruirMappeado(claveADestruir);
-	fclose(claveADestruir->archivo);
+	destruirInfoClave(claveADestruir);
 	char* dirArchivo = string_from_format("%s%s", obtenerPuntoDeMontaje(), nombreClave);
 	remove(dirArchivo);
 	free(dirArchivo);
-	free(claveADestruir);
+}
+
+void destruirInfoClave(infoClave* clave)
+{
+	destruirMappeado(clave);
+	fclose(clave->archivo);
+	free(clave);
 }
 
 int crearMappeado(infoClave* clave)
@@ -451,7 +459,20 @@ int min (int primerValor, int segundoValor)
 	return primerValor < segundoValor? primerValor : segundoValor;
 }
 
+void liberarRecursosGlobales()
+{
+	if(tablaDeControl)
+		free(tablaDeControl);
+	if(tablaDeEntradas)
+		free(tablaDeEntradas);
+	if(infoClaves)
+		dictionary_destroy_and_destroy_elements(infoClaves, destruirInfoClave);
+	if(socketCoord)
+		close(socketCoord);
+}
+
 void salirConError(char* error)
 {
-
+	error_show(error);
+	terminoEjecucion = 1;
 }

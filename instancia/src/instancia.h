@@ -62,7 +62,9 @@ cantEntradas_t tamValorACantEntradas(tamValor_t);
 int crearMappeado(infoClave*);
 int destruirMappeado(infoClave*);
 void destruirClave(char*);
+void destruirInfoClave(infoClave*);
 void incrementarPunteroReemplazo();
 int min (int, int);
+void liberarRecursosGlobales();
 void salirConError(char*);
 #endif /* INSTANCIA_H_ */
