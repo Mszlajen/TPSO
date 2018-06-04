@@ -84,7 +84,9 @@ void liberarRecursos()
 
 void esperarAvisoPlanificador()
 {
-	listen(socketPlan, 5);
+	while(listen(socketPlan, 5)){
+
+	}
 }
 
 //leer siguiente instruccion
