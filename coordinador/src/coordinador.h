@@ -24,7 +24,6 @@ typedef struct {
 	int idinstancia;
 	char* nombre;
 	Esi * esiTrabajando;
-	int ocupada;
 } Instancia;
 
 #define IPEscucha "127.0.0.2"
@@ -51,6 +50,8 @@ void setearReadfdsEsi (Esi esi);
 void escucharReadfdsInstancia (Instancia  instancia);
 void escucharReadfdsEsi (Esi esi);
 void recibirConexiones();
+Instancia * algoritmoUsado();
+Instancia * algoritmoEquitativeLoad();
 
 
 

@@ -18,7 +18,9 @@ t_dictionary * tablaDeClaves = NULL;
 socket_t  socketPlanificador;
 socket_t  socketCoordinador;
 
-int cantInstancias;
+char * Algoritmo;
+int contadorEquitativeLoad = 0;
+int cantInstancias = 0;
 int socketInstanciaMax = 0;
 
 int main(void) {
@@ -117,67 +119,73 @@ void escucharReadfdsEsi (Esi esi) {
 					tratarSet(&esi);
 					break;
 				case store:
+					tratarStore(&esi);
 					break;
 				}
 			}
-			//queda inicializar la clave y el valor del esi, luego seguir lo indicado en el diagrama
 		}
 }
 
 void tratarGet(Esi * esi){
 	tamClave_t * tamClave = NULL;
 	header header;
-	/*
-	 * ¿Para que le asignas un valor al protocolo si despues
-	 * lo vas a cambiar sin usarlo?
-	 * [MATI]
-	 */
-	header.protocolo = 11;
+	header.protocolo = 15;
+	enum tipoDeInstruccion tipo = bloqueante;
+	int enviado;
 
-	int estadoDellegada;
-	/*
-	 * No entiendo, si hay un error o se cierra el socket te quedas repitiendo infinitamente
-	 * la función
-	 * [MATI]
-	 */
-	do {
-		estadoDellegada = recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
-	} while (estadoDellegada);
+	recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
 
-	do {
-		estadoDellegada = recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
-	} while (estadoDellegada);
-	/*
-	 * ¡Lean las advertencias!
-	 *
-	 * tablaDeClaves es un puntero a diccionario.
-	 * [MATI]
-	 */
-	if( dictionary_has_key(&tablaDeClaves, esi->clave) ){
-		header.protocolo = 15;
-		int * buffer = malloc(sizeof(header) + *tamClave + sizeof(int));
+	recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
+
+	if( dictionary_has_key(tablaDeClaves, esi->clave) ){
+
+		int * buffer = malloc(sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
 
 		memcpy(buffer , &header.protocolo , sizeof(header) );
-		memcpy(buffer+sizeof(header) , tamClave , sizeof(int));
-		memcpy(buffer+sizeof(header)+sizeof(int), &esi->clave , *tamClave );
+		memcpy(buffer+sizeof(header) , &tipo , sizeof(enum tipoDeInstruccion));
+		memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion) , tamClave , sizeof(int));
+		memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion)+sizeof(int), &esi->clave , *tamClave );
 
-		int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + *tamClave + sizeof(int) );
+		enviado = enviarBuffer (socketPlanificador , buffer , sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
 
-		/*
-		 * Si fallo el envio del mensaje (por la razon que sea), ¿qué haces?
-		 * Ahora mismo seguis con la ejecución como si nada y está mal
-		 * porque es un error fatal.
-		 * [MATI]
-		 */
-		if (estado != 0)
-			{
-				error_show ("no se pudo informar de operacion get al planificador");
-			}
-
+		while(enviado != 0){
+			error_show ("no se envio correctamente el informe de get al planificador, enviando nuevamente");
+			enviado = enviarBuffer (socketPlanificador , buffer , sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
+		}
+		free(buffer);
 	} else {
-		// es el algoritmo quien decide como distribuir las claves, aun no esta implementado
-		// se debe comunicar al planificador por esta nueva clave
-		// dictionary_put(&tablaDeClaves, esi->clave, &instancia);
+		Instancia * instancia = algoritmoUsado();
+		dictionary_put(tablaDeClaves, esi->clave, &instancia);
+		header.protocolo = 11;
+		int * buffer = malloc(sizeof(header) + sizeof(enum instruccion) + sizeof(int) + *tamClave);
+		memcpy(buffer,&header.protocolo,sizeof(header));
+		memcpy(buffer+sizeof(header),&esi->instr,sizeof(enum instruccion));
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion),tamClave,sizeof(int));
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int),esi->clave,*tamClave);
+
+		enviado = enviarBuffer(instancia->socket,buffer,sizeof(header) + sizeof(enum instruccion) + sizeof(int) + *tamClave);
+		while(enviado !=0 ){
+			error_show("no se envio correctamente la clave a la instancia, volviendo a intentar");
+			enviado = enviarBuffer(instancia->socket,buffer,sizeof(header) + sizeof(enum instruccion) + sizeof(int) + *tamClave);
+			}
+		free(buffer);
+
+
+
+		buffer = malloc(sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
+
+		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer+sizeof(header) , &tipo , sizeof(enum tipoDeInstruccion));
+		memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion) , tamClave , sizeof(int));
+		memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion)+sizeof(int), &esi->clave , *tamClave );
+
+		enviado = enviarBuffer (socketPlanificador , buffer , sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
+
+		while(enviado != 0){
+			error_show ("no se envio correctamente el informe de get al planificador, enviando nuevamente");
+			enviado = enviarBuffer (socketPlanificador , buffer , sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
+		}
+		free(buffer);
 	}
 }
 
@@ -186,51 +194,27 @@ void tratarStore(Esi * esi) {
 	header header;
 	header.protocolo = 11;
 
-	int estadoDellegada;
-	do {
-		estadoDellegada = recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
-	} while (estadoDellegada);
+	recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
 
-	do {
-		estadoDellegada = recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
-	} while (estadoDellegada);
+	recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
 
 	if( consultarPorClaveTomada(*esi) == 1){
 
-		//instancia = algoritmoPedirInstancia(); aca tendria que pedir una instancia para poder enviarle el mensaje pero aun no esta el algoritmo
+		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
+
 		int * buffer = malloc(sizeof(header) + sizeof(int) + *tamClave + sizeof(int));
 		memcpy(buffer , &header.protocolo , sizeof(header) );
 		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(int) );
 		memcpy(buffer+sizeof(header)+sizeof(int) , tamClave , sizeof(int) );
 		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int), &esi->clave , *tamClave );
 
-		/*
-		int estado = enviarBuffer (instancia.socket , buffer , sizeof(header) + sizeof(enum instrucion) + *tamClave + sizeof(int) );
+		int estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 
-		if (estado != 0)
-		{
-			error_show ("no se pudo enviar store a la instancia: %s",instancia.nombre );
+		while(estado !=0){
+			error_show("no se pudo comunicar el store a la instancia, volviendo a intentar");
+			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 		}
-		*/
-		//instancia.ocupada = 0;
 		free(buffer);
-		buffer = malloc(sizeof(header) + sizeof(int) + *tamClave);
-		header.protocolo = 16;
-		memcpy(buffer , &header.protocolo , sizeof(header) );
-		memcpy(buffer+sizeof(header) , tamClave , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(int), &esi->clave , *tamClave );
-
-		int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + *tamClave );
-
-		if (estado != 0)
-		{
-			error_show ("no se pudo informar de operacion store al planificador ");
-		}
-
-		/*
-		 * ¿Para qué le avisas devuelta al planificador del store si ya lo hiciste
-		 * cuando le consultaste por el estado de la clave?
-		 */
 
 	}else{
 		// aca va el caso donde se hace store de una clave no tomada
@@ -244,53 +228,31 @@ void tratarSet(Esi * esi){
 	header header;
 	header.protocolo = 11;
 
-	int estadoDellegada;
-	do {
-		estadoDellegada = recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
-	} while (estadoDellegada);
+	recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
+	recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
+	recibirMensaje(esi->socket,sizeof(tamValor_t),(void *) &tamValor );
+	recibirMensaje(esi->socket,*tamValor,(void *) &esi->valor);
 
-	estadoDellegada = 1;
-
-	do {
-		estadoDellegada = recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
-	} while (estadoDellegada);
-
-	estadoDellegada = 1;
-
-	do {
-		estadoDellegada = recibirMensaje(esi->socket,sizeof(tamValor_t),(void *) &tamValor );
-	} while (estadoDellegada);
-
-	estadoDellegada = 1;
-
-	do {
-		estadoDellegada = recibirMensaje(esi->socket,*tamValor,(void *) &esi->valor);
-	} while (estadoDellegada);
 
 	if( consultarPorClaveTomada(*esi) != 0){
-		//instancia = algoritmoPedirInstancia(); aca tendria que pedir una instancia para poder enviarle el mensaje pero aun no esta el algoritmo
-		/*
-		 * No pedis la instancia todo el tiempo solo la primera vez que se hace SET de esa clave,
-		 * de la segunda para adelante tenes la instancia en la tablaDeClaves
-		 * [MATI]
-		 */
-		int * buffer = malloc(sizeof(header) + sizeof(int) + *tamClave + *tamValor + sizeof(int) * 2);
+
+		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
+
+		int * buffer = malloc(sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(int) * 2);
 		memcpy(buffer , &header.protocolo , sizeof(header) );
-		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(int) , tamClave , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int), &esi->clave , *tamClave );
-		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int)+*tamClave , tamValor , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int)*2+*tamClave , &esi->valor , *tamValor );
+		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(enum instruccion) );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion) , tamClave , sizeof(int) );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int), &esi->clave , *tamClave );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int)+*tamClave , tamValor , sizeof(int) );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int)*2+*tamClave , &esi->valor , *tamValor );
 
-		/*
-		int estado = enviarBuffer (instancia.socket , buffer , sizeof(header) + sizeof(enum instrucion) + *tamClave + *tamValor + sizeof(int) * 2);
 
-		if (estado != 0)
-		{
-			error_show ("no se pudo enviar instruccion a la instancia: %s",instancia.nombre );
-		}
-		*/
-		//instancia.ocupada = 0;
+		int estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(int) * 2);
+
+		while(estado !=0){
+			error_show("no se pudo comunicar el store a la instancia, volviendo a intentar");
+			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
+			}
 		free(buffer);
 	}else{
 		// aca va el caso en que la clave no pertenece al esi
@@ -304,6 +266,11 @@ void tratarSet(Esi * esi){
  * llamando a la funcion y no te aporta nada.
  * [MATI]
  */
+
+// lo hago por que segun entiendo, el list_iterate espera una clausura que recibe instancias y hace algo
+// FD_SET segun entiendo recibe mas de un parametro, por eso no puedo mandar a FD_SET como la clausura que espera el iterate
+// y entonces es que hago esta delegacion para que sirva como un adaptador entre lo que quiero y lo que espera el list_iterate
+
 void setearReadfdsInstancia (Instancia  instancia){
 	FD_SET(instancia.socket,&readfds);
 }
@@ -318,20 +285,19 @@ int consultarPorClaveTomada(Esi esi){
 	header.protocolo = 9;
 	tamClave_t  tamClave = sizeof(esi.clave);
 	int estadoDellegada;
+	enum tipoDeInstruccion tipo;
 
-	/*
-	 * ¿Qué son todos esos int que aparecen?
-	 * [MATI]
-	 *
-	 * PD: Si no se entendio mi sarcasmo, les estoy diciendo
-	 * que lo arreglen de una manera que se entienda que es
-	 * cada cosa.
-	 */
-	int * buffer = malloc(sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
+	if(esi.instr == store){
+		tipo = bloqueante;
+	} else {
+		tipo = noDefinido;
+	}
+
+	int * buffer = malloc(sizeof(header) + sizeof(enum tipoDeInstruccion) + sizeof(int) + tamClave);
 	memcpy(buffer , &header.protocolo , sizeof(header) );
-	memcpy(buffer+sizeof(header) , &esi.instr , sizeof(int) );
-	memcpy(buffer+sizeof(header) + sizeof(int)  , &tamClave, sizeof(int) );
-	memcpy(buffer+sizeof(header) + sizeof(int) + sizeof(int)  , &esi.clave, tamClave );
+	memcpy(buffer+sizeof(header) , &tipo, sizeof(enum tipoDeInstruccion) );
+	memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion)  , &tamClave, sizeof(int) );
+	memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion)+sizeof(int)  , &esi.clave, tamClave );
 
 	int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
 
@@ -385,7 +351,7 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 	 * [MATI]
 	 */
 	header* header;
-	int estadoDellegadaHeader = recibirMensaje(socketAceptado,1,(void *) &header);
+	recibirMensaje(socketAceptado,1,(void *) &header);
 
 	switch(header->protocolo){
 
@@ -443,27 +409,19 @@ void registrarEsi(socket_t socket){
 void registrarInstancia(socket_t socket)
 {
 	int * tamMensj = NULL;
-	int estadoDellegada;
 	Instancia instanciaRecibida;
 	instanciaRecibida.esiTrabajando = NULL;
-
-	do {
-		estadoDellegada = recibirMensaje(socket,4,(void *) &tamMensj );
-	} while (estadoDellegada);
-
+	int enviado;
 	char * nombre = NULL;
 
-
-	do {
-			estadoDellegada = recibirMensaje(socket,*tamMensj,(void *) &nombre );
-		} while (estadoDellegada);
+	recibirMensaje(socket,4,(void *) &tamMensj );
+	recibirMensaje(socket,*tamMensj,(void *) &nombre );
 
 	strcpy(instanciaRecibida.nombre , nombre);
-	instanciaRecibida.idinstancia = cantInstancias;
+	instanciaRecibida.idinstancia = cantInstancias + 1;
 	instanciaRecibida.socket = socket;
 
 	cantInstancias = list_add(listaInstancias,&instanciaRecibida);
-
 
 	header header;
 	header.protocolo = 5;
@@ -477,22 +435,43 @@ void registrarInstancia(socket_t socket)
 	memcpy(buffer+sizeof(header)+sizeof(int) , &cantEntradas , sizeof(cantEntradas) );
 	memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(cantEntradas) , &tamEntradas , sizeof(tamEntradas) );
 
-	int estado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
+	enviado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
 
-	/*
-	 * Devuelta, algo falla y la ejecucion sigue como si nada.
-	 * Eso está MAL.
-	 * Si algo falla ¿porque falla? y ¿Qué hago para manejar ese error?
-	 * Imprimir el error no está mal (de hecho está perfecto) pero antes
-	 * de eso programa tiene que saber manejar el error.
-	 * [MATI]
-	 */
-	if (estado != 0)
-	{
-		error_show ("no se pudo enviar informacion de entradas a la instancia %s",instanciaRecibida.nombre );
+	while(enviado != 0){
+		error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
+		enviado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
 	}
 
 	free(buffer);
+}
+
+Instancia * algoritmoUsado(){
+
+	Instancia * instancia;
+	if(strcmp("EL",*Algoritmo) == 0){
+		instancia = algoritmoEquitativeLoad();
+	}/*else if(strcmp("LSU",*Algoritmo) == 0){
+		return algoritmoLastStatementUsed();
+	}else if(strcmp("KE",*Algoritmo) == 0){
+		return algoritmoKeyExplicit();
+	} no voy a hacer estos algoritmos para este sabado*/
+
+	return instancia;
+}
+
+
+Instancia * algoritmoEquitativeLoad(){
+
+	Instancia * instancia;
+	instancia = list_get(listaInstancias, contadorEquitativeLoad);
+
+	if(contadorEquitativeLoad == cantInstancias){
+		contadorEquitativeLoad = 0;
+	}else{
+		contadorEquitativeLoad++;
+	}
+
+	return instancia;
 }
 
 int esperarYaceptar(socket_t socketCoordinador,struct sockaddr_in* dir)
@@ -550,7 +529,7 @@ void inicializacion()
 	configuracion = config_create(archivoConfig);
 	if(configuracion == NULL)
 		salirConError("Fallo al leer el archivo de configuracion del coordinador\n");
-	cantInstancias = 0;
+	Algoritmo = config_get_string_value(configuracion, "Algoritmo");
 	listaEsi = list_create();
 	listaInstancias = list_create();
 	tablaDeClaves = dictionary_create();
