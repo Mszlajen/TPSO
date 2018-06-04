@@ -81,9 +81,21 @@ void liberarRecursos()
 		cerrarSocket(socketPlan);
 }
 
-
+/*
+ * No te olvides de poner las declaraciones en el .h
+ * porque si no va fallar en tiempo de ejecución
+ * [MATI]
+ *
+ * PD: Si sos de los que escriben todo y despues
+ * lo declaran, ignora esto.
+ */
 void esperarAvisoPlanificador(char** argv)
 {
+	/*
+	 * Listen devuelve 1 o 0 para error y exito respectivamente,
+	 * no la cantidad de peticiones encoladas.
+	 * [MATI]
+	 */
 	int cantPeticiones = listen(socketPlan, 5);
 	char * linea;
 
@@ -91,9 +103,26 @@ void esperarAvisoPlanificador(char** argv)
 		for(int i=cantPeticiones;i>0;i--){
 
 		programa = abrirArchivoLectura(argv[1]);
-
+		/*
+		 * Lo que tenes que leer no tiene un tamaño fijo sino
+		 * que tenes que leer hasta encontrar el caracter de
+		 * fin de linea o fin de archivo, lo que pase primero.
+		 *
+		 * Ademas el primer paramentro de fread recibe la
+		 * dirección de memoria donde se va a guardar la
+		 * informacion.
+		 * [MATI]
+		 *
+		 * PD: para solucionar esto va a tener que usar la
+		 * biblioteca de strings de las commons.
+		 */
 		linea = fread(argv, sizeof("cadalinea"),1,programa);
 
+		/*
+		 * Parse recibe una linea (char*) y devuelve el valor
+		 * de un t_esi_operacion (definido en el parser).
+		 * [MATI]
+		 */
 		parse(linea);
 
 		}
