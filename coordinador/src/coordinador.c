@@ -22,6 +22,9 @@ char * Algoritmo;
 int contadorEquitativeLoad = 0;
 int cantInstancias = 0;
 int socketInstanciaMax = 0;
+t_log logOperaciones;
+
+
 
 int main(void) {
 
@@ -153,6 +156,7 @@ void tratarGet(Esi * esi){
 			enviado = enviarBuffer (socketPlanificador , buffer , sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
 		}
 		free(buffer);
+
 	}
 
 	else
@@ -544,4 +548,5 @@ void inicializacion()
 	listaEsi = list_create();
 	listaInstancias = list_create();
 	tablaDeClaves = dictionary_create();
+	logOperaciones = log_create("archivoLog.txt","logOperaciones",1,NULL);
 }

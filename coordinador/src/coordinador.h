@@ -10,6 +10,7 @@
 #include <string.h>
 #include <commons/config.h>
 #include <commons/collections/list.h>
+#include <commons/log.c>
 
 typedef struct {
 	socket_t socket;
