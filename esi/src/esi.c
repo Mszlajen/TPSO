@@ -85,13 +85,16 @@ void liberarRecursos()
 void esperarAvisoPlanificador(char** argv)
 {
 	int cantPeticiones = listen(socketPlan, 5);
+	char * linea;
 
 	while(cantPeticiones){
-		for(cantPeticiones;cantPeticiones>1;cantPeticiones--){
+		for(int i=cantPeticiones;i>0;i--){
 
 		programa = abrirArchivoLectura(argv[1]);
 
-		//pasar Al Parser = fread(argv, sizeof(cada linea),1,programa);
+		linea = fread(argv, sizeof("cadalinea"),1,programa);
+
+		parse(linea);
 
 		}
 	}
