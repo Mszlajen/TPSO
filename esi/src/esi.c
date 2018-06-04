@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
 
 	conectarConPlanificador();
 
-	esperarAvisoPlanificador();
+	esperarAvisoPlanificador(argv);
 
 	puts("Salio todo bien\n");
 	liberarRecursos();
@@ -82,14 +82,21 @@ void liberarRecursos()
 }
 
 
-void esperarAvisoPlanificador()
+void esperarAvisoPlanificador(char** argv)
 {
-	while(listen(socketPlan, 5)){
+	int cantPeticiones = listen(socketPlan, 5);
 
+	while(cantPeticiones){
+		for(cantPeticiones;cantPeticiones>1;cantPeticiones--){
+
+		programa = abrirArchivoLectura(argv[1]);
+
+		//pasar Al Parser = fread(argv, sizeof(cada linea),1,programa);
+
+		}
 	}
 }
 
-//leer siguiente instruccion
 
 void enviarInstruccionCoord()
 {
