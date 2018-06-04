@@ -1,6 +1,6 @@
 #include "instancia.h"
 
-char** tablaDeEntradas = NULL;
+char* tablaDeEntradas = NULL;
 t_dictionary* infoClaves = NULL;
 infoEntrada* tablaDeControl = NULL;
 instancia_id ID = ERROR;
@@ -9,7 +9,7 @@ cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
 socket_t socketCoord = ERROR;
 
 int main(int argc, char** argv) {
-	inicializar(argv[0]);
+	inicializar(argv[1]);
 
 	pthread_t hiloProcesamiento;
 	pthread_create(&hiloProcesamiento, NULL, (void*) procesamientoInstrucciones, NULL);
@@ -29,17 +29,12 @@ void inicializar(char* dirConfig)
 	infoClaves = dictionary_create();
 	conectarConCoordinador();
 	recibirRespuestaHandshake();
-	tablaDeEntradas = malloc(cantidadEntradas * sizeof(char*));
 	tablaDeControl = malloc(sizeof(infoEntrada) * cantidadEntradas);
 	int i;
 	for(i = 0; i < cantidadEntradas; i++)
 	{
 		tablaDeControl[i].clave = NULL;
 		tablaDeControl[i].tiempoUltimoUso = 0;
-	}
-	for(i = 0; i < cantidadEntradas; i++)
-	{
-		tablaDeEntradas = malloc(tamanioEntradas * sizeof(char));
 	}
 }
 
@@ -200,7 +195,7 @@ void instruccionStore(instruccion_t* instruccion)
 		for(i = 0; tamClavePendiente > 0; i++)
 		{
 			memcpy(clave -> mappeado,
-					tablaDeEntradas[clave -> entradaInicial + i * tamanioEntradas],
+					tablaDeEntradas + clave -> entradaInicial + i * tamanioEntradas,
 					min(tamanioEntradas, tamClavePendiente));
 			tablaDeControl[clave -> entradaInicial + i].tiempoUltimoUso = 0;
 			tamClavePendiente -= tamanioEntradas;
@@ -266,7 +261,7 @@ void registrarNuevaClave(char* clave, char* valor, tamValor_t tamValor)
 	{
 		tablaDeControl[posicion + i].clave = string_duplicate(clave);
 		tablaDeControl[posicion + i].tiempoUltimoUso = 0;
-		memcpy(tablaDeEntradas[posicion + i * tamanioEntradas],
+		memcpy(tablaDeEntradas + posicion + i * tamanioEntradas,
 				valor + i * tamanioEntradas,
 				min(tamValorRestante, tamanioEntradas));
 		tamValorRestante -= tamanioEntradas;
@@ -302,7 +297,7 @@ void actualizarValorMenorTamanio(char* clave, infoClave* informacionClave, char*
 	//Coloco el nuevo valor en la tabla de entradas;
 	for(i = 0; entradasRestantes > i; i++)
 	{
-		memcpy(tablaDeEntradas[informacionClave -> entradaInicial + i * tamanioEntradas],
+		memcpy(tablaDeEntradas + informacionClave -> entradaInicial + i * tamanioEntradas,
 				valor + i * tamanioEntradas,
 				min(tamValorRestante, tamanioEntradas));
 		tablaDeControl[informacionClave -> entradaInicial + i].tiempoUltimoUso = 0;
