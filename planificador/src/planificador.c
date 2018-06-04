@@ -10,8 +10,10 @@ pthread_mutex_t mReady, mBloqueados, mFinalizados, mESIEjecutando;
 
 pthread_mutex_t mSocketCoord;
 
-int main(void) {
-	inicializacion();
+int terminoEjecucion = 0;
+
+int main(int argc, char** argv) {
+	inicializacion(argv[1]);
 
 	bloquearClavesConfiguracion();
 
@@ -35,7 +37,7 @@ int main(void) {
 void terminal()
 {
 	char *linea, **palabras;
-	while(1)
+	while(!terminoEjecucion)
 	{
 		linea = readline("Comando:");
 		//Aca va a ir el procesamiento para ver si es una instrucción
@@ -72,7 +74,7 @@ void ejecucionDeESI()
 	consultaCoord * consulta = NULL;
 	resultado_t resultadoConsulta, *resultadoEjecucion = NULL;
 	int8_t mensRecibido;
-	while(1)
+	while(!terminoEjecucion)
 	{
 		pthread_mutex_lock(&enPausa);
 
@@ -129,7 +131,7 @@ void escucharPorESI ()
 	struct sockaddr_storage infoDirr;
 	socklen_t size_infoDirr = sizeof(struct sockaddr_storage);
 	ESI* nuevaESI;
-	while(1)
+	while(!terminoEjecucion)
 	{
 		socketNuevaESI = ERROR;
 		listen(socketServerESI, 5);
@@ -241,9 +243,9 @@ void comandoListar(char** palabras)
 	list_destroy_and_destroy_elements(listaDeID, free);
 }
 
-void inicializacion ()
+void inicializacion (char* dirConfig)
 {
-	if(crearConfiguracion())
+	if(crearConfiguracion(dirConfig))
 		salirConError("Fallo al leer el archivo de configuracion del planificador.\n");
 	inicializarColas();
 	pthread_mutex_init(&enPausa, NULL);
@@ -311,7 +313,7 @@ consultaCoord* recibirConsultaCoord()
 	header* encabezado;
 	recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado);
 	if(encabezado->protocolo != 9)
-		/*error*/;
+	{	/*error*/}
 	free(encabezado);
 
 	enum tipoDeInstruccion *tipo;
@@ -389,6 +391,7 @@ int procesarConsultaCoord(ESI* ejecutando, consultaCoord* consulta)
 void crearServerESI ()
 {
 	char * puerto = obtenerPuerto();
+	char * IPConexion = obtenerIP();
 	socketServerESI = crearSocketServer(IPConexion, puerto);
 	if(socketServerESI)
 		salirConError("Planificador no pudo crear el socket para conectarse con ESI\n");
@@ -461,6 +464,5 @@ void liberarRecursos()
 void salirConError(char * error)
 {
 	error_show(error);
-	liberarRecursos();
-	salir_agraciadamente(1);
+	terminoEjecucion = 1;
 }

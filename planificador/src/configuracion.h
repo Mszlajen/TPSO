@@ -6,7 +6,7 @@
 #include <commons/config.h>
 #include <commons/string.h>
 
-#define archivoConfig "planificador.config"
+#define Ip "IP"
 #define Puerto "Puerto"
 #define Algoritmo "Algoritmo"
 #define Alfa "Alfa"
@@ -17,8 +17,9 @@
 
 enum t_algoritmo {sjf, srt, hrrn};
 
-int crearConfiguracion(); //Devuelve 0 en exito o 1 en fallo
+int crearConfiguracion(char*); //Devuelve 0 en exito o 1 en fallo
 void eliminarConfiguracion();
+char* obtenerIP();
 char* obtenerPuerto();
 char* obtenerDireccionCoordinador();
 char* obtenerPuertoCoordinador();

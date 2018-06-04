@@ -2,7 +2,7 @@
 
 t_config * configuracion = NULL;
 
-int crearConfiguracion()
+int crearConfiguracion(char* archivoConfig)
 {
 	if(!configuracion)
 		configuracion = config_create(archivoConfig);
@@ -13,6 +13,11 @@ void eliminarConfiguracion()
 {
 	if(configuracion)
 		config_destroy(configuracion);
+}
+
+char* obtenerIP()
+{
+	return config_get_string_value(configuracion, Ip);
 }
 
 char* obtenerPuerto()

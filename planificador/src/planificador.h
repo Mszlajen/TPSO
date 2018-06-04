@@ -12,8 +12,6 @@
 
 #include "adminESI.h"
 
-#define IPConexion "127.0.0.2"
-
 typedef struct {
 	enum tipoDeInstruccion tipo;
 	uint8_t tamClave;
@@ -24,7 +22,7 @@ typedef uint8_t resultado_t;
 
 enum comandos {pausar, continuar, bloquear, desbloquear, listar, kill, status, deadlock, salir};
 
-void inicializacion();
+void inicializacion(char*);
 void bloquearClavesConfiguracion();
 void conectarConCoordinador();
 int enviarEncabezado(socket_t, int);
