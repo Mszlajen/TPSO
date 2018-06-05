@@ -51,6 +51,7 @@ int main(void) {
 	 pthread_create(&hiloEscuchaPorAcciones, NULL, (void*) escucharPorAcciones, NULL);
 
 	//close(socketCoordinador);
+	//log_destroy(logOperaciones);
 	exit(0);
 	/*
 	 * Comentario:
@@ -245,7 +246,9 @@ void tratarStore(Esi * esi) {
 			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 		}
 		free(buffer);
+		log_info(logOperaciones, "STORE %s" ,esi->clave);//NO SE SI ESTA BIEN UTILIZADO SI ME LO PUEDEN REVISAR MEJOR!![YOEL]
 		instancia->esiTrabajando = esi;
+
 
 	}else{
 		error_show("no se puede liberar una clave que nunca fue tomada por el esi. ");
@@ -288,6 +291,8 @@ void tratarSet(Esi * esi){
 
 		instancia->esiTrabajando = esi;
 		free(buffer);
+		log_info(logOperaciones, "SET %s",esi->clave);//NO SE SI ESTA BIEN UTILIZADO SI ME LO PUEDEN REVISAR MEJOR!![YOEL]
+
 	}else{
 		error_show("la clave no pertenece al esi "  );
 		//aun queda contemplar si se aborta el esi en este momento
