@@ -84,13 +84,32 @@ void escucharPorAcciones () {
 
 void escucharReadfdsInstancia (Instancia  instancia) {
 	header * header;
-
+	int * buffer;
+	int enviado;
 	if (FD_ISSET(instancia.socket, &readfds))
 	{
 		recibirMensaje(instancia.socket,sizeof(header),(void *) &header);
 		// tengo que revisar si quieren compactar o si ya terminaron
 		if(header->protocolo == 12){
 			// debo enviar un mensaje a la esi correspondiente que se ejecuto la instruccion
+			recibirMensaje(instancia.socket,sizeof(int),(void *) &buffer );
+			//que yo sepa no existe el caso en que la instancia no pueda terminar de ejecutar, salvo por un pedido de compactacion
+			//pero eso no se contempla en este bloque, de modo que solo recibo el mensaje para quitar los bits
+
+			buffer = malloc(sizeof(header) + sizeof(int) );
+			int resultado = EXITO;
+			memcpy(buffer , &header->protocolo , sizeof(header) );
+			memcpy(buffer+sizeof(header) , &resultado , sizeof(int));
+
+			enviado = enviarBuffer (instancia.esiTrabajando->socket , buffer , sizeof(header) + sizeof(int) );
+
+			while(enviado != 0){
+				error_show ("no se envio correctamente el informe de resultado al esi, enviando nuevamente");
+				enviado = enviarBuffer (instancia.esiTrabajando->socket , buffer , sizeof(header) + sizeof(int) );
+			}
+			free(buffer);
+		}else{
+
 		}
 	}
 }
@@ -226,9 +245,10 @@ void tratarStore(Esi * esi) {
 			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 		}
 		free(buffer);
-
+		instancia->esiTrabajando = esi;
 
 	}else{
+		error_show("no se puede liberar una clave que nunca fue tomada por el esi. ");
 		// aca va el caso donde se hace store de una clave no tomada
 	}
 
@@ -266,9 +286,11 @@ void tratarSet(Esi * esi){
 			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 			}
 
+		instancia->esiTrabajando = esi;
 		free(buffer);
 	}else{
-		// aca va el caso en que la clave no pertenece al esi
+		error_show("la clave no pertenece al esi "  );
+		//aun queda contemplar si se aborta el esi en este momento
 	}
 
 }
@@ -296,7 +318,6 @@ int consultarPorClaveTomada(Esi esi){
 	header header;
 	header.protocolo = 9;
 	tamClave_t  tamClave = sizeof(esi.clave);
-	int estadoDellegada;
 	enum tipoDeInstruccion tipo;
 
 	if(esi.instr == store){
@@ -314,24 +335,23 @@ int consultarPorClaveTomada(Esi esi){
 
 	int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
 
-	if (estado != 0)
-	{
-		error_show ("no se pudo preguntar al planificador si la clave esta asignada al esi ");
-	}
+	while(estado !=0){
+		error_show("no se pudo preguntar por el estado de la clave al planificador, volviendo a intentar");
+		estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
+		}
+	free(buffer);
 
-	do {
-		estadoDellegada = recibirMensaje(socketPlanificador,sizeof(header) + sizeof(int),(void *) &buffer);
-		} while (estadoDellegada);
+	buffer = malloc(sizeof(int));
+	recibirMensaje(socketPlanificador,sizeof(header),(void *) &header.protocolo);
+	recibirMensaje(socketPlanificador,sizeof(int),(void *) &buffer );
 
 	if (*buffer == 0){
-		free(buffer);
-		return 0;
-	} else {
-		free(buffer);
-		return 1;
-	}
-
-
+			free(buffer);
+			return 0;
+		} else {
+			free(buffer);
+			return 1;
+		}
 }
 
 void recibirConexiones() {
@@ -548,5 +568,6 @@ void inicializacion()
 	listaEsi = list_create();
 	listaInstancias = list_create();
 	tablaDeClaves = dictionary_create();
-	logOperaciones = log_create("archivoLog.txt","logOperaciones",1,NULL);
+	//logOperaciones = log_create("archivoLog.txt","logOperaciones",1,NULL);
+	//me tira un error de compilacion con el cuarto parametro
 }
