@@ -310,6 +310,12 @@ void tratarSet(Esi * esi){
 // FD_SET segun entiendo recibe mas de un parametro, por eso no puedo mandar a FD_SET como la clausura que espera el iterate
 // y entonces es que hago esta delegacion para que sirva como un adaptador entre lo que quiero y lo que espera el list_iterate
 
+/*
+ * Entonces está mal definida porque las funciones de interación
+ * reciben un puntero al objeto (que es lo que guardan las listas)
+ * [MATI]
+ */
+
 void setearReadfdsInstancia (Instancia  instancia){
 	FD_SET(instancia.socket,&readfds);
 }
@@ -573,6 +579,12 @@ void inicializacion()
 	listaEsi = list_create();
 	listaInstancias = list_create();
 	tablaDeClaves = dictionary_create();
+	/*
+	 * Copio la descripcion de log_create:
+	 * Crea una instancia de logger, tomando por parametro
+	 * el nombre del programa (segundo parametro), el nombre del archivo donde se van a generar los logs (primer parametro),
+	 * el nivel de detalle minimo a loguear (cuarto parametro, un enum) y si además se muestra por pantalla lo que se loguea (tercer parametro).
+	 */
 	//logOperaciones = log_create("archivoLog.txt","logOperaciones",1,NULL);
 	//me tira un error de compilacion con el cuarto parametro
 }
