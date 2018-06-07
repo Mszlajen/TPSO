@@ -168,9 +168,12 @@ void tratarGet(Esi * esi){
 
 	{
 		//comunico de get a la instancia
+
 		Instancia * instancia = algoritmoUsado();
 		dictionary_put(tablaDeClaves, esi->clave, &instancia);
+
 		header.protocolo = 11;
+
 		int * buffer = malloc(sizeof(header) + sizeof(enum instruccion) + sizeof(int) + *tamClave);
 		memcpy(buffer,&header.protocolo,sizeof(header));
 		memcpy(buffer+sizeof(header),&esi->instr,sizeof(enum instruccion));
@@ -200,7 +203,6 @@ void tratarGet(Esi * esi){
 			enviado = enviarBuffer (socketPlanificador , buffer , sizeof(header) +sizeof(enum tipoDeInstruccion) + sizeof(int) + *tamClave );
 		}
 		free(buffer);
-
 	}
 }
 
@@ -215,7 +217,7 @@ void tratarStore(Esi * esi) {
 
 	recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
 
-	if( consultarPorClaveTomada(*esi) == 1){
+	if( consultarPorClaveTomada(*esi) == 0){
 
 		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
 
@@ -233,12 +235,6 @@ void tratarStore(Esi * esi) {
 		}
 		free(buffer);
 
-		/*
-		 * El log tiene que decir que ESI hizo el STORE.
-		 * Copio el formato que da el enunciado:
-		 * ESI 1 STORE materias:K3001
-		 * [MATI]
-		 */
 		log_info(logOperaciones, "ESI %d STORE %s " , esi->idEsi , esi->clave);
 
 		instancia->esiTrabajando = esi;
@@ -246,7 +242,6 @@ void tratarStore(Esi * esi) {
 	}else{
 
 		error_show("no se puede liberar una clave que nunca fue tomada por el esi. ");
-		log_info(logOperaciones,"%s no esta tomada,no se puede hacer STORE, aborto operacion." , esi->clave);
 
 		header.protocolo = 12;
 
@@ -280,8 +275,7 @@ void tratarSet(Esi * esi){
 	recibirMensaje(esi->socket,sizeof(tamValor_t),(void *) &tamValor );
 	recibirMensaje(esi->socket,*tamValor,(void *) &esi->valor);
 
-
-	if( consultarPorClaveTomada(*esi) != 0){
+	if( consultarPorClaveTomada(*esi) == 0){
 
 		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
 
@@ -307,7 +301,6 @@ void tratarSet(Esi * esi){
 
 	}else{
 		error_show("la clave no pertenece al esi "  );
-		log_info(logOperaciones,"%s no esta tomada, no se puede hacer SET, aborto operacion." , esi->clave);
 
 		header.protocolo = 12;
 
@@ -510,7 +503,10 @@ Instancia * algoritmoUsado(){
 Instancia * algoritmoEquitativeLoad(){
 
 	Instancia * instancia;
+	pthread_mutex_lock(&mListaInst);
 	instancia = list_get(listaInstancias, contadorEquitativeLoad);
+	pthread_mutex_unlock(&mListaInst);
+
 
 	if(contadorEquitativeLoad == cantInstancias){
 		contadorEquitativeLoad = 0;
