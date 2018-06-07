@@ -18,6 +18,8 @@ t_dictionary * tablaDeClaves = NULL;
 socket_t  socketPlanificador;
 socket_t  socketCoordinador;
 
+pthread_mutex_t mListaInst;
+
 char * Algoritmo;
 int contadorEquitativeLoad = 0;
 int cantInstancias = 0;
@@ -25,14 +27,13 @@ int socketInstanciaMax = 0;
 int idInstanciaAuxiliar;
 t_log * logOperaciones;
 
-
-
 int main(void) {
 
 	struct sockaddr_in dirPlanificador;
 	int esPlanificador;
 	pthread_t hiloRecibeConexiones;
 	pthread_t hiloEscuchaPorAcciones;
+	FD_ZERO(&readfds);
 
 	inicializacion();
 
@@ -43,28 +44,15 @@ int main(void) {
 		esPlanificador = validarPlanificador(socketPlanificador );
 	} while (esPlanificador);
 
+	pthread_create(&hiloRecibeConexiones, NULL, (void*) recibirConexiones, NULL);
+	pthread_create(&hiloEscuchaPorAcciones, NULL, (void*) escucharPorAcciones, NULL);
 
+	pthread_join(hiloRecibeConexiones, NULL);
+	pthread_join(hiloEscuchaPorAcciones, NULL);
 
-	 pthread_create(&hiloRecibeConexiones, NULL, (void*) recibirConexiones, NULL);
-
-	 FD_ZERO(&readfds);
-
-	 pthread_create(&hiloEscuchaPorAcciones, NULL, (void*) escucharPorAcciones, NULL);
-
-	//close(socketCoordinador);
-	//log_destroy(logOperaciones);
+	liberarRecursos();
 	exit(0);
-	/*
-	 * Comentario:
-	 * Ese exit(0) está al pedo porque no deberia llegar
-	 * en ejecución normal (ni en anormal por el while(1)
-	 * pero si llegara a ser utilizable tendrian que
-	 * reemplazarlo con una función que libere los recursos
-	 * y despues haga exit(0), como la de error pero sin el
-	 * error.
-	 *
-	 * [MATI]
-	 */
+
 }
 
 
@@ -76,14 +64,10 @@ void escucharPorAcciones () {
 		list_iterate(listaEsi,(void*) setearReadfdsEsi);
 
 		select(socketInstanciaMax + 1,&readfds,NULL,NULL,NULL);
-		// debo revisar si los socket que quedaron en readfds son esi o instancia, si son instancia reviso si quieren compactar o si ya terminaron,
-		// si son esi reviso si me envian comandos
 
 		list_iterate(listaInstancias, (void*) escucharReadfdsInstancia);
 		list_iterate(listaEsi, (void*) escucharReadfdsEsi);
-
 	}
-
 }
 
 
@@ -94,12 +78,9 @@ void escucharReadfdsInstancia (Instancia  instancia) {
 	if (FD_ISSET(instancia.socket, &readfds))
 	{
 		recibirMensaje(instancia.socket,sizeof(header),(void *) &header);
-		// tengo que revisar si quieren compactar o si ya terminaron
+
 		if(header->protocolo == 12){
-			// debo enviar un mensaje a la esi correspondiente que se ejecuto la instruccion
 			recibirMensaje(instancia.socket,sizeof(int),(void *) &buffer );
-			//que yo sepa no existe el caso en que la instancia no pueda terminar de ejecutar, salvo por un pedido de compactacion
-			//pero eso no se contempla en este bloque, de modo que solo recibo el mensaje para quitar los bits
 
 			buffer = malloc(sizeof(header) + sizeof(int) );
 			int resultado = EXITO;
@@ -114,7 +95,7 @@ void escucharReadfdsInstancia (Instancia  instancia) {
 			}
 			free(buffer);
 		}else{
-
+			//aca va el codigo que trata los mensajes de la compactacion de Instancias
 		}
 	}
 }
@@ -124,10 +105,12 @@ void escucharReadfdsEsi (Esi esi) {
 	enum instruccion * instr = NULL;
 	int estadoDellegada;
 
-
 		if (FD_ISSET(esi.socket, &readfds))
 		{
 			recibirMensaje(esi.socket,sizeof(header),(void *) &header);
+
+			recibirMensaje(esi.socket,sizeof(int),(void *) &esi.idEsi);
+
 			if (header->protocolo == 8){
 
 				do {
@@ -236,19 +219,11 @@ void tratarStore(Esi * esi) {
 
 		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
 
-		/*
-		 * ¿No puse alguna vez ya que tantos int no se entiende que se supone que son?
-		 * Si no lo dije, lo digo ahora.
-		 * Si son cosas que ya están definidas en el protocolo, usen eso.
-		 * Si no están definidas pueden hacer un typedef exclusivo de su modulo.
-		 * Así como está ahora es indebuggeable (y sospecho que está mal)
-		 * [MATI]
-		 */
-		buffer = malloc(sizeof(header) + sizeof(int) + *tamClave + sizeof(int));
+		buffer = malloc(sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int));
 		memcpy(buffer , &header.protocolo , sizeof(header) );
-		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(int) );
+		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(enum instruccion) );
 		memcpy(buffer+sizeof(header)+sizeof(int) , tamClave , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int), &esi->clave , *tamClave );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int), &esi->clave , *tamClave );
 
 		estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 
@@ -264,16 +239,12 @@ void tratarStore(Esi * esi) {
 		 * ESI 1 STORE materias:K3001
 		 * [MATI]
 		 */
-		log_info(logOperaciones, "STORE %s " , esi->clave);
+		log_info(logOperaciones, "ESI %d STORE %s " , esi->idEsi , esi->clave);
 
 		instancia->esiTrabajando = esi;
 
-
 	}else{
-		/*
-		 * ¿Para que describir el problema si los errores
-		 * tienen nombres definidos en el enunciado?
-		 */
+
 		error_show("no se puede liberar una clave que nunca fue tomada por el esi. ");
 		log_info(logOperaciones,"%s no esta tomada,no se puede hacer STORE, aborto operacion." , esi->clave);
 
@@ -332,7 +303,7 @@ void tratarSet(Esi * esi){
 
 		instancia->esiTrabajando = esi;
 		free(buffer);
-		log_info(logOperaciones, "SET %s %s ",esi->clave ,esi->valor);
+		log_info(logOperaciones, "ESI %d SET %s %s " , esi->idEsi ,esi->clave ,esi->valor);
 
 	}else{
 		error_show("la clave no pertenece al esi "  );
@@ -357,30 +328,17 @@ void tratarSet(Esi * esi){
 
 }
 
-/*
- * Esto es exceso de delegación.
- * Escribis exactamente la misma cantidad de caracteres
- * llamando a la funcion y no te aporta nada.
- * [MATI]
- */
-// lo hago por que segun entiendo, el list_iterate espera una clausura que recibe instancias y hace algo
-// FD_SET segun entiendo recibe mas de un parametro, por eso no puedo mandar a FD_SET como la clausura que espera el iterate
-// y entonces es que hago esta delegacion para que sirva como un adaptador entre lo que quiero y lo que espera el list_iterate
 
-/*
- * Entonces está mal definida porque las funciones de interación
- * reciben un puntero al objeto (que es lo que guardan las listas)
- * [MATI]
- */
-// pero lo unico que yo necesito poner en el readfds es el socket, osea, no voy a modificar lo elementos de la lista
-// solo voy a poner todos los socket en el readfds entonces es lo mismo que reciba la dir de memoria de la instancia, o una copia
 
-void setearReadfdsInstancia (Instancia instancia){
-	FD_SET(instancia.socket,&readfds);
+void setearReadfdsInstancia (Instancia * instancia){
+	pthread_mutex_lock(&mListaInst);
+	FD_SET(instancia->socket,&readfds);
+	pthread_mutex_unlock(&mListaInst);
+
 }
 
-void setearReadfdsEsi (Esi esi){
-	FD_SET(esi.socket,&readfds);
+void setearReadfdsEsi (Esi * esi){
+	FD_SET(esi->socket,&readfds);
 }
 
 
@@ -399,8 +357,8 @@ int consultarPorClaveTomada(Esi esi){
 	int * buffer = malloc(sizeof(header) + sizeof(enum tipoDeInstruccion) + sizeof(int) + tamClave);
 	memcpy(buffer , &header.protocolo , sizeof(header) );
 	memcpy(buffer+sizeof(header) , &tipo, sizeof(enum tipoDeInstruccion) );
-	memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion)  , &tamClave, sizeof(int) );
-	memcpy(buffer+sizeof(header)+sizeof(enum tipoDeInstruccion)+sizeof(int)  , &esi.clave, tamClave );
+	memcpy(buffer+sizeof(header) + sizeof(enum tipoDeInstruccion)  , &tamClave, sizeof(int) );
+	memcpy(buffer+sizeof(header) + sizeof(enum tipoDeInstruccion) + sizeof(int) , &esi.clave, tamClave );
 
 
 	int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
@@ -440,19 +398,6 @@ void recibirConexiones() {
 void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 {
 
-	/*
-	 * Voy a hacer otra explicación de como funciona recibirMensaje:
-	 * 1- Creo una variable puntero del tipo (tipo* p) de lo que quiero
-	 * 	  	recibir y no le asigno nada (o NULL a lo sumo)
-	 * 2- Le paso como tercer parametro la dirección de ese puntero (&p)
-	 * 2.5- Si el tipo del puntero no es un void*, cosa probable, lo
-	 * 		casteo a un puntero de puntero de void (void**)
-	 * 3- Despues del llamado de la función, si termino bien, el puntero
-	 * 		va a dirigir un espacio de memoria donde está el dato
-	 * 		recibido.
-	 *
-	 * [MATI]
-	 */
 	header* header;
 	recibirMensaje(socketAceptado,1,(void *) &header);
 
@@ -467,21 +412,8 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 	case 4:
 		reconectarInstancia(socketAceptado);
 		break;
-
 	default:
-
-		//Creo que no hace nada si no es Esi o Instancia
-		/*
-		 * No deberia pasar y no creo que lo prueben pero
-		 * por ser correctos, si al socket de recepción en
-		 * este punto le llega algo que no es ESI o Instancia
-		 * podes cerrar ese socket y mandar un mensaje de
-		 * error informando al usuario.
-		 *
-		 * [MATI]
-		 */
 		break;
-
 	}
 }
 
@@ -492,22 +424,17 @@ void reconectarInstancia(socket_t socket){
 
 	idInstanciaAuxiliar = *idInstancia;
 
+	pthread_mutex_lock(&mListaInst);
 	instancia = list_find(listaInstancias,(void *) idInstancia);
+	pthread_mutex_unlock(&mListaInst);
+
 
 	instancia->socket = socket;
 
 }
 
-bool idInstancia(Instancia instancia){
-	/*
-	 * ¿Por qué no hacer directamente return instancia.idinstancia == idInstanciaAuxiliar?
-	 * [MATI]
-	 */
-	if(instancia.idinstancia == idInstanciaAuxiliar){
-		return 1;
-	}else{
-		return 0;
-	}
+bool idInstancia(Instancia * instancia){
+	return instancia->idinstancia == idInstanciaAuxiliar;
 }
 
 void registrarEsi(socket_t socket){
@@ -538,7 +465,9 @@ void registrarInstancia(socket_t socket)
 	instanciaRecibida.idinstancia = cantInstancias + 1;
 	instanciaRecibida.socket = socket;
 
+	pthread_mutex_lock(&mListaInst);
 	cantInstancias = list_add(listaInstancias,&instanciaRecibida);
+	pthread_mutex_unlock(&mListaInst);
 
 	header header;
 	header.protocolo = 5;
@@ -624,13 +553,10 @@ int validarPlanificador (socket_t socket) {
 
 void liberarRecursos()
 {
-	/*
-	 * Consejo:
-	 * 	Cada vez que agreguen un recurso, vengan
-	 * 	y ya dejan su liberación escrita.
-	 *
-	 * [MATI]
-	 */
+
+	close(socketCoordinador);
+	log_destroy(logOperaciones);
+
 	if(configuracion != NULL)
 		config_destroy(configuracion);
 }
@@ -651,12 +577,7 @@ void inicializacion()
 	listaEsi = list_create();
 	listaInstancias = list_create();
 	tablaDeClaves = dictionary_create();
-	/*
-	 * Copio la descripcion de log_create:
-	 * Crea una instancia de logger, tomando por parametro
-	 * el nombre del programa (segundo parametro), el nombre del archivo donde se van a generar los logs (primer parametro),
-	 * el nivel de detalle minimo a loguear (cuarto parametro, un enum) y si además se muestra por pantalla lo que se loguea (tercer parametro).
-	 */
+
 	logOperaciones = log_create("archivoLog.txt","logOperaciones",1,LOG_LEVEL_INFO);
 
 }

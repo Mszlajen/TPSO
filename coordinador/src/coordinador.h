@@ -10,13 +10,14 @@
 #include <string.h>
 #include <commons/config.h>
 #include <commons/collections/list.h>
-#include <commons/log.c> //Se incluye el .h [MATI]
+#include <commons/log.c>
 
 typedef struct {
 	socket_t socket;
 	enum instruccion instr;
 	char* clave;
 	char* valor;
+	int idEsi;
 } Esi;
 
 
@@ -42,14 +43,14 @@ void atenderEsi(socket_t socket);
 void registrarEsi(socket_t socket);
 void registrarInstancia(socket_t socket);
 void reconectarInstancia(socket_t socket);
-bool idInstancia(Instancia instancia);
+bool idInstancia(Instancia * instancia);
 void escucharPorAcciones ();
 void tratarGet(Esi * esi);
 void tratarSet(Esi * esi);
 void tratarStore(Esi * esi);
 int consultarPorClaveTomada(Esi esi);
-void setearReadfdsInstancia (Instancia instancia);
-void setearReadfdsEsi (Esi esi);
+void setearReadfdsInstancia (Instancia * instancia);
+void setearReadfdsEsi (Esi * esi);
 void escucharReadfdsInstancia (Instancia  instancia);
 void escucharReadfdsEsi (Esi esi);
 void recibirConexiones();
