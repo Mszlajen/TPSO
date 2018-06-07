@@ -236,6 +236,14 @@ void tratarStore(Esi * esi) {
 
 		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
 
+		/*
+		 * ¿No puse alguna vez ya que tantos int no se entiende que se supone que son?
+		 * Si no lo dije, lo digo ahora.
+		 * Si son cosas que ya están definidas en el protocolo, usen eso.
+		 * Si no están definidas pueden hacer un typedef exclusivo de su modulo.
+		 * Así como está ahora es indebuggeable (y sospecho que está mal)
+		 * [MATI]
+		 */
 		buffer = malloc(sizeof(header) + sizeof(int) + *tamClave + sizeof(int));
 		memcpy(buffer , &header.protocolo , sizeof(header) );
 		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(int) );
@@ -250,12 +258,22 @@ void tratarStore(Esi * esi) {
 		}
 		free(buffer);
 
+		/*
+		 * El log tiene que decir que ESI hizo el STORE.
+		 * Copio el formato que da el enunciado:
+		 * ESI 1 STORE materias:K3001
+		 * [MATI]
+		 */
 		log_info(logOperaciones, "STORE %s " , esi->clave);
 
 		instancia->esiTrabajando = esi;
 
 
 	}else{
+		/*
+		 * ¿Para que describir el problema si los errores
+		 * tienen nombres definidos en el enunciado?
+		 */
 		error_show("no se puede liberar una clave que nunca fue tomada por el esi. ");
 		log_info(logOperaciones,"%s no esta tomada,no se puede hacer STORE, aborto operacion." , esi->clave);
 
@@ -481,6 +499,10 @@ void reconectarInstancia(socket_t socket){
 }
 
 bool idInstancia(Instancia instancia){
+	/*
+	 * ¿Por qué no hacer directamente return instancia.idinstancia == idInstanciaAuxiliar?
+	 * [MATI]
+	 */
 	if(instancia.idinstancia == idInstanciaAuxiliar){
 		return 1;
 	}else{

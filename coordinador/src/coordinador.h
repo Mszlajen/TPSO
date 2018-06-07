@@ -10,7 +10,7 @@
 #include <string.h>
 #include <commons/config.h>
 #include <commons/collections/list.h>
-#include <commons/log.c>
+#include <commons/log.c> //Se incluye el .h [MATI]
 
 typedef struct {
 	socket_t socket;
