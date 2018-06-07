@@ -5,14 +5,12 @@
 #include <commons/config.h>
 #include <commons/string.h>
 
-#define nombre 			"nombreInstancia"
-#define IPCoord 		"IPCoordinador"
-#define puertoCoord 	"puertoCoordinador"
-#define puntoMontaje 	"puntoDeMontaje"
-#define tiempoDump 		"tiempoIntervaloDump"
-#define algoReempl		"algoritmoDeReemplazo"
-#define cantEntradas	"cantidadDeEntradas"
-#define tamEntradas		"tamanioDeEntradas"
+#define nombre "nombreInstancia"
+#define IPCoord "IPCoordinador"
+#define puertoCoord "puertoCoordinador"
+#define puntoMontaje "puntoDeMontaje"
+#define tiempoDump "tiempoIntervaloDump"
+#define algoReempl "algoritmoDeReemplazo"
 
 enum algoritmoReemplazo {BSU, LRU, Circular};
 
