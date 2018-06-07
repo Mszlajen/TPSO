@@ -22,7 +22,8 @@ char * Algoritmo;
 int contadorEquitativeLoad = 0;
 int cantInstancias = 0;
 int socketInstanciaMax = 0;
-t_log logOperaciones;
+int idInstanciaAuxiliar;
+t_log * logOperaciones;
 
 
 
@@ -70,15 +71,18 @@ int main(void) {
 
 void escucharPorAcciones () {
 
-	list_iterate(listaInstancias,(void*) setearReadfdsInstancia);
-	list_iterate(listaEsi,(void*) setearReadfdsEsi);
+	while(1){
+		list_iterate(listaInstancias,(void*) setearReadfdsInstancia);
+		list_iterate(listaEsi,(void*) setearReadfdsEsi);
 
-	select(socketInstanciaMax + 1,&readfds,NULL,NULL,NULL);
-	// debo revisar si los socket que quedaron en readfds son esi o instancia, si son instancia reviso si quieren compactar o si ya terminaron,
-	// si son esi reviso si me envian comandos
+		select(socketInstanciaMax + 1,&readfds,NULL,NULL,NULL);
+		// debo revisar si los socket que quedaron en readfds son esi o instancia, si son instancia reviso si quieren compactar o si ya terminaron,
+		// si son esi reviso si me envian comandos
 
-	list_iterate(listaInstancias, (void*) escucharReadfdsInstancia);
-	list_iterate(listaEsi, (void*) escucharReadfdsEsi);
+		list_iterate(listaInstancias, (void*) escucharReadfdsInstancia);
+		list_iterate(listaEsi, (void*) escucharReadfdsEsi);
+
+	}
 
 }
 
@@ -118,8 +122,6 @@ void escucharReadfdsInstancia (Instancia  instancia) {
 void escucharReadfdsEsi (Esi esi) {
 	header * header;
 	enum instruccion * instr = NULL;
-		//char* clave;
-		//char* valor;
 	int estadoDellegada;
 
 
@@ -223,7 +225,8 @@ void tratarStore(Esi * esi) {
 	tamClave_t * tamClave = NULL;
 	header header;
 	header.protocolo = 11;
-
+	int * buffer;
+	int estado;
 
 	recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
 
@@ -233,26 +236,44 @@ void tratarStore(Esi * esi) {
 
 		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
 
-		int * buffer = malloc(sizeof(header) + sizeof(int) + *tamClave + sizeof(int));
+		buffer = malloc(sizeof(header) + sizeof(int) + *tamClave + sizeof(int));
 		memcpy(buffer , &header.protocolo , sizeof(header) );
 		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(int) );
 		memcpy(buffer+sizeof(header)+sizeof(int) , tamClave , sizeof(int) );
 		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(int), &esi->clave , *tamClave );
 
-		int estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
+		estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 
 		while(estado !=0){
 			error_show("no se pudo comunicar el store a la instancia, volviendo a intentar");
 			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
 		}
 		free(buffer);
-		log_info(logOperaciones, "STORE %s" ,esi->clave);//NO SE SI ESTA BIEN UTILIZADO SI ME LO PUEDEN REVISAR MEJOR!![YOEL]
+
+		log_info(logOperaciones, "STORE %s " , esi->clave);
+
 		instancia->esiTrabajando = esi;
 
 
 	}else{
 		error_show("no se puede liberar una clave que nunca fue tomada por el esi. ");
-		// aca va el caso donde se hace store de una clave no tomada
+		log_info(logOperaciones,"%s no esta tomada,no se puede hacer STORE, aborto operacion." , esi->clave);
+
+		header.protocolo = 12;
+
+		buffer = malloc(sizeof(header) + sizeof(int) );
+		int resultado = ERROR;
+		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer+sizeof(header) , &resultado , sizeof(int));
+
+		estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(int) );
+
+		while(estado != 0){
+			error_show ("no se envio correctamente el informe de resultado al esi, enviando nuevamente");
+			estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(int) );
+		}
+		free(buffer);
+
 	}
 
 }
@@ -262,6 +283,8 @@ void tratarSet(Esi * esi){
 	tamValor_t * tamValor = NULL;
 	header header;
 	header.protocolo = 11;
+	int * buffer;
+	int estado;
 
 	recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
 	recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
@@ -273,7 +296,7 @@ void tratarSet(Esi * esi){
 
 		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
 
-		int * buffer = malloc(sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(int) * 2);
+		buffer = malloc(sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(int) * 2);
 		memcpy(buffer , &header.protocolo , sizeof(header) );
 		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(enum instruccion) );
 		memcpy(buffer+sizeof(header)+sizeof(enum instruccion) , tamClave , sizeof(int) );
@@ -282,7 +305,7 @@ void tratarSet(Esi * esi){
 		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int)*2+*tamClave , &esi->valor , *tamValor );
 
 
-		int estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(int) * 2);
+		estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(int) * 2);
 
 		while(estado !=0){
 			error_show("no se pudo comunicar el store a la instancia, volviendo a intentar");
@@ -291,11 +314,27 @@ void tratarSet(Esi * esi){
 
 		instancia->esiTrabajando = esi;
 		free(buffer);
-		log_info(logOperaciones, "SET %s",esi->clave);//NO SE SI ESTA BIEN UTILIZADO SI ME LO PUEDEN REVISAR MEJOR!![YOEL]
+		log_info(logOperaciones, "SET %s %s ",esi->clave ,esi->valor);
 
 	}else{
 		error_show("la clave no pertenece al esi "  );
-		//aun queda contemplar si se aborta el esi en este momento
+		log_info(logOperaciones,"%s no esta tomada, no se puede hacer SET, aborto operacion." , esi->clave);
+
+		header.protocolo = 12;
+
+		buffer = malloc(sizeof(header) + sizeof(int) );
+		int resultado = ERROR;
+		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer+sizeof(header) , &resultado , sizeof(int));
+
+		estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(int) );
+
+		while(estado != 0){
+			error_show ("no se envio correctamente el informe de resultado al esi, enviando nuevamente");
+			estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(int) );
+		}
+		free(buffer);
+
 	}
 
 }
@@ -315,12 +354,14 @@ void tratarSet(Esi * esi){
  * reciben un puntero al objeto (que es lo que guardan las listas)
  * [MATI]
  */
+// pero lo unico que yo necesito poner en el readfds es el socket, osea, no voy a modificar lo elementos de la lista
+// solo voy a poner todos los socket en el readfds entonces es lo mismo que reciba la dir de memoria de la instancia, o una copia
 
-void setearReadfdsInstancia (Instancia  instancia){
+void setearReadfdsInstancia (Instancia instancia){
 	FD_SET(instancia.socket,&readfds);
 }
 
-void setearReadfdsEsi (Esi  esi){
+void setearReadfdsEsi (Esi esi){
 	FD_SET(esi.socket,&readfds);
 }
 
@@ -400,24 +441,13 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 	switch(header->protocolo){
 
 	case 2:
-		/*
-		 * Si el header que te llego dice protocolo = 2 es una instancia que nueva
-		 * que se está conectando y no puede ser otra cosa (porque el numero de
-		 * protocolo seria otro).
-		 * Segun entiendo tu codigo, en está función solo se van a procesar los
-		 * mensajes de socket recien creadas (salvo la del planificador) en cuyo
-		 * caso, solo deberia de poder llegar los protocolos 2 a 4 inclusive.
-		 *
-		 * [MATI]
-		 */
 		registrarInstancia(socketAceptado);
 		break;
-
 	case 3:
 		registrarEsi(socketAceptado);
 		break;
 	case 4:
-		// una instancia se reconecta
+		reconectarInstancia(socketAceptado);
 		break;
 
 	default:
@@ -437,6 +467,26 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 	}
 }
 
+void reconectarInstancia(socket_t socket){
+	Instancia * instancia;
+	int * idInstancia;
+	recibirMensaje(socket,sizeof(int),(void *) &idInstancia );
+
+	idInstanciaAuxiliar = *idInstancia;
+
+	instancia = list_find(listaInstancias,(void *) idInstancia);
+
+	instancia->socket = socket;
+
+}
+
+bool idInstancia(Instancia instancia){
+	if(instancia.idinstancia == idInstanciaAuxiliar){
+		return 1;
+	}else{
+		return 0;
+	}
+}
 
 void registrarEsi(socket_t socket){
 
@@ -459,7 +509,7 @@ void registrarInstancia(socket_t socket)
 
 	char * nombre = NULL;
 
-	recibirMensaje(socket,4,(void *) &tamMensj );
+	recibirMensaje(socket,sizeof(int),(void *) &tamMensj );
 	recibirMensaje(socket,*tamMensj,(void *) &nombre );
 
 	strcpy(instanciaRecibida.nombre , nombre);
@@ -585,6 +635,6 @@ void inicializacion()
 	 * el nombre del programa (segundo parametro), el nombre del archivo donde se van a generar los logs (primer parametro),
 	 * el nivel de detalle minimo a loguear (cuarto parametro, un enum) y si además se muestra por pantalla lo que se loguea (tercer parametro).
 	 */
-	//logOperaciones = log_create("archivoLog.txt","logOperaciones",1,NULL);
-	//me tira un error de compilacion con el cuarto parametro
+	logOperaciones = log_create("archivoLog.txt","logOperaciones",1,LOG_LEVEL_INFO);
+
 }

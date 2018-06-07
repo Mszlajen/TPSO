@@ -41,6 +41,8 @@ void inicializacion();
 void atenderEsi(socket_t socket);
 void registrarEsi(socket_t socket);
 void registrarInstancia(socket_t socket);
+void reconectarInstancia(socket_t socket);
+bool idInstancia(Instancia instancia);
 void escucharPorAcciones ();
 void tratarGet(Esi * esi);
 void tratarSet(Esi * esi);
