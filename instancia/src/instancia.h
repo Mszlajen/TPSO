@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/mman.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <commons/string.h>
 #include <commons/collections/dictionary.h>
@@ -18,7 +19,7 @@ typedef struct {
 typedef struct {
 	tamValor_t tamanio;
 	cantEntradas_t entradaInicial;
-	FILE* archivo;
+	int fd;
 	void* mappeado;
 } infoClave;
 
@@ -40,18 +41,17 @@ void procesamientoInstrucciones();
 
 instruccion_t* recibirInstruccionCoordinador();
 void incrementarUltimoUsoEntradas();
-void instruccionSet(instruccion_t*);
-void instruccionStore(instruccion_t*);
+enum resultadoEjecucion instruccionSet(instruccion_t*);
+enum resultadoEjecucion instruccionStore(instruccion_t*);
 
-void actualizarValorDeClave(char*, char*, tamValor_t);
-void registrarNuevaClave(char*, char*, tamValor_t);
+enum resultadoEjecucion actualizarValorDeClave(char*, char*, tamValor_t);
+enum resultadoEjecucion registrarNuevaClave(char*, char*, tamValor_t);
 
 cantEntradas_t encontrarEspacioLibreConsecutivo(tamValor_t);
 int haySuficienteEspacio(tamValor_t);
 void algoritmoDeReemplazo();
-void actualizarValorMayorTamanio(char*, infoClave*, char*, tamValor_t);
-void actualizarValorIgualTamanio(char*, infoClave*, char*, tamValor_t);
-void actualizarValorMenorTamanio(char*, infoClave*, char*, tamValor_t);
+enum resultadoEjecucion actualizarValorMayorTamanio(char*, infoClave*, char*, tamValor_t);
+enum resultadoEjecucion actualizarValorMenorTamanio(char*, infoClave*, char*, tamValor_t);
 
 void reemplazoCircular();
 
@@ -61,6 +61,7 @@ cantEntradas_t tamValorACantEntradas(tamValor_t);
 //Devuelve 0 en exito, ERROR si fallo
 int crearMappeado(infoClave*);
 int destruirMappeado(infoClave*);
+int guardarEnArchivo(infoClave*);
 void destruirClave(char*);
 void destruirInfoClave(infoClave*);
 void incrementarPunteroReemplazo();
