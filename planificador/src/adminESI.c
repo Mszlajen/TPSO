@@ -14,7 +14,6 @@ ESI* crearESI (socket_t sock, int estimacionInicial)
 	unaESI -> arriboListos = instruccionesEjecutadas;
 	//unaESI -> recursos = list_create();
 	unaESI -> socket = sock;
-	pthread_mutex_init(&(unaESI -> sEjecutando), NULL);
 	return unaESI;
 }
 

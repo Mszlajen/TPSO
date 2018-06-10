@@ -6,7 +6,7 @@ t_dictionary * tablaBloqueos = NULL; //(Clave. ESI)
 void reservarClave(ESI* esi, char* clave)
 {
 	dictionary_put(tablaBloqueos, clave, esi);
-	agregarRecurso(esi, clave);
+	//agregarRecurso(esi, clave);
 }
 void reservarClaveSinESI(char *clave)
 {
@@ -46,15 +46,15 @@ void colocarEnColaESI(ESI* esi, char* clave)
 	}
 }
 
-int claveTomada (char* clave)
+booleano claveTomada (char* clave)
 {
 	return dictionary_has_key(tablaBloqueos, clave);
 }
 
-booleano claveTomadaPorESI (char* clave, ESI* esi)
+booleano claveTomadaPorESI (char* clave, ESI_id ID)
 {
 	if(dictionary_has_key(tablaBloqueos, clave))
-		return ((ESI*) dictionary_get(tablaBloqueos, clave) ) -> id == esi -> id;
+		return ((ESI*) dictionary_get(tablaBloqueos, clave) ) -> id == ID;
 	else
 		return 0;
 }

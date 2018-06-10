@@ -12,7 +12,7 @@
 #include "adminESI.h"
 
 typedef struct {
-	id_t id_esi;
+	ESI_id id_esi;
 	enum tipoDeInstruccion tipo;
 	uint8_t tamClave;
 	char* clave;
@@ -31,11 +31,10 @@ int enviarIdESI(socket_t, int);
 int enviarRespuestaConsultaCoord(socket_t, booleano);
 consultaCoord* recibirConsultaCoord(socket_t);
 socket_t crearServerESI();
-int procesarConsultaCoord(ESI*, consultaCoord*);
 pthread_t crearHiloTerminal ();
 pthread_t crearHiloNuevasESI ();
 pthread_t crearHiloEjecucion (ESI*);
-pthread_t crearHiloCoordinador (socket_t);
+pthread_t crearHiloCoordinador ();
 
 enum comandos convertirComando(char *);
 void salirConError(char *);

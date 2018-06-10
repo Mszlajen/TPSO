@@ -11,7 +11,6 @@ typedef struct {
 	int estimacion;
 	int ultimaEstimacion;
 	unsigned long int arriboListos;
-	pthread_mutex_t sEjecutando;
 	t_list *recursos;
 }ESI;
 
