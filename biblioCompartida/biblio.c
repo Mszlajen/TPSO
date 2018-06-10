@@ -79,8 +79,6 @@ int enviarHeader (socket_t sock, header head)
 
 int enviarBuffer (socket_t sock, void* buffer, int tamBuffer)
 {
-	if(tamBuffer == 0)
-		tamBuffer = sizeof(*buffer);
 	int bytesEnviados = send(sock, buffer, tamBuffer, 0);
 	if(bytesEnviados == ERROR)
 		return -1;

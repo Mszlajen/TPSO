@@ -28,7 +28,11 @@ typedef struct {
 	uint8_t protocolo;
 } header;
 
-enum instruccion {get, set, store, compactacion};
+/*
+ * Create es para cuando se envia set por primera vez
+ * a la instancia.
+ */
+enum instruccion {get, set, store, compactacion, create};
 enum tipoDeInstruccion {bloqueante, liberadora, noDefinido};
 enum resultadoEjecucion {exito, bloqueo, fallo};
 
