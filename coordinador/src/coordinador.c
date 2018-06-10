@@ -12,7 +12,6 @@
 t_config * configuracion = NULL;
 t_list * listaInstancias = NULL;
 t_list * listaEsi = NULL;
-fd_set readfds;
 t_dictionary * tablaDeClaves = NULL;
 
 socket_t  socketPlanificador;
@@ -23,67 +22,50 @@ pthread_mutex_t mListaInst;
 char * Algoritmo;
 int contadorEquitativeLoad = 0;
 int cantInstancias = 0;
-int socketInstanciaMax = 0;
-int idInstanciaAuxiliar;
 t_log * logOperaciones;
 
-int main(void) {
+int main(int argc, char **argv) {
 
 	struct sockaddr_in dirPlanificador;
 	int esPlanificador;
 	pthread_t hiloRecibeConexiones;
-	pthread_t hiloEscuchaPorAcciones;
-	FD_ZERO(&readfds);
 
-	inicializacion();
+	inicializacion(argv[1]);
 
 	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
 
 	 do {
 		socketPlanificador = esperarYaceptar(socketCoordinador ,&dirPlanificador);
 		esPlanificador = validarPlanificador(socketPlanificador );
+		//validarPlanificador crea el hilo que atendera al planificador
 	} while (esPlanificador);
 
 	pthread_create(&hiloRecibeConexiones, NULL, (void*) recibirConexiones, NULL);
-	pthread_create(&hiloEscuchaPorAcciones, NULL, (void*) escucharPorAcciones, NULL);
 
 	pthread_join(hiloRecibeConexiones, NULL);
-	pthread_join(hiloEscuchaPorAcciones, NULL);
 
 	liberarRecursos();
 	exit(0);
 
 }
 
-
-
-void escucharPorAcciones () {
-
-	while(1){
-		list_iterate(listaInstancias,(void*) setearReadfdsInstancia);
-		list_iterate(listaEsi,(void*) setearReadfdsEsi);
-
-		select(socketInstanciaMax + 1,&readfds,NULL,NULL,NULL);
-
-		list_iterate(listaInstancias, (void*) escucharReadfdsInstancia);
-		list_iterate(listaEsi, (void*) escucharReadfdsEsi);
-	}
+void esucharPlanificador (socket_t socket){
+	// aun no la voy a desarrollar, pero esta sera la funcion que maneje el hilo del Planificador
 }
 
-
-void escucharReadfdsInstancia (Instancia  instancia) {
+void escucharInstancia (Instancia  instancia) {
 	header * header;
 	int * buffer;
 	int enviado;
-	if (FD_ISSET(instancia.socket, &readfds))
-	{
+	int resultado;
+
 		recibirMensaje(instancia.socket,sizeof(header),(void *) &header);
 
 		if(header->protocolo == 12){
-			recibirMensaje(instancia.socket,sizeof(int),(void *) &buffer );
+			recibirMensaje(instancia.socket,sizeof(int),(void *) &resultado );
 
 			buffer = malloc(sizeof(header) + sizeof(int) );
-			int resultado = EXITO;
+
 			memcpy(buffer , &header->protocolo , sizeof(header) );
 			memcpy(buffer+sizeof(header) , &resultado , sizeof(int));
 
@@ -97,39 +79,32 @@ void escucharReadfdsInstancia (Instancia  instancia) {
 		}else{
 			//aca va el codigo que trata los mensajes de la compactacion de Instancias
 		}
-	}
+
 }
 
-void escucharReadfdsEsi (Esi esi) {
+void escucharEsi (Esi esi) {
 	header * header;
 	enum instruccion * instr = NULL;
-	int estadoDellegada;
 
-		if (FD_ISSET(esi.socket, &readfds))
-		{
-			recibirMensaje(esi.socket,sizeof(header),(void *) &header);
+		recibirMensaje(esi.socket,sizeof(header),(void *) &header);
+		recibirMensaje(esi.socket,sizeof(int),(void *) &esi.idEsi);
 
-			recibirMensaje(esi.socket,sizeof(int),(void *) &esi.idEsi);
+		if (header->protocolo == 8){
 
-			if (header->protocolo == 8){
+			recibirMensaje(esi.socket,sizeof(enum instruccion),(void *) &instr );
 
-				do {
-					estadoDellegada = recibirMensaje(esi.socket,sizeof(enum instruccion),(void *) &instr );
-				} while (estadoDellegada);
+			esi.instr = *instr;
 
-				esi.instr = *instr;
-
-				switch(esi.instr){
-				case get:
-					tratarGet(&esi);
-					break;
-				case set:
-					tratarSet(&esi);
-					break;
-				case store:
-					tratarStore(&esi);
-					break;
-				}
+			switch(esi.instr){
+			case get:
+				tratarGet(&esi);
+				break;
+			case set:
+				tratarSet(&esi);
+				break;
+			case store:
+				tratarStore(&esi);
+				break;
 			}
 		}
 }
@@ -239,6 +214,8 @@ void tratarStore(Esi * esi) {
 
 		instancia->esiTrabajando = esi;
 
+		escucharInstancia(*instancia);
+
 	}else{
 
 		error_show("no se puede liberar una clave que nunca fue tomada por el esi. ");
@@ -299,6 +276,8 @@ void tratarSet(Esi * esi){
 		free(buffer);
 		log_info(logOperaciones, "ESI %d SET %s %s " , esi->idEsi ,esi->clave ,esi->valor);
 
+		escucharInstancia(*instancia);
+
 	}else{
 		error_show("la clave no pertenece al esi "  );
 
@@ -321,20 +300,6 @@ void tratarSet(Esi * esi){
 
 }
 
-
-
-void setearReadfdsInstancia (Instancia * instancia){
-	pthread_mutex_lock(&mListaInst);
-	FD_SET(instancia->socket,&readfds);
-	pthread_mutex_unlock(&mListaInst);
-
-}
-
-void setearReadfdsEsi (Esi * esi){
-	FD_SET(esi->socket,&readfds);
-}
-
-
 int consultarPorClaveTomada(Esi esi){
 	header header;
 	header.protocolo = 9;
@@ -347,11 +312,12 @@ int consultarPorClaveTomada(Esi esi){
 		tipo = noDefinido;
 	}
 
-	int * buffer = malloc(sizeof(header) + sizeof(enum tipoDeInstruccion) + sizeof(int) + tamClave);
+	int * buffer = malloc(sizeof(header) + sizeof(enum tipoDeInstruccion) + sizeof(int) * 2 + tamClave);
 	memcpy(buffer , &header.protocolo , sizeof(header) );
-	memcpy(buffer+sizeof(header) , &tipo, sizeof(enum tipoDeInstruccion) );
-	memcpy(buffer+sizeof(header) + sizeof(enum tipoDeInstruccion)  , &tamClave, sizeof(int) );
-	memcpy(buffer+sizeof(header) + sizeof(enum tipoDeInstruccion) + sizeof(int) , &esi.clave, tamClave );
+	memcpy(buffer+sizeof(header) , &esi.idEsi, sizeof(int) );
+	memcpy(buffer+sizeof(header) + sizeof(int) , &tipo, sizeof(enum tipoDeInstruccion) );
+	memcpy(buffer+sizeof(header) + sizeof(int) + sizeof(enum tipoDeInstruccion)  , &tamClave, sizeof(int) );
+	memcpy(buffer+sizeof(header) + sizeof(int) + sizeof(enum tipoDeInstruccion) + sizeof(int) , &esi.clave, tamClave );
 
 
 	int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
@@ -387,7 +353,6 @@ void recibirConexiones() {
 		}
 }
 
-
 void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 {
 
@@ -398,36 +363,15 @@ void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
 
 	case 2:
 		registrarInstancia(socketAceptado);
+		//registrarInstancia es quien verifica que las id sean 0 (instancia nueva) o una id asignada de una instancia que se reconecta
 		break;
 	case 3:
 		registrarEsi(socketAceptado);
-		break;
-	case 4:
-		reconectarInstancia(socketAceptado);
+		//ahora registrar esi, ademas de registrarla crea un hilo que se encargara de atenderla
 		break;
 	default:
 		break;
 	}
-}
-
-void reconectarInstancia(socket_t socket){
-	Instancia * instancia;
-	int * idInstancia;
-	recibirMensaje(socket,sizeof(int),(void *) &idInstancia );
-
-	idInstanciaAuxiliar = *idInstancia;
-
-	pthread_mutex_lock(&mListaInst);
-	instancia = list_find(listaInstancias,(void *) idInstancia);
-	pthread_mutex_unlock(&mListaInst);
-
-
-	instancia->socket = socket;
-
-}
-
-bool idInstancia(Instancia * instancia){
-	return instancia->idinstancia == idInstanciaAuxiliar;
 }
 
 void registrarEsi(socket_t socket){
@@ -437,52 +381,62 @@ void registrarEsi(socket_t socket){
 	nuevaEsi.clave = NULL;
 	nuevaEsi.valor = NULL;
 	list_add(listaEsi,&nuevaEsi);
-	if (nuevaEsi.socket > socketInstanciaMax) {
-		socketInstanciaMax = nuevaEsi.socket;
-	}
+
+	pthread_t hiloEsi;
+	pthread_create(&hiloEsi, NULL, (void*) escucharEsi, &nuevaEsi);
 }
 
 void registrarInstancia(socket_t socket)
 {
 	int * tamMensj = NULL;
+	int idInstancia;
 	Instancia instanciaRecibida;
 	instanciaRecibida.esiTrabajando = NULL;
 	int enviado;
 
 	char * nombre = NULL;
+	recibirMensaje(socket,sizeof(int),(void *) &idInstancia );
 
-	recibirMensaje(socket,sizeof(int),(void *) &tamMensj );
-	recibirMensaje(socket,*tamMensj,(void *) &nombre );
+	if(idInstancia == 0){
 
-	strcpy(instanciaRecibida.nombre , nombre);
-	instanciaRecibida.idinstancia = cantInstancias + 1;
-	instanciaRecibida.socket = socket;
+		recibirMensaje(socket,sizeof(int),(void *) &tamMensj );
+		recibirMensaje(socket,*tamMensj,(void *) &nombre );
 
-	pthread_mutex_lock(&mListaInst);
-	cantInstancias = list_add(listaInstancias,&instanciaRecibida);
-	pthread_mutex_unlock(&mListaInst);
+		strcpy(instanciaRecibida.nombre , nombre);
+		instanciaRecibida.idinstancia = cantInstancias + 1;
+		instanciaRecibida.socket = socket;
 
-	header header;
-	header.protocolo = 5;
-	cantEntradas_t cantEntradas = config_get_int_value(configuracion, "CantEntradas");
-	tamEntradas_t tamEntradas = config_get_int_value(configuracion, "TamEntradas");
-	int * buffer = malloc(sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
+		pthread_mutex_lock(&mListaInst);
+		cantInstancias = list_add(listaInstancias,&instanciaRecibida);
+		pthread_mutex_unlock(&mListaInst);
 
+		header header;
+		header.protocolo = 5;
+		cantEntradas_t cantEntradas = config_get_int_value(configuracion, "CantEntradas");
+		tamEntradas_t tamEntradas = config_get_int_value(configuracion, "TamEntradas");
+		int * buffer = malloc(sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
 
-	memcpy(buffer , &header.protocolo , sizeof(header) );
-	memcpy(buffer+sizeof(header) , &instanciaRecibida.idinstancia , sizeof(int) );
-	memcpy(buffer+sizeof(header)+sizeof(int) , &cantEntradas , sizeof(cantEntradas) );
-	memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(cantEntradas) , &tamEntradas , sizeof(tamEntradas) );
+		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer+sizeof(header) , &instanciaRecibida.idinstancia , sizeof(int) );
+		memcpy(buffer+sizeof(header)+sizeof(int) , &cantEntradas , sizeof(cantEntradas) );
+		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(cantEntradas) , &tamEntradas , sizeof(tamEntradas) );
 
-	enviado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
-
-
-	while(enviado != 0){
-		error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
 		enviado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
+
+
+		while(enviado != 0){
+			error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
+			enviado = enviarBuffer (instanciaRecibida.socket , buffer , sizeof(header) + sizeof(instanciaRecibida.idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
+		}
+
+		free(buffer);
+
+	}else{
+		//aca esta el caso donde una instancia se reconecta, debo corregir el socket de la version de la instancia que ya tengo en la lista
+		//y debo enviar a esa instancia las claves que tenia
 	}
 
-	free(buffer);
+
 }
 
 Instancia * algoritmoUsado(){
@@ -528,6 +482,7 @@ int esperarYaceptar(socket_t socketCoordinador,struct sockaddr_in* dir)
 int validarPlanificador (socket_t socket) {
 	header* handshake = NULL;
 	int estadoDellegada;
+	pthread_t hiloPlanificador;
 
 	estadoDellegada = recibirMensaje(socket,sizeof(header),(void*) &handshake);
 	if (estadoDellegada != 0)
@@ -543,6 +498,7 @@ int validarPlanificador (socket_t socket) {
 	}
 	else
 	{
+		pthread_create(&hiloPlanificador, NULL, (void*) esucharPlanificador, &socket);
 		return 0;
 	}
 }
@@ -564,11 +520,16 @@ void salirConError(char * error)
 	salir_agraciadamente(1);
 }
 
-void inicializacion()
-{
+int crearConfiguracion(char* archivoConfig){
+ if(!configuracion)
 	configuracion = config_create(archivoConfig);
-	if(configuracion == NULL)
-		salirConError("Fallo al leer el archivo de configuracion del coordinador\n");
+ return configuracion? 0 : 1;
+}
+
+ void inicializacion (char* dirConfig)
+	{
+	if(crearConfiguracion(dirConfig))
+		salirConError("Fallo al leer el archivo de configuracion del planificador.\n");
 	Algoritmo = config_get_string_value(configuracion, "Algoritmo");
 	listaEsi = list_create();
 	listaInstancias = list_create();

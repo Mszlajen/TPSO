@@ -29,33 +29,28 @@ typedef struct {
 } Instancia;
 
 #define IPEscucha "127.0.0.2"
-#define archivoConfig "coordinador.config"
 #define Puerto "Puerto"
 
-void hiloDeInstancia();
 void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir);
 int esperarYaceptar(socket_t socketCoordinador,struct sockaddr_in* dir);
 int validarPlanificador (socket_t socket);
 void liberarRecursos();
 void salirConError(char * error);
 void inicializacion();
-void atenderEsi(socket_t socket);
 void registrarEsi(socket_t socket);
 void registrarInstancia(socket_t socket);
-void reconectarInstancia(socket_t socket);
 bool idInstancia(Instancia * instancia);
-void escucharPorAcciones ();
 void tratarGet(Esi * esi);
 void tratarSet(Esi * esi);
 void tratarStore(Esi * esi);
 int consultarPorClaveTomada(Esi esi);
-void setearReadfdsInstancia (Instancia * instancia);
-void setearReadfdsEsi (Esi * esi);
-void escucharReadfdsInstancia (Instancia  instancia);
-void escucharReadfdsEsi (Esi esi);
+void escucharInstancia (Instancia  instancia);
+void escucharEsi (Esi esi);
+void escucharPlanificador (socket_t socket);
 void recibirConexiones();
 Instancia * algoritmoUsado();
 Instancia * algoritmoEquitativeLoad();
+int crearConfiguracion(char * archivoConfig);
 
 
 
