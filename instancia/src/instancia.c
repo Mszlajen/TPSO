@@ -33,7 +33,9 @@ void inicializar(char* dirConfig)
 	conectarConCoordinador();
 	recibirRespuestaHandshake();
 	tablaDeControl = malloc(sizeof(infoEntrada) * cantidadEntradas);
-	desasociarEntradas(0, cantidadEntradas);
+	int i;
+	for(i = 0; i < cantidadEntradas; i++)
+		tablaDeControl[i].clave = NULL;
 }
 
 void dump()
@@ -353,7 +355,10 @@ void desasociarEntradas(cantEntradas_t base, cantEntradas_t cantidad)
 {
 	int i;
 	for(i = 0; cantidad > i; i++)
+	{
+		free(tablaDeControl[base + i].clave);
 		tablaDeControl[base + i].clave = NULL;
+	}
 }
 
 void algoritmoDeReemplazo()
