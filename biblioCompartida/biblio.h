@@ -22,6 +22,7 @@ typedef uint8_t cantEntradas_t;
 typedef uint8_t tamNombreInstancia_t;
 typedef uint8_t tamClave_t;
 typedef uint8_t tamValor_t;
+typedef uint8_t cantClaves_t;
 typedef uint8_t booleano;
 
 

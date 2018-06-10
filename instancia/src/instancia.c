@@ -33,12 +33,7 @@ void inicializar(char* dirConfig)
 	conectarConCoordinador();
 	recibirRespuestaHandshake();
 	tablaDeControl = malloc(sizeof(infoEntrada) * cantidadEntradas);
-	int i;
-	for(i = 0; i < cantidadEntradas; i++)
-	{
-		tablaDeControl[i].clave = NULL;
-		tablaDeControl[i].tiempoUltimoUso = 0;
-	}
+	desasociarEntradas(0, cantidadEntradas);
 }
 
 void dump()
@@ -57,12 +52,12 @@ void procesamientoInstrucciones()
 		{
 		case set:
 			if(obtenerAlgoritmoReemplazo() == LRU)
-				incrementarUltimoUsoEntradas();
+				incrementarUltimoUsoClaves();
 			res = instruccionSet(instruc);
 			break;
 		case store:
 			if(obtenerAlgoritmoReemplazo() == LRU)
-				incrementarUltimoUsoEntradas();
+				incrementarUltimoUsoClaves();
 			res = instruccionStore(instruc);
 			break;
 		case compactacion:
@@ -127,7 +122,8 @@ void recibirRespuestaHandshake()
 	int tamMensaje = sizeof(header) +
 					 sizeof(instancia_id) +
 					 sizeof(tamEntradas_t) +
-					 sizeof(cantEntradas_t);
+					 sizeof(cantEntradas_t) +
+					 sizeof(cantClaves_t);
 	recibirMensaje(socketCoord, tamMensaje, &buffer);
 	header head;
 	memcpy(&head, buffer, sizeof(header));
@@ -137,9 +133,29 @@ void recibirRespuestaHandshake()
 	}
 	memcpy(&tamanioEntradas, buffer + sizeof(header) + sizeof(instancia_id), sizeof(tamEntradas_t));
 	memcpy(&cantidadEntradas, buffer + sizeof(header) + sizeof(instancia_id) + sizeof(tamEntradas_t), sizeof(cantEntradas_t));
+
+	cantClaves_t cantClaves;
+	memcpy(&cantClaves, buffer + tamMensaje - sizeof(cantClaves_t), sizeof(cantClaves_t));
+	free(buffer);
+
+	tamClave_t* tamClave;
+	char *clave, *valor;
+	tamValor_t tamValor;
+	for(; cantClaves > 0; cantClaves--)
+	{
+		recibirMensaje(socketCoord, sizeof(tamClave_t), (void**) &tamClave);
+		recibirMensaje(socketCoord, *tamClave, (void**) &clave);
+		tamValor = leerDeArchivo(clave, &valor);
+		if(tamValor)
+			registrarNuevaClave(clave, valor, tamValor);
+		else
+			error_show("No se pudo recuperar la clave %s", clave);
+		free(tamClave);
+		free(clave);
+		free(valor);
+	}
 	if(head.protocolo != 5)
 	{ /* ERROR */ }
-	free(buffer);
 }
 
 instruccion_t* recibirInstruccionCoordinador()
@@ -194,17 +210,9 @@ enum resultadoEjecucion instruccionStore(instruccion_t* instruccion)
 	if(dictionary_has_key(infoClaves, instruccion -> clave))
 	{
 		infoClave *clave = dictionary_get(infoClaves, instruccion -> clave);
-		tamClave_t tamClavePendiente = clave -> tamanio;
+		clave -> tiempoUltimoUso = 0;
 		if(guardarEnArchivo(clave))
-		{
-			int i;
-			for(i = 0; tamClavePendiente > 0; i++)
-			{
-				tablaDeControl[clave -> entradaInicial + i].tiempoUltimoUso = 0;
-				tamClavePendiente -= tamanioEntradas;
-			}
 			return exito;
-		}
 	}
 	return fallo;
 }
@@ -229,7 +237,7 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 	infoClave* nuevaClave = malloc(sizeof(infoClave));
 
 	char* dirArchivo = obtenerDireccionArchivoMontaje(clave);
-	nuevaClave -> fd = open(dirArchivo, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH);
+	nuevaClave -> fd = open(dirArchivo, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH);
 	free(dirArchivo);
 
 	ftruncate(nuevaClave -> fd, nuevaClave -> tamanio);
@@ -253,7 +261,6 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 		}while(1);
 		/*
 		 * Reemplaza claves hasta tener espacio suficiente para guardar la clave.
-		 * Falta hacer que si la clave reemplazada quedo consecutiva al espacio libre NO llame la compactacion.
 		 */
 	}
 
@@ -261,34 +268,30 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 	nuevaClave -> tamanio = tamValor;
 	crearMappeado(nuevaClave);
 
+	nuevaClave ->tiempoUltimoUso = 0;
+
+	memcpy(tablaDeEntradas + posicion * tamanioEntradas, valor, tamValor);
+
 	tamValor_t tamValorRestante = tamValor;
 	int i;
 	for(i = 0; tamValorRestante > 0; i++)
 	{
 		tablaDeControl[posicion + i].clave = string_duplicate(clave);
-		tablaDeControl[posicion + i].tiempoUltimoUso = 0;
-		memcpy(tablaDeEntradas + posicion + i * tamanioEntradas,
-				valor + i * tamanioEntradas,
-				min(tamValorRestante, tamanioEntradas));
 		tamValorRestante -= tamanioEntradas;
 	}
 	dictionary_put(infoClaves, clave, nuevaClave);
 	return exito;
 }
 
-/*
- * Si quiero actualizar el valor de una clave por otro que requiere más entradas
- * elimino la información de esa Clave y le busco un lugar como si fuera una clave
- * nueva.
- */
 enum resultadoEjecucion actualizarValorMayorTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
 {
-	int i;
+	/*
+	 * Si quiero actualizar el valor de una clave por otro que requiere más entradas
+	 * elimino la información de esa Clave y le busco un lugar como si fuera una clave
+	 * nueva.
+	 */
 	cantEntradas_t cantEntradasClave = tamValorACantEntradas(informacionClave -> tamanio);
-	for(i = 0; i < cantEntradasClave; i++)
-	{
-		tablaDeControl[informacionClave -> entradaInicial + i].clave=NULL;
-	}
+	desasociarEntradas(informacionClave -> entradaInicial, cantEntradasClave);
 	destruirMappeado(informacionClave);
 	close(informacionClave -> fd); //¿Hace falta cerrar el archivo o gasto tiempo innecesariamente?
 	free(informacionClave);
@@ -298,18 +301,9 @@ enum resultadoEjecucion actualizarValorMayorTamanio(char* clave, infoClave* info
 
 enum resultadoEjecucion actualizarValorMenorTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
 {
-	tamValor_t tamValorRestante = tamValor;
 	cantEntradas_t entradasRestantes = tamValorACantEntradas(tamValor);
-	int i;
 	//Coloco el nuevo valor en la tabla de entradas;
-	for(i = 0; entradasRestantes > i; i++)
-	{
-		memcpy(tablaDeEntradas + informacionClave -> entradaInicial + i * tamanioEntradas,
-				valor + i * tamanioEntradas,
-				min(tamValorRestante, tamanioEntradas));
-		tablaDeControl[informacionClave -> entradaInicial + i].tiempoUltimoUso = 0;
-		tamValorRestante -= tamanioEntradas;
-	}
+	memcpy(tablaDeEntradas + informacionClave -> entradaInicial * tamanioEntradas, valor, tamValor);
 
 	/*
 	 * Libero las entradas sobrantes.
@@ -318,8 +312,7 @@ enum resultadoEjecucion actualizarValorMenorTamanio(char* clave, infoClave* info
 	 */
 	cantEntradas_t finNuevaClave = informacionClave -> entradaInicial + tamValorACantEntradas(tamValor);
 	entradasRestantes = tamValorACantEntradas(informacionClave -> tamanio) - tamValorACantEntradas(tamValor);
-	for(i = 0; entradasRestantes > i; i++)
-		tablaDeControl[finNuevaClave + i].clave = NULL;
+	desasociarEntradas(finNuevaClave, entradasRestantes);
 
 	destruirMappeado(informacionClave);
 	informacionClave -> tamanio = tamValor;
@@ -354,6 +347,13 @@ int haySuficienteEspacio(tamValor_t espacioRequerido)
 			entradasDisponibles++;
 	}
 	return entradasRequeridas <= entradasDisponibles;
+}
+
+void desasociarEntradas(cantEntradas_t base, cantEntradas_t cantidad)
+{
+	int i;
+	for(i = 0; cantidad > i; i++)
+		tablaDeControl[base + i].clave = NULL;
 }
 
 void algoritmoDeReemplazo()
@@ -399,11 +399,13 @@ void enviarResultadoEjecucion(enum resultadoEjecucion res)
 	enviarBuffer(socketCoord, buffer, sizeof(header) + sizeof(enum resultadoEjecucion));
 }
 
-void incrementarUltimoUsoEntradas()
+void incrementarUltimoUsoClaves()
 {
-	int i;
-	for(i = 0; i < cantidadEntradas; i++)
-		tablaDeControl[i].tiempoUltimoUso++;
+	void incrementar(void *clave)
+	{
+		((infoClave*) clave) -> tiempoUltimoUso++;
+	}
+	dictionary_iterator(infoClaves, incrementar);
 }
 
 void almacenarID()
@@ -457,6 +459,26 @@ int guardarEnArchivo(infoClave* clave)
 {
 	strcpy(clave -> mappeado, tablaDeEntradas + clave -> entradaInicial * tamanioEntradas);
 	return msync(clave -> mappeado, clave -> tamanio, MS_SYNC);
+}
+
+tamValor_t leerDeArchivo(char* clave, char** valor)
+{
+	char aux;
+	char *dirArchivo = string_from_format("%s%s", obtenerPuntoDeMontaje(), clave);
+	FILE* archivo = fopen(dirArchivo, "r");
+	free(dirArchivo);
+
+	if(!archivo)
+		return 0;
+	tamValor_t tamValor;
+	*valor = string_new();
+	while(!feof(archivo))
+	{
+		fread(&aux, sizeof(char), 1, archivo);
+		string_append_with_format(valor, "%c", aux);
+		tamValor += 1;
+	}
+	return tamValor;
 }
 
 void incrementarPunteroReemplazo()

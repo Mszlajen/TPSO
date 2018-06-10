@@ -12,13 +12,13 @@
 #include "configuracion.h"
 
 typedef struct {
-	int tiempoUltimoUso;
 	char* clave;
 } infoEntrada;
 
 typedef struct {
 	tamValor_t tamanio;
 	cantEntradas_t entradaInicial;
+	int tiempoUltimoUso;
 	int fd;
 	void* mappeado;
 } infoClave;
@@ -40,7 +40,7 @@ void procesamientoInstrucciones();
 
 
 instruccion_t* recibirInstruccionCoordinador();
-void incrementarUltimoUsoEntradas();
+void incrementarUltimoUsoClaves();
 enum resultadoEjecucion instruccionSet(instruccion_t*);
 enum resultadoEjecucion instruccionStore(instruccion_t*);
 
@@ -48,6 +48,7 @@ enum resultadoEjecucion actualizarValorDeClave(char*, char*, tamValor_t);
 enum resultadoEjecucion registrarNuevaClave(char*, char*, tamValor_t);
 
 cantEntradas_t encontrarEspacioLibreConsecutivo(tamValor_t);
+void desasociarEntradas (cantEntradas_t, cantEntradas_t);
 int haySuficienteEspacio(tamValor_t);
 void algoritmoDeReemplazo();
 enum resultadoEjecucion actualizarValorMayorTamanio(char*, infoClave*, char*, tamValor_t);
@@ -62,6 +63,7 @@ cantEntradas_t tamValorACantEntradas(tamValor_t);
 int crearMappeado(infoClave*);
 int destruirMappeado(infoClave*);
 int guardarEnArchivo(infoClave*);
+tamValor_t leerDeArchivo(char*, char**);
 void destruirClave(char*);
 void destruirInfoClave(infoClave*);
 void incrementarPunteroReemplazo();
