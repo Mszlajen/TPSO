@@ -2,6 +2,7 @@
 #define ADMINESI_H_
 
 #include <commons/collections/list.h>
+#include <pthread.h>
 #include <biblio.h>
 
 typedef struct {
@@ -10,21 +11,20 @@ typedef struct {
 	int estimacion;
 	int ultimaEstimacion;
 	unsigned long int arriboListos;
+	pthread_mutex_t sEjecutando;
 	t_list *recursos;
 }ESI;
 
 ESI* crearESI (socket_t, int);
-/*
- * Antes de destruir hay que liberar sus recursos.
- */
+
 void destruirESI(ESI*);
-void borrarRecursosESI(ESI*);
-void removedorESI(ESI*, t_list* lista);
+//void borrarRecursosESI(ESI*);
+//void removedorESI(ESI*, t_list* lista);
 
 void actualizarEstimacion(ESI*);
 void recalcularEstimacion(ESI*, int);
 void ejecutarInstruccion(ESI*);
 int calcularVejez(ESI*);
-void agregarRecurso(ESI*, char*);
+//void agregarRecurso(ESI*, char*);
 
 #endif /* ADMINESI_H_ */

@@ -12,8 +12,9 @@ ESI* crearESI (socket_t sock, int estimacionInicial)
 	unaESI -> estimacion = estimacionInicial;
 	unaESI -> ultimaEstimacion = estimacionInicial;
 	unaESI -> arriboListos = instruccionesEjecutadas;
-	unaESI -> recursos = list_create();
+	//unaESI -> recursos = list_create();
 	unaESI -> socket = sock;
+	pthread_mutex_init(&(unaESI -> sEjecutando), NULL);
 	return unaESI;
 }
 
@@ -44,7 +45,7 @@ void actualizarArribo(ESI* esi)
 {
 	esi -> arriboListos = instruccionesEjecutadas;
 }
-
+/*
 void agregarRecurso(ESI* esi, char* clave)
 {
 	list_add(esi -> recursos, clave);
@@ -53,7 +54,7 @@ void agregarRecurso(ESI* esi, char* clave)
 void borrarRecursosESI(ESI* esi)
 {
 	list_iterate(esi -> recursos, free);
-}
+}*/
 
 void destruirESI(ESI* esi)
 {
@@ -61,9 +62,10 @@ void destruirESI(ESI* esi)
 	list_destroy(esi -> recursos);
 	free(esi);
 }
-
+/*
 void removedorESI(ESI* esi, t_list* lista)
 {
 	list_iterate(lista, borrarRecursosESI);
 	destruirESI(esi);
 }
+*/

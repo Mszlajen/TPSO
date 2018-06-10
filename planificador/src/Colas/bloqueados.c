@@ -51,7 +51,7 @@ int claveTomada (char* clave)
 	return dictionary_has_key(tablaBloqueos, clave);
 }
 
-int claveTomadaPorESI (char* clave, ESI* esi)
+booleano claveTomadaPorESI (char* clave, ESI* esi)
 {
 	if(dictionary_has_key(tablaBloqueos, clave))
 		return ((ESI*) dictionary_get(tablaBloqueos, clave) ) -> id == esi -> id;
@@ -137,9 +137,8 @@ void cerrarColasBloqueados()
 {
 	void removerBloqueados(void* lista)
 	{
-		list_iterate((t_list*) lista, borrarRecursosESI);
-		list_iterate((t_list*) lista, destruirESI);
-		list_destroy((t_list*) lista);
+		//list_iterate((t_list*) lista, borrarRecursosESI);
+		list_destroy_and_destroy_elements((t_list*) lista, destruirESI);
 	}
 
 	if(colasBloqueados)
