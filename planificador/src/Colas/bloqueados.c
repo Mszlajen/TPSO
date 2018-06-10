@@ -6,7 +6,7 @@ t_dictionary * tablaBloqueos = NULL; //(Clave. ESI)
 void reservarClave(ESI* esi, char* clave)
 {
 	dictionary_put(tablaBloqueos, clave, esi);
-	//agregarRecurso(esi, clave);
+	agregarRecurso(esi, clave);
 }
 void reservarClaveSinESI(char *clave)
 {
@@ -24,7 +24,6 @@ int ESIEstaBloqueadoPorClave(ESI* esi, char* clave)
 //Algo fideo, revisar luego;
 int ESITieneClave(ESI* esi, char* clave)
 {
-	//Comprueba si alguien tiene la clave tomada
 	if(dictionary_has_key(tablaBloqueos, clave))
 	{
 		ESI* poseedor = dictionary_get(tablaBloqueos, clave);

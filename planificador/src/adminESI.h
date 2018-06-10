@@ -3,6 +3,7 @@
 
 #include <commons/collections/list.h>
 #include <pthread.h>
+#include <commons/string.h>
 #include <biblio.h>
 
 typedef struct {
@@ -11,19 +12,19 @@ typedef struct {
 	int estimacion;
 	int ultimaEstimacion;
 	unsigned long int arriboListos;
-	t_list *recursos;
+	pthread_t hiloDeFin;
+	t_list* recursos;
 }ESI;
 
 ESI* crearESI (socket_t, int);
 
 void destruirESI(ESI*);
-//void borrarRecursosESI(ESI*);
-//void removedorESI(ESI*, t_list* lista);
+void borrarRecursosESI(ESI*);
 
 void actualizarEstimacion(ESI*);
 void recalcularEstimacion(ESI*, int);
 void ejecutarInstruccion(ESI*);
 int calcularVejez(ESI*);
-//void agregarRecurso(ESI*, char*);
+void agregarRecurso(ESI*, char*);
 
 #endif /* ADMINESI_H_ */

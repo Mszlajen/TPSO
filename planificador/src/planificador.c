@@ -6,6 +6,8 @@ pthread_mutex_t enPausa, ejecutando;
 
 pthread_mutex_t mReady, mBloqueados, mFinalizados, mESIEjecutando;
 
+socket_t socketLlegadaNuevaESI = ERROR, socketEjecucionDeCoordinador = ERROR;
+
 consultaCoord *ultimaConsulta = NULL;
 
 int terminoEjecucion = 0;
@@ -25,7 +27,6 @@ int main(int argc, char** argv) {
 	while(!terminoEjecucion)
 	{
 		pthread_mutex_lock(&enPausa);
-		pthread_mutex_lock(&ejecutando);
 		while(readyVacio());
 
 		pthread_mutex_lock(&mESIEjecutando);
@@ -33,7 +34,7 @@ int main(int argc, char** argv) {
 		esiAEjecutar = seleccionarESIPorAlgoritmo(obtenerAlgoritmo());
 		pthread_mutex_unlock(&mReady);
 
-		enviarEncabezado(esiAEjecutar -> socket, 0);
+		ejecucionDeESI(esiAEjecutar);
 
 		pthread_mutex_lock(&mESIEjecutando);
 		pthread_mutex_unlock(&enPausa);
@@ -79,70 +80,52 @@ void ejecucionDeESI(ESI* esi)
 {
 	booleano res;
 	void* resultado = NULL;
-	header* head;
-	while(!terminoEjecucion)
+
+	enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
+
+	recibirMensaje(esi -> socket, sizeof(header) + sizeof(booleano), resultado);
+
+	if(((header*) resultado) -> protocolo != 12)
+	{ /* ERROR */ }
+
+	res = *((booleano*) resultado + sizeof(header));
+
+	free(resultado);
+
+	if(!res)
 	{
-		if(recibirMensaje(esi -> socket, sizeof(header), (void**)&head) == 1)
-		{
-			error_show("Se desconecto el esi %i", esi -> id);
-			pthread_mutex_lock(&mBloqueados);
-			pthread_mutex_lock(&mReady);
-			finalizarESI(esi);
-			pthread_mutex_unlock(&mBloqueados);
-			pthread_mutex_unlock(&mReady);
-			pthread_exit(NULL);
-		}
-
-		free(head);
-
-		enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
-
-		recibirMensaje(esi -> socket, sizeof(header) + sizeof(booleano), resultado);
-
-		if(((header*) resultado) -> protocolo != 12)
-		{ /* ERROR */ }
-
-		res = *((booleano*) resultado + sizeof(header));
-
-		free(resultado);
-
-		if(!res)
-		{
-			pthread_mutex_lock(&mBloqueados);
-			pthread_mutex_lock(&mReady);
-			finalizarESI(esi);
-			pthread_mutex_unlock(&mBloqueados);
-			pthread_mutex_unlock(&mReady);
-			pthread_exit(NULL);
-		}
-
-		switch(ultimaConsulta -> tipo)
-		{
-		case liberadora:
-			pthread_mutex_lock(&mBloqueados);
-			pthread_mutex_lock(&mReady);
-			listarParaEjecucion(liberarClave(ultimaConsulta -> clave));
-			pthread_mutex_unlock(&mBloqueados);
-			pthread_mutex_unlock(&mReady);
-			break;
-		case bloqueante:
-			pthread_mutex_lock(&mBloqueados);
-			if(ultimaConsulta -> resultado)
-				colocarEnColaESI(esi, ultimaConsulta -> clave);
-			else
-				reservarClave(esi, ultimaConsulta -> clave);
-			pthread_mutex_unlock(&mBloqueados);
-			break;
-		default:
-			break;
-		}
-
-		free(ultimaConsulta -> clave);
-		free(ultimaConsulta);
-		ultimaConsulta = NULL;
-
-		pthread_mutex_unlock(&ejecutando);
+		pthread_cancel(esi -> hiloDeFin);
+		pthread_mutex_lock(&mBloqueados);
+		pthread_mutex_lock(&mReady);
+		finalizarESI(esi);
+		pthread_mutex_unlock(&mBloqueados);
+		pthread_mutex_unlock(&mReady);
 	}
+
+	switch(ultimaConsulta -> tipo)
+	{
+	case liberadora:
+		pthread_mutex_lock(&mBloqueados);
+		pthread_mutex_lock(&mReady);
+		listarParaEjecucion(liberarClave(ultimaConsulta -> clave));
+		pthread_mutex_unlock(&mBloqueados);
+		pthread_mutex_unlock(&mReady);
+		break;
+	case bloqueante:
+		pthread_mutex_lock(&mBloqueados);
+		if(ultimaConsulta -> resultado)
+			colocarEnColaESI(esi, ultimaConsulta -> clave);
+		else
+			reservarClave(esi, ultimaConsulta -> clave);
+		pthread_mutex_unlock(&mBloqueados);
+		break;
+	default:
+		break;
+	}
+
+	free(ultimaConsulta -> clave);
+	free(ultimaConsulta);
+	ultimaConsulta = NULL;
 }
 
 void escucharPorESI ()
@@ -164,7 +147,7 @@ void escucharPorESI ()
 		nuevaESI = crearESI(socketNuevaESI, obtenerEstimacionInicial());
 		if(!enviarIdESI(socketNuevaESI, nuevaESI -> id))
 		{
-			crearHiloEjecucion(nuevaESI);
+			crearFinEjecucion(nuevaESI);
 			pthread_mutex_lock(&mReady);
 			listarParaEjecucion(nuevaESI);
 			pthread_mutex_unlock(&mReady);
@@ -177,25 +160,51 @@ void escucharPorESI ()
 	}
 }
 
-void comunicacionCoord(socket_t socketCoord)
+void escucharPorFinESI(ESI* esi)
 {
-	header * headerDeAccion = NULL;
 	while(1)
 	{
-		if(recibirMensaje(socketCoord, sizeof(header), (void**)headerDeAccion) == 1)
-			salirConError("Se desconecto el coordinador");
-
-		switch(headerDeAccion -> protocolo)
+		listen(esi -> socket, 5);
+		if(seDesconectoSocket(esi -> socket))
 		{
-		case 0:
-			//status
-			break;
-		case 9:
+			printf("Se termino el esi %i", esi -> id);
+			pthread_mutex_lock(&mESIEjecutando);
+			pthread_mutex_lock(&mBloqueados);
+			pthread_mutex_lock(&mReady);
+			finalizarESI(esi);
+			pthread_mutex_unlock(&mBloqueados);
+			pthread_mutex_unlock(&mReady);
+			pthread_mutex_unlock(&mESIEjecutando);
+			pthread_exit(NULL);
+		}
+	}
+}
+
+void comunicacionCoord(socket_t socketCoord)
+{
+	int maxFd = max(socketCoord, socketEjecucionDeCoordinador);
+	fd_set master, read;
+
+	FD_ZERO(&master);
+	FD_SET(socketCoord, &master);
+	FD_SET(socketEjecucionDeCoordinador, &master);
+	while(1)
+	{
+		read = master;
+		select(maxFd, &read, NULL, NULL, NULL);
+
+		if(FD_ISSET(socketCoord, &read))
+		{
+			if(seDesconectoSocket(socketCoord))
+				salirConError("Se desconecto el coordinador.");
 			//Consulta estado clave
 			ultimaConsulta = recibirConsultaCoord(socketCoord);
 			enviarRespuestaConsultaCoord(socketCoord,
 						claveTomadaPorESI(ultimaConsulta -> clave, ultimaConsulta -> id_esi));
-			break;
+		}
+		else
+		{
+			//status
 		}
 	}
 }
@@ -298,6 +307,13 @@ void inicializacion (char* dirConfig)
 	pthread_mutex_init(&mBloqueados, NULL);
 	pthread_mutex_init(&mFinalizados, NULL);
 	pthread_mutex_init(&mESIEjecutando, NULL);
+
+	/*
+	 * Crea los socket en cualquier IP y puerto que el SO
+	 * tenga disponible.
+	 */
+	socketLlegadaNuevaESI = crearSocketServer(NULL, "0");
+	socketEjecucionDeCoordinador = crearSocketServer(NULL, "0");
 
 }
 
@@ -408,15 +424,16 @@ pthread_t crearHiloNuevasESI()
 	return hilo;
 }
 
-pthread_t crearHiloEjecucion(ESI* esi)
+pthread_t crearFinEjecucion(ESI* esi)
 {
 	pthread_t hilo;
 	pthread_attr_t attr;
 
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	pthread_create(&hilo, NULL, (void*) ejecucionDeESI, (void*) esi);
+	pthread_create(&hilo, NULL, (void*) escucharPorFinESI, (void*) esi);
 	pthread_attr_destroy(&attr);
+	esi -> hiloDeFin = hilo;
 	return hilo;
 }
 
@@ -458,6 +475,13 @@ enum comandos convertirComando(char* linea)
 		return -1;
 }
 
+int max (int v1, int v2)
+{
+	if(v1 > v2)
+		return v1;
+	else
+		return v2;
+}
 
 /*
  * Falta sincronizar el cierre de la colas y

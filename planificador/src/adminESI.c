@@ -44,27 +44,20 @@ void actualizarArribo(ESI* esi)
 {
 	esi -> arriboListos = instruccionesEjecutadas;
 }
-/*
+
 void agregarRecurso(ESI* esi, char* clave)
 {
-	list_add(esi -> recursos, clave);
+	list_add(esi -> recursos, string_duplicate(clave));
 }
 
 void borrarRecursosESI(ESI* esi)
 {
 	list_iterate(esi -> recursos, free);
-}*/
+}
 
 void destruirESI(ESI* esi)
 {
 	close(esi -> socket);
-	list_destroy(esi -> recursos);
+	list_destroy_and_destroy_elements(esi -> recursos, free);
 	free(esi);
 }
-/*
-void removedorESI(ESI* esi, t_list* lista)
-{
-	list_iterate(lista, borrarRecursosESI);
-	destruirESI(esi);
-}
-*/
