@@ -1,7 +1,7 @@
 #include "ready.h"
 
 t_list * listos = NULL;
-uint8_t flagNuevos = 0;
+booleano flagNuevos = 0;
 
 void listarParaEjecucion (ESI* nuevaESI)
 {
@@ -66,6 +66,11 @@ void setFlagNuevos(uint8_t valor)
 uint8_t getFlagNuevos()
 {
 	return flagNuevos;
+}
+
+booleano readyVacio()
+{
+	return list_is_empty(listos);
 }
 
 void crearListaReady()

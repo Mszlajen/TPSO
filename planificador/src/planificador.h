@@ -3,7 +3,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <readline/readline.h>
 #include <commons/collections/list.h>
 #include <commons/error.h>
@@ -13,27 +12,30 @@
 #include "adminESI.h"
 
 typedef struct {
+	id_t id_esi;
 	enum tipoDeInstruccion tipo;
 	uint8_t tamClave;
 	char* clave;
+	booleano resultado;
 } consultaCoord;
-
-typedef uint8_t resultado_t;
 
 enum comandos {pausar, continuar, bloquear, desbloquear, listar, kill, status, deadlock, salir};
 
+typedef uint8_t instruccionesCoord;
+
 void inicializacion(char*);
 void bloquearClavesConfiguracion();
-void conectarConCoordinador();
+socket_t conectarConCoordinador();
 int enviarEncabezado(socket_t, int);
 int enviarIdESI(socket_t, int);
-int enviarRespuestaConsultaCoord(socket_t, uint8_t);
-consultaCoord* recibirConsultaCoord();
-void crearServerESI();
+int enviarRespuestaConsultaCoord(socket_t, booleano);
+consultaCoord* recibirConsultaCoord(socket_t);
+socket_t crearServerESI();
 int procesarConsultaCoord(ESI*, consultaCoord*);
 pthread_t crearHiloTerminal ();
 pthread_t crearHiloNuevasESI ();
-pthread_t crearHiloEjecucion ();
+pthread_t crearHiloEjecucion (ESI*);
+pthread_t crearHiloCoordinador (socket_t);
 
 enum comandos convertirComando(char *);
 void salirConError(char *);
@@ -41,7 +43,8 @@ void liberarRecursos();
 
 void terminal();
 void escucharPorESI ();
-void ejecucionDeESI ();
+void ejecucionDeESI (ESI*);
+void comunicacionCoord(socket_t);
 
 void comandoBloquear(char**);
 void comandoDesbloquear(char**);

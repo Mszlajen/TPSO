@@ -10,7 +10,7 @@
 int ESIEstaBloqueadoPorClave(ESI*, char*);
 int ESITieneClave(ESI*, char*);
 int claveTomada (char*);
-int claveTomadaPorESI (char*, ESI*);
+booleano claveTomadaPorESI (char*, ESI*);
 void reservarClave(ESI*, char*);
 void reservarClaveSinESI(char*);
 ESI* liberarClave(char*);

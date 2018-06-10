@@ -18,12 +18,14 @@ void listarParaEjecucion(ESI*);
 ESI* encontrarPorFCFS();
 ESI* encontrarPorSJF();
 
+booleano readyVacio();
 ESI* ESIEnReady(ESI_id);
 
 void quitarESIDeReady(ESI_id);
 
 void setFlagNuevos(uint8_t);
 uint8_t getFlagNuevos();
+
 void crearListaReady();
 void cerrarListaReady();
 #endif /* READY_H_ */

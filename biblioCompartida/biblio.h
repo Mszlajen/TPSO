@@ -22,6 +22,7 @@ typedef uint8_t cantEntradas_t;
 typedef uint8_t tamNombreInstancia_t;
 typedef uint8_t tamClave_t;
 typedef uint8_t tamValor_t;
+typedef uint8_t booleano;
 
 
 typedef struct {
@@ -61,7 +62,12 @@ int enviarBuffer (socket_t, void*, int);
 int recibirMensaje (socket_t, int, void**);
 
 /*
- * Si el socket no está iniciado (valor == ERROR)
+ * Devuelve el valor del nuevo socket aceptado.
+ */
+socket_t aceptarConexion(socket_t);
+
+/*
+ * Si el socket está iniciado (valor != ERROR)
  * lo cierra, no hace nada en caso contrario
  */
 void cerrarSocket(socket_t);

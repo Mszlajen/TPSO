@@ -2,13 +2,11 @@
 #include "configuracion.h"
 #include "colas.h"
 
-socket_t socketCoord = ERROR, socketServerESI = ERROR;
-
-pthread_mutex_t enPausa;
+pthread_mutex_t enPausa, ejecutando;
 
 pthread_mutex_t mReady, mBloqueados, mFinalizados, mESIEjecutando;
 
-pthread_mutex_t mSocketCoord;
+consultaCoord *ultimaConsulta = NULL;
 
 int terminoEjecucion = 0;
 
@@ -17,19 +15,26 @@ int main(int argc, char** argv) {
 
 	bloquearClavesConfiguracion();
 
-	conectarConCoordinador();
+	crearHiloCoordinador();
 
-	crearServerESI();
+	crearHiloTerminal();
 
-	pthread_t hiloTerminal = crearHiloTerminal();
+	crearHiloNuevasESI();
 
-	pthread_t hiloESI = crearHiloNuevasESI();
+	ESI * esiAEjecutar;
+	while(!terminoEjecucion)
+	{
+		pthread_mutex_lock(&enPausa);
+		while(readyVacio());
+		pthread_mutex_lock(&ejecutando);
 
-	pthread_t hiloEjecucion = crearHiloEjecucion();
+		esiAEjecutar = seleccionarESIPorAlgoritmo(obtenerAlgoritmo());
+		pthread_mutex_lock(&(esiAEjecutar -> sEjecutando));
 
-	pthread_join(hiloTerminal, NULL);
-	pthread_join(hiloEjecucion, NULL);
-	pthread_join(hiloESI, NULL);
+		enviarEncabezado(esiAEjecutar -> socket, 0);
+		pthread_mutex_unlock(&enPausa);
+	}
+
 	liberarRecursos();
 	exit(0);
 }
@@ -40,8 +45,6 @@ void terminal()
 	while(!terminoEjecucion)
 	{
 		linea = readline("Comando:");
-		//Aca va a ir el procesamiento para ver si es una instrucción
-		//y su procesamiento correspondiente
 		palabras = string_split(linea, " ");
 		switch(convertirComando(palabras[0]))
 		{
@@ -68,74 +71,73 @@ void terminal()
 	}
 }
 
-void ejecucionDeESI()
+void ejecucionDeESI(ESI* esi)
 {
-	ESI* enEjecucion;
-	consultaCoord * consulta = NULL;
-	resultado_t resultadoConsulta, *resultadoEjecucion = NULL;
-	int8_t mensRecibido;
+	booleano res;
+	void* resultado;
+	header* head;
 	while(!terminoEjecucion)
 	{
-		pthread_mutex_lock(&enPausa);
-
-		pthread_mutex_lock(&mESIEjecutando);
-		pthread_mutex_lock(&mReady);
-		do
+		if(recibirMensaje(esi -> socket, sizeof(header), &head) == 1)
 		{
-			enEjecucion = seleccionarESIPorAlgoritmo(obtenerAlgoritmo());
-			if(seDesconectoSocket(enEjecucion -> socket))
-				finalizarESI(enEjecucion);
+			error_show("Se desconecto el esi %i", esi -> id);
+			finalizarESI(esi);
+			pthread_exit(NULL);
+		}
+
+		free(head);
+
+		enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
+
+		recibirMensaje(esi -> socket, sizeof(header) + sizeof(booleano), resultado);
+
+		if(((header*) resultado) -> protocolo != 12)
+		{ /* ERROR */ }
+
+		res = *((booleano*) resultado + sizeof(header));
+
+		free(resultado);
+
+		if(!res)
+		{
+			finalizarESI(esi);
+			pthread_mutex_unlock(&ejecutando);
+			pthread_exit(NULL);
+		}
+
+		switch(ultimaConsulta -> tipo)
+		{
+		case liberadora:
+			listarParaEjecucion(liberarClave(ultimaConsulta -> clave));
+			break;
+		case bloqueante:
+			if(ultimaConsulta -> resultado)
+				colocarEnColaESI(esi, ultimaConsulta -> clave);
 			else
-				break;
-		}while(1);
-		pthread_mutex_unlock(&mReady);
-		pthread_mutex_lock(&mSocketCoord);
-		if(seDesconectoSocket(socketCoord))
-		{
-			//Avisar a los ESI que tienen que morirse.
-			salirConError("Se desconecto el coordinador.");
-		}
-		enviarEncabezado(enEjecucion -> socket, 7); //Enviar el aviso de ejecucion
-
-		consulta = recibirConsultaCoord();
-		resultadoConsulta = procesarConsultaCoord(enEjecucion, consulta);
-		enviarRespuestaConsultaCoord(socketCoord, resultadoConsulta);
-		pthread_mutex_unlock(&mSocketCoord);
-
-		mensRecibido = recibirMensaje(enEjecucion -> socket, sizeof(resultado_t), (void**) &resultadoEjecucion);
-		ejecutarInstruccion(enEjecucion);
-		//Este if puede cambiar una vez se defina que es lo que devuelve el ESI.
-		if(!mensRecibido || !(*resultadoEjecucion))
-		{
-			/*
-			 * Dado que no se en que cola está al final de su ejecución finalizar ESI
-			 * lo busca en todas las colas y por lo tanto requiere que no se modifiquen
-			 * en el entretiempo.
-			 */
-			pthread_mutex_lock(&mBloqueados);
-			pthread_mutex_lock(&mReady);
-			finalizarESI(enEjecucion);
-			pthread_mutex_unlock(&mBloqueados);
-			pthread_mutex_unlock(&mReady);
+				reservarClave(esi, ultimaConsulta -> clave);
+			break;
 		}
 
-		free(resultadoEjecucion);
-		pthread_mutex_unlock(&mESIEjecutando);
-		pthread_mutex_unlock(&enPausa);
+		free(ultimaConsulta -> clave);
+		free(ultimaConsulta);
+		ultimaConsulta = NULL;
+
+		pthread_mutex_unlock(&(esi -> sEjecutando));
+		pthread_mutex_unlock(&ejecutando);
 	}
 }
 
 void escucharPorESI ()
 {
-	int socketNuevaESI;
-	struct sockaddr_storage infoDirr;
-	socklen_t size_infoDirr = sizeof(struct sockaddr_storage);
+	socket_t socketServerESI = ERROR, socketNuevaESI;
 	ESI* nuevaESI;
+
+	socketServerESI = crearServerESI();
 	while(!terminoEjecucion)
 	{
 		socketNuevaESI = ERROR;
 		listen(socketServerESI, 5);
-		socketNuevaESI = accept(socketServerESI, (struct sockaddr *) &infoDirr, &size_infoDirr);
+		socketNuevaESI = aceptarConexion(socketServerESI);
 		if(socketNuevaESI == ERROR)
 		{
 			error_show("Fallo en la conexion de ESI\n");
@@ -144,6 +146,7 @@ void escucharPorESI ()
 		nuevaESI = crearESI(socketNuevaESI, obtenerEstimacionInicial());
 		if(!enviarIdESI(socketNuevaESI, nuevaESI -> id))
 		{
+			crearHiloEjecucion(nuevaESI);
 			pthread_mutex_lock(&mReady);
 			listarParaEjecucion(nuevaESI);
 			pthread_mutex_unlock(&mReady);
@@ -152,6 +155,29 @@ void escucharPorESI ()
 		{
 			destruirESI(nuevaESI);
 			error_show("Fallo en la conexion de ESI\n");
+		}
+	}
+}
+
+void comunicacionCoord(socket_t socketCoord)
+{
+	header * headerDeAccion;
+	while(1)
+	{
+		if(recibirMensaje(socketCoord, sizeof(header), headerDeAccion) == 1)
+			salirConError("Se desconecto el coordinador");
+
+		switch(*headerDeAccion)
+		{
+		case 0:
+			//status
+			break;
+		case 9:
+			//Consulta estado clave
+			ultimaConsulta = recibirConsultaCoord(socketCoord);
+			enviarRespuestaConsultaCoord(socketCoord,
+						claveTomadaPorESI(ultimaConsulta -> clave, ultimaConsulta -> id_esi));
+			break;
 		}
 	}
 }
@@ -249,11 +275,11 @@ void inicializacion (char* dirConfig)
 		salirConError("Fallo al leer el archivo de configuracion del planificador.\n");
 	inicializarColas();
 	pthread_mutex_init(&enPausa, NULL);
+	pthread_mutex_init(&ejecutando, NULL);
 	pthread_mutex_init(&mReady, NULL);
 	pthread_mutex_init(&mBloqueados, NULL);
 	pthread_mutex_init(&mFinalizados, NULL);
 	pthread_mutex_init(&mESIEjecutando, NULL);
-	pthread_mutex_init(&mSocketCoord, NULL);
 
 }
 
@@ -264,15 +290,11 @@ void bloquearClavesConfiguracion()
 	string_iterate_lines(claves, free);
 }
 
-void conectarConCoordinador()
+socket_t conectarConCoordinador()
 {
 	char * IP = obtenerDireccionCoordinador();
 	char * puerto = obtenerPuertoCoordinador();
-	socketCoord = crearSocketCliente(IP, puerto);
-	if(socketCoord == ERROR)
-		salirConError("Fallo al conectar planificador con coordinador\n");
-	if(!enviarEncabezado(socketCoord, 1)) //Enviar el handshake
-		salirConError("Fallo al enviar el handshake planificador -> Coordinador\n");
+	return crearSocketCliente(IP, puerto);
 }
 
 int enviarEncabezado(socket_t sock, int prot)
@@ -295,7 +317,7 @@ int enviarIdESI(socket_t sock, ESI_id id)
 	return resultado;
 }
 
-int enviarRespuestaConsultaCoord(socket_t coord, uint8_t respuesta)
+int enviarRespuestaConsultaCoord(socket_t coord, booleano respuesta)
 {
 	header encabezado;
 	encabezado.protocolo = 10;
@@ -305,16 +327,14 @@ int enviarRespuestaConsultaCoord(socket_t coord, uint8_t respuesta)
 	return enviarBuffer(coord, buffer, sizeof(buffer));
 }
 
-consultaCoord* recibirConsultaCoord()
+consultaCoord* recibirConsultaCoord(socket_t socketCoord)
 {
-	listen(socketCoord, 5);
 	consultaCoord *consulta = malloc(sizeof(consultaCoord));
 
-	header* encabezado;
-	recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado);
-	if(encabezado->protocolo != 9)
-	{	/*error*/}
-	free(encabezado);
+	id_t *id_esi;
+	recibirMensaje(socketCoord, sizeof(enum tipoDeInstruccion), (void**) &id_esi);
+	consulta -> tipo = *id_esi;
+	free(id_esi);
 
 	enum tipoDeInstruccion *tipo;
 	recibirMensaje(socketCoord, sizeof(enum tipoDeInstruccion), (void**) &tipo);
@@ -388,13 +408,14 @@ int procesarConsultaCoord(ESI* ejecutando, consultaCoord* consulta)
 	return resultado;
 }
 
-void crearServerESI ()
+socket_t crearServerESI ()
 {
 	char * puerto = obtenerPuerto();
 	char * IPConexion = obtenerIP();
-	socketServerESI = crearSocketServer(IPConexion, puerto);
+	socket_t socketServerESI = crearSocketServer(IPConexion, puerto);
 	if(socketServerESI)
 		salirConError("Planificador no pudo crear el socket para conectarse con ESI\n");
+	return socketServerESI;
 }
 
 /*
@@ -405,22 +426,59 @@ void crearServerESI ()
 pthread_t crearHiloTerminal()
 {
 	pthread_t hilo;
-	pthread_create(&hilo, NULL, (void*) terminal, NULL);
+	pthread_attr_t attr;
+
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	pthread_create(&hilo, &attr, (void*) terminal, NULL);
+	pthread_attr_destroy(&attr);
 	return hilo;
 }
 
 pthread_t crearHiloNuevasESI()
 {
 	pthread_t hilo;
-	pthread_create(&hilo, NULL, (void*) escucharPorESI, NULL);
+	pthread_attr_t attr;
+
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	pthread_create(&hilo, &attr, (void*) escucharPorESI, NULL);
+	pthread_attr_destroy(&attr);
 	return hilo;
 }
 
-pthread_t crearHiloEjecucion()
+pthread_t crearHiloEjecucion(ESI* esi)
 {
 	pthread_t hilo;
-	pthread_create(&hilo, NULL, (void*) ejecucionDeESI, NULL);
+	pthread_attr_t attr;
+
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	pthread_create(&hilo, NULL, (void*) ejecucionDeESI, (void*) esi);
+	pthread_attr_destroy(&attr);
 	return hilo;
+}
+
+pthread_t crearHiloCoordinador()
+{
+	socket_t socketCoord = ERROR;
+	pthread_t hilo;
+	pthread_attr_t attr;
+
+	socketCoord = conectarConCoordinador();
+
+	if(socketCoord == ERROR)
+		salirConError("No se pudo conectar con el coordinador.");
+	if(!enviarEncabezado(socketCoord, 1)) //Enviar el handshake
+		salirConError("Fallo al enviar el handshake planificador -> Coordinador\n");
+
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	pthread_create(&hilo, NULL, (void*) comunicacionCoord, (void*) socketCoord);
+	pthread_attr_destroy(&attr);
+
+	return hilo;
+
 }
 
 enum comandos convertirComando(char* linea)
@@ -454,11 +512,8 @@ void liberarRecursos()
 	pthread_mutex_destroy(&mBloqueados);
 	pthread_mutex_destroy(&mFinalizados);
 	pthread_mutex_destroy(&mESIEjecutando);
-	pthread_mutex_destroy(&mSocketCoord);
 	pthread_mutex_destroy(&enPausa);
 
-	cerrarSocket(socketCoord);
-	cerrarSocket(socketServerESI);
 }
 
 void salirConError(char * error)
