@@ -120,6 +120,14 @@ int recibirMensaje(socket_t sock, int tamMens, void** buffer)
 	return EXITO;
 }
 
+socket_t aceptarConexion (socket_t socketServer)
+{
+	struct sockaddr_storage infoDirr;
+	socklen_t size_infoDirr = sizeof(struct sockaddr_storage);
+
+	return accept(socketServer, (struct sockaddr *) &infoDirr, &size_infoDirr);
+}
+
 void cerrarSocket(socket_t sock)
 {
 	if(sock == ERROR)
