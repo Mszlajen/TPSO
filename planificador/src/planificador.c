@@ -34,7 +34,10 @@ int main(int argc, char** argv) {
 		esiAEjecutar = seleccionarESIPorAlgoritmo(obtenerAlgoritmo());
 		pthread_mutex_unlock(&mReady);
 
+		pthread_cancel(esiAEjecutar -> hiloDeFin);
 		ejecucionDeESI(esiAEjecutar);
+
+		crearFinEjecucion(esiAEjecutar);
 
 		pthread_mutex_lock(&mESIEjecutando);
 		pthread_mutex_unlock(&enPausa);
@@ -78,23 +81,23 @@ void terminal()
 
 void ejecucionDeESI(ESI* esi)
 {
-	booleano res;
+	enum resultadoEjecucion res;
 	void* resultado = NULL;
 
 	enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
 
-	recibirMensaje(esi -> socket, sizeof(header) + sizeof(booleano), resultado);
+	recibirMensaje(esi -> socket, sizeof(header) + sizeof(enum resultadoEjecucion), resultado);
 
 	if(((header*) resultado) -> protocolo != 12)
 	{ /* ERROR */ }
 
-	res = *((booleano*) resultado + sizeof(header));
+	res = *((enum resultadoEjecucion*) resultado + sizeof(header));
 
 	free(resultado);
 
-	if(!res)
+	if(res == fallo || res == fin)
 	{
-		pthread_cancel(esi -> hiloDeFin);
+		printf("Se termino el esi %i", esi -> id);
 		pthread_mutex_lock(&mBloqueados);
 		pthread_mutex_lock(&mReady);
 		finalizarESI(esi);
