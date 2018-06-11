@@ -11,6 +11,8 @@
 #include <biblio.h>
 #include "configuracion.h"
 
+#define nuevoID 0;
+
 typedef struct {
 	char* clave;
 } infoEntrada;
@@ -31,15 +33,15 @@ typedef struct {
 } instruccion_t;
 
 
-void inicializar(char*);
-void conectarConCoordinador();
-void recibirRespuestaHandshake();
+void inicializar(char*, socket_t*);
+void conectarConCoordinador(socket_t*);
+void recibirRespuestaHandshake(socket_t);
 
 void dump();
-void procesamientoInstrucciones();
+void procesamientoInstrucciones(socket_t);
 
 
-instruccion_t* recibirInstruccionCoordinador();
+instruccion_t* recibirInstruccionCoordinador(socket_t);
 void incrementarUltimoUsoClaves();
 enum resultadoEjecucion instruccionSet(instruccion_t*);
 enum resultadoEjecucion instruccionStore(instruccion_t*);
@@ -56,8 +58,8 @@ enum resultadoEjecucion actualizarValorMenorTamanio(char*, infoClave*, char*, ta
 
 void reemplazoCircular();
 
-void almacenarID();
-void enviarResultadoEjecucion(enum resultadoEjecucion);
+booleano almacenarID(instancia_id);
+void enviarResultadoEjecucion(socket_t, enum resultadoEjecucion);
 cantEntradas_t tamValorACantEntradas(tamValor_t);
 //Devuelve 0 en exito, ERROR si fallo
 int crearMappeado(infoClave*);

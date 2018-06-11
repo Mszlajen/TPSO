@@ -3,35 +3,31 @@
 char* tablaDeEntradas = NULL;
 t_dictionary* infoClaves = NULL;
 infoEntrada* tablaDeControl = NULL;
-instancia_id ID = ERROR;
 tamEntradas_t tamanioEntradas;
 cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
-socket_t socketCoord = ERROR;
 
 int terminoEjecucion = 0;
 
 int main(int argc, char** argv) {
-	inicializar(argv[1]);
+	socket_t socketCoord = ERROR;
+	inicializar(argv[1], &socketCoord);
 
-	pthread_t hiloProcesamiento;
-	pthread_create(&hiloProcesamiento, NULL, (void*) procesamientoInstrucciones, NULL);
+	procesamientoInstrucciones(socketCoord);
 	/*pthread_t hiloDump;
 	pthread_create(&hiloDump, NULL, (void*) dump, NULL);*/
-
-	pthread_join(hiloProcesamiento, NULL);
 	//pthread_join(hiloDump, NULL);
 
 	liberarRecursosGlobales();
 	exit(0);
 }
 
-void inicializar(char* dirConfig)
+void inicializar(char* dirConfig, socket_t *socketCoord)
 {
 	if(crearConfiguracion(dirConfig))
 		salirConError("No se pudo abrir la configuracion.");
 	infoClaves = dictionary_create();
-	conectarConCoordinador();
-	recibirRespuestaHandshake();
+	conectarConCoordinador(socketCoord);
+	recibirRespuestaHandshake(*socketCoord);
 	tablaDeControl = malloc(sizeof(infoEntrada) * cantidadEntradas);
 	int i;
 	for(i = 0; i < cantidadEntradas; i++)
@@ -43,24 +39,30 @@ void dump()
 
 }
 
-void procesamientoInstrucciones()
+void procesamientoInstrucciones(socket_t socketCoord)
 {
 	instruccion_t* instruc;
 	enum resultadoEjecucion res;
+	booleano esLRU = obtenerAlgoritmoReemplazo() == LRU;
 	while(!terminoEjecucion)
 	{
-		instruc = recibirInstruccionCoordinador();
+		instruc = recibirInstruccionCoordinador(socketCoord);
 		switch(instruc -> tipo)
 		{
 		case set:
-			if(obtenerAlgoritmoReemplazo() == LRU)
+			if(esLRU)
 				incrementarUltimoUsoClaves();
 			res = instruccionSet(instruc);
 			break;
 		case store:
-			if(obtenerAlgoritmoReemplazo() == LRU)
+			if(esLRU)
 				incrementarUltimoUsoClaves();
 			res = instruccionStore(instruc);
+			break;
+		case create:
+			if(esLRU)
+				incrementarUltimoUsoClaves();
+			res = registrarNuevaClave(instruc -> clave, instruc -> valor, instruc -> tamValor);
 			break;
 		case compactacion:
 			break;
@@ -70,97 +72,108 @@ void procesamientoInstrucciones()
 			 */
 			break;
 		}
-		enviarResultadoEjecucion(res);
+		enviarResultadoEjecucion(socketCoord, res);
 		free(instruc -> clave);
 		free(instruc -> valor);
 		free(instruc);
 	}
 }
 
-void conectarConCoordinador()
+void conectarConCoordinador(socket_t *socketCoord)
 {
 	header head;
 	FILE* archivoID = NULL;
 	char* dirArchivoID = obtenerDireccionArchivoID();
 	void* buffer = NULL;
+	instancia_id ID = nuevoID;
 
-	socketCoord = crearSocketCliente(obtenerIPCordinador(), obtenerPuertoCoordinador());
-	if(socketCoord == ERROR)
+	*socketCoord = crearSocketCliente(obtenerIPCordinador(), obtenerPuertoCoordinador());
+	if(*socketCoord == ERROR)
 		salirConError("No se pudo conectar con el coordinador");
 
 	if((archivoID = fopen(dirArchivoID, "r")))
 	{
 		fread((void*)&ID, sizeof(instancia_id), 1, archivoID);
-		buffer = malloc(sizeof(ID) + sizeof(header));
-		head.protocolo = 4;
-		memcpy(buffer, &head, sizeof(head));
-		memcpy(buffer + sizeof(head), &ID, sizeof(ID));
-		enviarBuffer(socketCoord, buffer, sizeof(sizeof(ID) + sizeof(header)));
 		fclose(archivoID);
 	}
 	else
 	{
-
 		tamNombreInstancia_t tamNombre = sizeof(char) * string_length(obtenerNombreInstancia()) +
 						sizeof(char);
 		int tamBuffer = sizeof(head) +
+						sizeof(instancia_id) +
 						sizeof(tamNombreInstancia_t) +
 						tamNombre;
 
 		buffer = malloc(tamBuffer);
 		head.protocolo = 2;
 		memcpy(buffer, &head, sizeof(head));
-		memcpy(buffer + sizeof(head), &tamNombre, sizeof(tamNombreInstancia_t));
-		memcpy(buffer + sizeof(head) + sizeof(tamNombre), obtenerNombreInstancia(), tamNombre);
-		enviarBuffer(socketCoord, buffer, tamBuffer);
+		memcpy(buffer + sizeof(instancia_id), &ID, sizeof(instancia_id));
+		memcpy(buffer + sizeof(head) + sizeof(instancia_id), &tamNombre, sizeof(tamNombreInstancia_t));
+		memcpy(buffer + sizeof(head) + sizeof(instancia_id) + sizeof(tamNombre), obtenerNombreInstancia(), tamNombre);
+		enviarBuffer(*socketCoord, buffer, tamBuffer);
 	}
 	free(buffer);
 	free(dirArchivoID);
 }
 
-void recibirRespuestaHandshake()
+void recibirRespuestaHandshake(socket_t socketCoord)
 {
-	void * buffer = NULL;
-	int tamMensaje = sizeof(header) +
-					 sizeof(instancia_id) +
-					 sizeof(tamEntradas_t) +
-					 sizeof(cantEntradas_t) +
-					 sizeof(cantClaves_t);
-	recibirMensaje(socketCoord, tamMensaje, &buffer);
-	header head;
-	memcpy(&head, buffer, sizeof(header));
-	if(ID == ERROR)
-	{
-		memcpy(&ID, buffer + sizeof(header), sizeof(instancia_id));
-	}
-	memcpy(&tamanioEntradas, buffer + sizeof(header) + sizeof(instancia_id), sizeof(tamEntradas_t));
-	memcpy(&cantidadEntradas, buffer + sizeof(header) + sizeof(instancia_id) + sizeof(tamEntradas_t), sizeof(cantEntradas_t));
+	header *head;
+	recibirMensaje(socketCoord, sizeof(header), (void**)&head);
 
-	cantClaves_t cantClaves;
-	memcpy(&cantClaves, buffer + tamMensaje - sizeof(cantClaves_t), sizeof(cantClaves_t));
-	free(buffer);
-
-	tamClave_t* tamClave;
-	char *clave, *valor;
-	tamValor_t tamValor;
-	for(; cantClaves > 0; cantClaves--)
+	cantEntradas_t *buffCantEntr;
+	tamEntradas_t *buffTamEntr;
+	instancia_id *buffID;
+	switch(head -> protocolo)
 	{
-		recibirMensaje(socketCoord, sizeof(tamClave_t), (void**) &tamClave);
-		recibirMensaje(socketCoord, *tamClave, (void**) &clave);
-		tamValor = leerDeArchivo(clave, &valor);
-		if(tamValor)
-			registrarNuevaClave(clave, valor, tamValor);
-		else
-			error_show("No se pudo recuperar la clave %s", clave);
-		free(tamClave);
-		free(clave);
-		free(valor);
+	case 4:
+		recibirMensaje(socketCoord, sizeof(cantEntradas_t), (void **) &buffCantEntr);
+		cantidadEntradas = *buffCantEntr;
+		free(buffCantEntr);
+		recibirMensaje(socketCoord, sizeof(tamEntradas_t), (void **) &buffTamEntr);
+		tamanioEntradas = *buffTamEntr;
+		free(buffTamEntr);
+
+		cantClaves_t *cantClaves;
+		recibirMensaje(socketCoord, sizeof(cantClaves_t), (void **) &cantClaves);
+
+		tamClave_t* tamClave;
+		char *clave, *valor;
+		tamValor_t tamValor;
+		for(; *cantClaves > 0; (*cantClaves)--)
+		{
+			recibirMensaje(socketCoord, sizeof(tamClave_t), (void**) &tamClave);
+			recibirMensaje(socketCoord, *tamClave, (void**) &clave);
+			tamValor = leerDeArchivo(clave, &valor);
+			if(tamValor)
+				registrarNuevaClave(clave, valor, tamValor);
+			else
+				error_show("No se pudo recuperar la clave %s", clave);
+			free(tamClave);
+			free(clave);
+			free(valor);
+		}
+		free(cantClaves);
+		break;
+	case 5:
+		recibirMensaje(socketCoord, sizeof(instancia_id), (void**) &buffID);
+		if(!almacenarID(*buffID))
+			error_show("No se pudo almacenar la ID");
+		free(buffID);
+
+		recibirMensaje(socketCoord, sizeof(cantEntradas_t), (void **) &buffCantEntr);
+		cantidadEntradas = *buffCantEntr;
+		free(buffCantEntr);
+
+		recibirMensaje(socketCoord, sizeof(tamEntradas_t), (void **) &buffTamEntr);
+		tamanioEntradas = *buffTamEntr;
+		free(buffTamEntr);
+		break;
 	}
-	if(head.protocolo != 5)
-	{ /* ERROR */ }
 }
 
-instruccion_t* recibirInstruccionCoordinador()
+instruccion_t* recibirInstruccionCoordinador(socket_t socketCoord)
 {
 	listen(socketCoord, 5);
 	instruccion_t *instruccion = malloc(sizeof(instruccion_t));
@@ -182,7 +195,7 @@ instruccion_t* recibirInstruccionCoordinador()
 
 		recibirMensaje(socketCoord, *tamClave, (void**) &(instruccion -> clave));
 		free(tamClave);
-		if(instruccion -> tipo == set)
+		if(instruccion -> tipo == set || instruccion -> tipo == create)
 		{
 			tamValor_t *tamValor;
 			recibirMensaje(socketCoord, sizeof(tamValor_t), (void**) &tamValor);
@@ -198,13 +211,9 @@ instruccion_t* recibirInstruccionCoordinador()
 enum resultadoEjecucion instruccionSet(instruccion_t* instruccion)
 {
 	if(dictionary_has_key(infoClaves, instruccion -> clave))
-	{
 		return actualizarValorDeClave(instruccion -> clave, instruccion -> valor, instruccion -> tamValor);
-	}
 	else
-	{
-		return registrarNuevaClave(instruccion -> clave, instruccion -> valor, instruccion -> tamValor);
-	}
+		return fallo;
 }
 
 enum resultadoEjecucion instruccionStore(instruccion_t* instruccion)
@@ -396,7 +405,7 @@ void reemplazoCircular()
 	tablaDeControl[punteroReemplazo].clave = NULL;
 }
 
-void enviarResultadoEjecucion(enum resultadoEjecucion res)
+void enviarResultadoEjecucion(socket_t socketCoord, enum resultadoEjecucion res)
 {
 	void* buffer = malloc(sizeof(header) + sizeof(enum resultadoEjecucion));
 	((header*) buffer) -> protocolo = 12;
@@ -413,16 +422,19 @@ void incrementarUltimoUsoClaves()
 	dictionary_iterator(infoClaves, incrementar);
 }
 
-void almacenarID()
+booleano almacenarID(instancia_id ID)
 {
 	FILE* archivo = NULL;
 	char* dirArchivo = obtenerDireccionArchivoID();
+	booleano resultado = 0;
 	if((archivo = fopen(dirArchivo, "w")))
 	{
 		fwrite((void*)&ID, sizeof(instancia_id), 1, archivo);
 		fclose(archivo);
+		resultado = 1;
 	}
 	free(dirArchivo);
+	return resultado;
 }
 
 cantEntradas_t tamValorACantEntradas(tamValor_t v)
@@ -506,8 +518,6 @@ void liberarRecursosGlobales()
 		free(tablaDeEntradas);
 	if(infoClaves)
 		dictionary_destroy_and_destroy_elements(infoClaves, destruirInfoClave);
-	if(socketCoord)
-		close(socketCoord);
 }
 
 void salirConError(char* error)
