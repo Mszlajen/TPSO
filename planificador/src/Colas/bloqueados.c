@@ -60,8 +60,11 @@ booleano claveTomadaPorESI (char* clave, ESI_id ID)
 
 ESI* liberarClave(char* clave)
 {
-	dictionary_remove(tablaBloqueos, clave);
-
+	ESI* poseedorActual = dictionary_get(tablaBloqueos, clave);
+	if(poseedorActual)
+		quitarRecurso(poseedorActual, clave);
+	if(dictionary_has_key(tablaBloqueos, clave))
+		dictionary_remove(tablaBloqueos, clave);
 	return desbloquearESIDeClave(clave);
 }
 

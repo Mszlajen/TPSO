@@ -26,5 +26,5 @@ void recalcularEstimacion(ESI*, int);
 void ejecutarInstruccion(ESI*);
 int calcularVejez(ESI*);
 void agregarRecurso(ESI*, char*);
-
+void quitarRecurso(ESI*, char*);
 #endif /* ADMINESI_H_ */

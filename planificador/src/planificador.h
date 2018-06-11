@@ -15,14 +15,12 @@
 typedef struct {
 	ESI_id id_esi;
 	enum tipoDeInstruccion tipo;
-	uint8_t tamClave;
+	tamClave_t tamClave;
 	char* clave;
 	booleano resultado;
 } consultaCoord;
 
 enum comandos {pausar, continuar, bloquear, desbloquear, listar, kill, status, deadlock, salir};
-
-typedef uint8_t instruccionesCoord;
 
 void inicializacion(char*);
 void ejecucionDeESI (ESI*);

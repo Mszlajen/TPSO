@@ -2,7 +2,7 @@
 
 unsigned long int instruccionesEjecutadas = 0;
 
-id_t ESItotales = 0;
+ESI_id ESItotales = 0;
 
 ESI* crearESI (socket_t sock, int estimacionInicial)
 {
@@ -12,7 +12,7 @@ ESI* crearESI (socket_t sock, int estimacionInicial)
 	unaESI -> estimacion = estimacionInicial;
 	unaESI -> ultimaEstimacion = estimacionInicial;
 	unaESI -> arriboListos = instruccionesEjecutadas;
-	//unaESI -> recursos = list_create();
+	unaESI -> recursos = list_create();
 	unaESI -> socket = sock;
 	return unaESI;
 }
@@ -48,6 +48,16 @@ void actualizarArribo(ESI* esi)
 void agregarRecurso(ESI* esi, char* clave)
 {
 	list_add(esi -> recursos, string_duplicate(clave));
+}
+
+void quitarRecurso(ESI* esi, char* clave)
+{
+	int posicion = 0;
+	bool esClave(void* recurso)
+	{
+		return string_equals_ignore_case((char*)recurso, clave);
+	}
+	list_remove_and_destroy_by_condition(esi -> recursos, esClave, free);
 }
 
 void borrarRecursosESI(ESI* esi)

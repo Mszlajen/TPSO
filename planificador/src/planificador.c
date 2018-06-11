@@ -263,11 +263,17 @@ void comandoBloquear(char** palabras)
 
 void comandoDesbloquear(char** palabras)
 {
+	/*
+	 * Si la clave que se le pasa es inexistente, el comando no hace
+	 * nada y tampoco avisa al usuario.
+	 * (Revisar, tal vez)
+	 */
 	pthread_mutex_lock(&mBloqueados);
 	ESI* ESIDesbloqueado = desbloquearESIDeClave(palabras[1]);
 	if(!ESIDesbloqueado)
 	{
-		printf("No hay ESI bloqueados para esa clave o no existe.\n");
+		printf("No hay ESI bloqueados para esa clave\n");
+		liberarClave(palabras[1]); //No necesito leer el valor de retorno porque sé que es NULL
 		pthread_mutex_unlock(&mBloqueados);
 		return;
 	}
