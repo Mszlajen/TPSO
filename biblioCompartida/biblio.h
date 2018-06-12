@@ -36,7 +36,7 @@ typedef struct {
  */
 enum instruccion {get, set, store, compactacion, create};
 enum tipoDeInstruccion {bloqueante, liberadora, noDefinido};
-enum resultadoEjecucion {exito, bloqueo, fallo, fin};
+enum resultadoEjecucion {exito, bloqueo, fallo, fin, necesitaCompactar};
 
 void salir_agraciadamente(int);
 //-1 en error o fileDescriptor en exito
