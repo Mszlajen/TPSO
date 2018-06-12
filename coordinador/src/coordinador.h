@@ -48,9 +48,11 @@ void escucharInstancia (Instancia  instancia);
 void escucharEsi (Esi esi);
 void escucharPlanificador (socket_t socket);
 void recibirConexiones();
-Instancia * algoritmoUsado();
-Instancia * algoritmoEquitativeLoad();
+Instancia * algoritmoUsado(void);
+Instancia * algoritmoEquitativeLoad(void);
 int crearConfiguracion(char * archivoConfig);
+int buscarClaves(char * clave);
+int buscarInstanciaPorId(Instancia * instancia);
 
 
 
