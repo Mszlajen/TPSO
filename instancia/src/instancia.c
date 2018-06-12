@@ -10,6 +10,7 @@ int terminoEjecucion = 0;
 
 int main(int argc, char** argv) {
 	socket_t socketCoord = ERROR;
+
 	inicializar(argv[1], &socketCoord);
 
 	procesamientoInstrucciones(socketCoord);
@@ -263,7 +264,7 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 				//Compactacion
 				posicion = encontrarEspacioLibreConsecutivo(tamValor);
 				if(posicion == cantidadEntradas)
-					return compactacion;
+					return necesitaCompactar;
 				else
 					break;
 			}

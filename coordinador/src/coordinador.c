@@ -57,12 +57,23 @@ void esucharPlanificador (socket_t socket){
 
 void escucharInstancia (Instancia  instancia) {
 	header * header;
+	/*
+	 * ¿Por qué buffer de int si no le estás metiendo int?
+	 * Y resultado no es un int, es un tipo de dato definido en
+	 * la biblioteca compartida.
+	 * [MATI]
+	 */
 	int * buffer;
 	int enviado;
 	int resultado;
 
 		recibirMensaje(instancia.socket,sizeof(header),(void *) &header);
 
+		/*
+		 * La compactación es un resultado de ejecución no otro numero de mensaje.
+		 * Me habia olvidado de ponerlo en el enum.
+		 * [MATI]
+		 */
 		if(header->protocolo == 12){
 			recibirMensaje(instancia.socket,sizeof(int),(void *) &resultado );
 
@@ -88,6 +99,15 @@ void escucharEsi (Esi esi) {
 	header * header;
 	enum instruccion * instr = NULL;
 
+		/*
+		 * ¿Decime que es ese int?
+		 * Recibir mensaje deja una dirección a memoria dinamica en el
+		 * tercer parametro, por eso es void**, no copia el valor en la variable.
+		 * ¿Qué pasa si el ESI se desconecto?
+		 * y, ¿Para que mantener todas las demas variables del struct
+		 * en memoria si solo las usas una vez que el ESI envio un mensaje?
+		 * [MATI]
+		 */
 		recibirMensaje(esi.socket,sizeof(header),(void *) &header);
 		recibirMensaje(esi.socket,sizeof(int),(void *) &esi.idEsi);
 
@@ -113,6 +133,10 @@ void escucharEsi (Esi esi) {
 
 void tratarGet(Esi * esi){
 	tamClave_t * tamClave = NULL;
+	/*
+	 * ¿Para qué darle valor nueve al header si el
+	 * unico lugar donde lo usas lo reasignas a once?
+	 */
 	header header;
 	header.protocolo = 9;
 	int enviado;
@@ -125,6 +149,7 @@ void tratarGet(Esi * esi){
 
 		consultarPorClaveTomada(*esi);
 		// al consultar por la clave, el planificador sabe que se realizo una operacion bloqueante de tal clave en tal esi
+
 	}
 
 	else
@@ -193,7 +218,11 @@ void tratarStore(Esi * esi) {
 		escucharInstancia(*instancia);
 
 	}else{
-
+		/*
+		 * Mostrar por pantalla es importante pero no cuando tenes que loggear en un
+		 * archivo y la función que lo hace tambien te muestra por pantalla.
+		 * [MATI]
+		 */
 		error_show("no se puede liberar una clave que nunca fue tomada por el esi. ");
 
 		header.protocolo = 12;
@@ -275,19 +304,36 @@ void tratarSet(Esi * esi){
 	}
 
 }
-
+/*
+ * Acordate que todas las conexiones son hilos separadados,
+ * incluida la del planificador por lo tanto no vas a llamar
+ * una función sino sincronizarte con el hilo del planificador
+ * para hacer la consulta.
+ */
 int consultarPorClaveTomada(Esi esi){
 	header header;
 	header.protocolo = 9;
+	/*
+	 * Estás guardando el tamaño de un puntero, no el tamaño de la
+	 * clave, para eso tenes que recordarlo vos o usar una función
+	 * de strings
+	 * [MATI]
+	 */
 	tamClave_t  tamClave = sizeof(esi.clave);
 	enum tipoDeInstruccion tipo;
-
+	/*
+	 * Te falta un tipo de instrucción y las que están, están mal
+	 * [MATI]
+	 */
 	if(esi.instr == store){
 		tipo = bloqueante;
 	} else {
 		tipo = noDefinido;
 	}
-
+	/*
+	 * Seguis con los int
+	 * [MATI]
+	 */
 	int * buffer = malloc(sizeof(header) + sizeof(enum tipoDeInstruccion) + sizeof(int) * 2 + tamClave);
 	memcpy(buffer , &header.protocolo , sizeof(header) );
 	memcpy(buffer+sizeof(header) , &esi.idEsi, sizeof(int) );
@@ -500,7 +546,14 @@ Instancia * algoritmoEquitativeLoad(void){
 	instancia = list_get(listaInstancias, contadorEquitativeLoad);
 	pthread_mutex_unlock(&mListaInst);
 
-
+	/*
+	 * ¿Qué pasa si el contador está en 8 con 9 instancia
+	 * y la siguiente vez que se llama al algoritmo se
+	 * desconectaron dos instancias?
+	 * ¿Qué pasa si reinicio el contador pero antes de volver
+	 * a llamar al algoritmo se conectaron más instancias?
+	 * [MATI]
+	 */
 	if(contadorEquitativeLoad == cantInstancias){
 		contadorEquitativeLoad = 0;
 	}else{
