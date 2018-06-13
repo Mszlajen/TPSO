@@ -63,13 +63,13 @@ void terminal()
 			pthread_mutex_unlock(&enPausa);
 			break;
 		case bloquear:
-			comandoBloquear(palabras);
+			comandoBloquear(palabras[1], palabras[2]);
 			break;
 		case desbloquear:
-			comandoDesbloquear(palabras);
+			comandoDesbloquear(palabras[1]);
 			break;
 		case listar:
-			comandoListar(palabras);
+			comandoListar(palabras[1]);
 			break;
 		default:
 			system(linea);
@@ -83,6 +83,7 @@ void ejecucionDeESI(ESI* esi)
 {
 	enum resultadoEjecucion res;
 	void* resultado = NULL;
+	booleano seBloqueo = 0;
 
 	enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
 
@@ -95,35 +96,67 @@ void ejecucionDeESI(ESI* esi)
 
 	free(resultado);
 
-	if(res == fallo || res == fin)
+	if(res == fallo)
 	{
-		printf("Se termino el esi %i", esi -> id);
-		pthread_mutex_lock(&mBloqueados);
-		pthread_mutex_lock(&mReady);
-		finalizarESI(esi);
-		pthread_mutex_unlock(&mBloqueados);
-		pthread_mutex_unlock(&mReady);
+		terminarEjecucionESI(esi);
+		free(ultimaConsulta -> clave);
+		free(ultimaConsulta);
+		ultimaConsulta = NULL;
+		return;
 	}
 
 	switch(ultimaConsulta -> tipo)
 	{
-	case liberadora:
-		pthread_mutex_lock(&mBloqueados);
-		pthread_mutex_lock(&mReady);
-		listarParaEjecucion(liberarClave(ultimaConsulta -> clave));
-		pthread_mutex_unlock(&mBloqueados);
-		pthread_mutex_unlock(&mReady);
-		break;
-	case bloqueante:
-		pthread_mutex_lock(&mBloqueados);
-		if(ultimaConsulta -> resultado)
-			colocarEnColaESI(esi, ultimaConsulta -> clave);
+		case liberadora:
+			pthread_mutex_lock(&mBloqueados);
+			pthread_mutex_lock(&mReady);
+			ESI* esiLiberado = liberarClave(ultimaConsulta -> clave);
+			if(esiLiberado)
+				listarParaEjecucion(esiLiberado);
+			pthread_mutex_unlock(&mBloqueados);
+			pthread_mutex_unlock(&mReady);
+			printf("Se libero la clave %s del ESI %i", ultimaConsulta -> clave, esi -> id);
+			break;
+		case bloqueante:
+			//En realidad acá están mal usados los semaforos porque no están pegados a la region critica.
+			pthread_mutex_lock(&mBloqueados);
+			if(ultimaConsulta -> resultado)
+			{
+				colocarEnColaESI(esi, ultimaConsulta -> clave);
+				seBloqueo = 1;
+				printf("El ESI %i se bloqueo por la clave %s", esi -> id, ultimaConsulta -> clave);
+			}
+			else
+			{
+				reservarClave(esi, ultimaConsulta -> clave);
+				printf("El ESI %i tomo poseción de la clave %s", esi -> id, ultimaConsulta -> clave);
+			}
+			pthread_mutex_unlock(&mBloqueados);
+			break;
+		default:
+			break;
+	}
+
+	if(res == fin)
+	{
+		finalizarESI(esi);
+		if(hayAvisoBloqueo())
+		{
+			printf("El ESI %i finalizo y no pudo ser bloqueado", esi -> id);
+			settearAvisoBloqueo(NULL);
+		}
+	}
+
+	if(hayAvisoBloqueo())
+	{
+		if(seBloqueo)
+			printf("El ESI %i ya se encuentra bloqueado por la clave %s", esi -> id, ultimaConsulta -> clave);
 		else
-			reservarClave(esi, ultimaConsulta -> clave);
-		pthread_mutex_unlock(&mBloqueados);
-		break;
-	default:
-		break;
+		{
+			colocarEnColaESI(esi, getClaveAvisoBloqueo());
+			printf("El ESI %i se bloqueo por la clave %s", esi -> id, getClaveAvisoBloqueo());
+		}
+		settearAvisoBloqueo(NULL);
 	}
 
 	free(ultimaConsulta -> clave);
@@ -170,14 +203,7 @@ void escucharPorFinESI(ESI* esi)
 		listen(esi -> socket, 5);
 		if(seDesconectoSocket(esi -> socket))
 		{
-			printf("Se termino el esi %i", esi -> id);
-			pthread_mutex_lock(&mESIEjecutando);
-			pthread_mutex_lock(&mBloqueados);
-			pthread_mutex_lock(&mReady);
-			finalizarESI(esi);
-			pthread_mutex_unlock(&mBloqueados);
-			pthread_mutex_unlock(&mReady);
-			pthread_mutex_unlock(&mESIEjecutando);
+			terminarEjecucionESI(esi);
 			pthread_exit(NULL);
 		}
 	}
@@ -212,11 +238,10 @@ void comunicacionCoord(socket_t socketCoord)
 	}
 }
 
-void comandoBloquear(char** palabras)
+void comandoBloquear(char* clave, char* IdESI)
 {
-	ESI_id IDparaBloquear = atoi(palabras[2]);
+	ESI_id IDparaBloquear = atoi(IdESI);
 	ESI* ESIParaBloquear = NULL;
-	uint8_t esESIEjecutando;
 	if(!IDparaBloquear)
 	{
 		printf("El parametro ID no es valido.\n");
@@ -225,43 +250,32 @@ void comandoBloquear(char** palabras)
 
 	if(esESIEnEjecucion(IDparaBloquear))
 	{
-		pthread_mutex_lock(&mESIEjecutando);
-		/*
-		 * Si el ESI a bloquear es el que se está ejecutando pueden pasar dos cosas:
-		 * 1- No está ejecutando ninguna instrucción por lo tanto el mutex es tomado
-		 * inmediatamente y el if siguiente es innecesario.
-		 * 2- Está ejecutando una instrucción por lo tanto el mutex bloquea el hilo
-		 * y en el intermedio hasta su liberación el ESI pudo haber terminado su ejecución
-		 * o bloquearse y hay que comprobar que siga siendo el que ejecuta.
-		 */
-		if((esESIEjecutando = esESIEnEjecucion(IDparaBloquear)))
-			ESIParaBloquear = ESIEjecutando();
-		else
-			pthread_mutex_unlock(&mESIEjecutando);
+		settearAvisoBloqueo(clave);
+		printf("El ESI a bloquear está ejecutando, esperando fin de ejecución.\n");
+		while(hayAvisoBloqueo());
 	}
-	pthread_mutex_lock(&mBloqueados);
-	pthread_mutex_lock(&mReady);
-	if(!esESIEjecutando && !(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
+	else
 	{
-		printf("El ESI no se encuentra en ready, ejecutando o no existe.\n");
+		pthread_mutex_lock(&mBloqueados);
+		pthread_mutex_lock(&mReady);
+		if(!(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
+		{
+			printf("El ESI no se encuentra en ready o ejecutando.\n");
+			pthread_mutex_unlock(&mReady);
+			pthread_mutex_unlock(&mBloqueados);
+			return;
+		}
+
+		bloquearESI(ESIParaBloquear, clave);
+
 		pthread_mutex_unlock(&mReady);
+
 		pthread_mutex_unlock(&mBloqueados);
-		return;
+
 	}
-
-
-	bloquearESI(ESIParaBloquear, palabras[1]);
-
-	pthread_mutex_unlock(&mReady);
-
-	pthread_mutex_unlock(&mBloqueados);
-
-	if(esESIEjecutando)
-		pthread_mutex_unlock(&mESIEjecutando);
-
 }
 
-void comandoDesbloquear(char** palabras)
+void comandoDesbloquear(char* clave)
 {
 	/*
 	 * Si la clave que se le pasa es inexistente, el comando no hace
@@ -269,11 +283,11 @@ void comandoDesbloquear(char** palabras)
 	 * (Revisar, tal vez)
 	 */
 	pthread_mutex_lock(&mBloqueados);
-	ESI* ESIDesbloqueado = desbloquearESIDeClave(palabras[1]);
+	ESI* ESIDesbloqueado = desbloquearESIDeClave(clave);
 	if(!ESIDesbloqueado)
 	{
 		printf("No hay ESI bloqueados para esa clave\n");
-		liberarClave(palabras[1]); //No necesito leer el valor de retorno porque sé que es NULL
+		liberarClave(clave); //No necesito leer el valor de retorno porque sé que es NULL
 		pthread_mutex_unlock(&mBloqueados);
 		return;
 	}
@@ -284,7 +298,7 @@ void comandoDesbloquear(char** palabras)
 	pthread_mutex_unlock(&mReady);
 }
 
-void comandoListar(char** palabras)
+void comandoListar(char* clave)
 {
 	void imprimirID(void* id)
 	{
@@ -293,7 +307,7 @@ void comandoListar(char** palabras)
 	t_list* listaDeID;
 
 	pthread_mutex_lock(&mBloqueados);
-	listaDeID = listarID(palabras[1]);
+	listaDeID = listarID(clave);
 	if(!listaDeID)
 	{
 		printf("No hay ESI bloqueados con esa clave.\n");
@@ -490,6 +504,16 @@ int max (int v1, int v2)
 		return v1;
 	else
 		return v2;
+}
+
+void terminarEjecucionESI(ESI* esi)
+{
+	printf("Se termino el esi %i", esi -> id);
+	pthread_mutex_lock(&mBloqueados);
+	pthread_mutex_lock(&mReady);
+	finalizarESI(esi);
+	pthread_mutex_unlock(&mBloqueados);
+	pthread_mutex_unlock(&mReady);
 }
 
 /*
