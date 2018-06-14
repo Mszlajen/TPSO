@@ -18,13 +18,22 @@ t_dictionary * tablaDeClaves = NULL;
 socket_t  socketPlanificador;
 socket_t  socketCoordinador;
 
+pthread_mutex_t mRespuestaPlanificador;
+pthread_cond_t sbRespuestaPlanificador;
 pthread_mutex_t mListaInst;
+pthread_mutex_t mEsiActual;
+pthread_cond_t sbRespuestaInstancia;
+pthread_mutex_t mRespuestaInstancia;
+pthread_cond_t sbConsultarPorClave;
+pthread_mutex_t mConsultarPorClave;
 
 char * Algoritmo;
 int auxiliarIdInstancia;
 int contadorEquitativeLoad = 0;
 int cantInstancias = 0;
+int respuestaPlanificador;
 t_log * logOperaciones;
+Esi * esiActual;
 
 int main(int argc, char **argv) {
 
@@ -52,104 +61,166 @@ int main(int argc, char **argv) {
 }
 
 void esucharPlanificador (socket_t socket){
-	// aun no la voy a desarrollar, pero esta sera la funcion que maneje el hilo del Planificador
-}
+	header header;
+	header.protocolo = 9;
+	enum tipoDeInstruccion tipo;
 
-void escucharInstancia (Instancia  instancia) {
-	header * header;
-	/*
-	 * ¿Por qué buffer de int si no le estás metiendo int?
-	 * Y resultado no es un int, es un tipo de dato definido en
-	 * la biblioteca compartida.
-	 * [MATI]
-	 */
-	int * buffer;
-	int enviado;
-	int resultado;
+	pthread_mutex_lock(&mEsiActual);
+	pthread_mutex_lock(&mConsultarPorClave);
+	pthread_cond_wait(&sbConsultarPorClave, &mConsultarPorClave);
 
-		recibirMensaje(instancia.socket,sizeof(header),(void *) &header);
+	tamClave_t tamClave = string_length(esiActual->clave);
 
-		/*
-		 * La compactación es un resultado de ejecución no otro numero de mensaje.
-		 * Me habia olvidado de ponerlo en el enum.
-		 * [MATI]
-		 */
-		if(header->protocolo == 12){
-			recibirMensaje(instancia.socket,sizeof(int),(void *) &resultado );
+	switch(esiActual->instr){
+	case store:
+		tipo = liberadora;
+		break;
+	case get:
+		tipo = bloqueante;
+		break;
+	case set:
+		tipo = noDefinido;
+		break;
+	}
 
-			buffer = malloc(sizeof(header) + sizeof(int) );
+	void * buffer = malloc(sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion) + sizeof(tamClave_t) + tamClave);
 
-			memcpy(buffer , &header->protocolo , sizeof(header) );
-			memcpy(buffer+sizeof(header) , &resultado , sizeof(int));
+	memcpy(buffer , &header.protocolo , sizeof(header) );
+	memcpy(buffer+sizeof(header) , &esiActual->idEsi, sizeof(ESI_id) );
+	memcpy(buffer+sizeof(header) + sizeof(ESI_id) , &tipo, sizeof(enum tipoDeInstruccion) );
+	memcpy(buffer+sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion)  , &tamClave, sizeof(tamClave_t) );
+	memcpy(buffer+sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion) + sizeof(tamClave_t) , &esiActual->clave, tamClave );
 
-			enviado = enviarBuffer (instancia.esiTrabajando->socket , buffer , sizeof(header) + sizeof(int) );
+	int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion) + sizeof(tamClave_t) + tamClave);
 
-			while(enviado != 0){
-				error_show ("no se envio correctamente el informe de resultado al esi, enviando nuevamente");
-				enviado = enviarBuffer (instancia.esiTrabajando->socket , buffer , sizeof(header) + sizeof(int) );
-			}
-			free(buffer);
-		}else{
-			//aca va el codigo que trata los mensajes de la compactacion de Instancias
+	while(estado !=0){
+		error_show("no se pudo preguntar por el estado de la clave al planificador, volviendo a intentar");
+		estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion) + sizeof(tamClave_t) + tamClave);
 		}
+	free(buffer);
+
+	int *respuesta = malloc(sizeof(booleano));
+	recibirMensaje(socketPlanificador,sizeof(header),(void *) &header.protocolo);
+	recibirMensaje(socketPlanificador,sizeof(int),(void *) &respuesta );
+
+	pthread_mutex_lock(&mRespuestaPlanificador);
+	respuestaPlanificador = *respuesta;
+	pthread_mutex_unlock(&mRespuestaPlanificador);
+	pthread_cond_signal(&sbRespuestaPlanificador);
+
+	pthread_mutex_unlock(&mConsultarPorClave);
+	pthread_mutex_unlock(&mEsiActual);
+
+	free(respuesta);
 
 }
 
-void escucharEsi (Esi esi) {
+void escucharInstancia (Instancia * instancia) {
+	header * header;
+	void * buffer;
+	int enviado;
+	int * resultado;
+
+	//el mutex es por que el cond lo exije, pero la verdad yo no veo region critica en ese codigo
+	//si hay una mejor manera, la esucho
+	pthread_mutex_lock(&mRespuestaInstancia);
+	pthread_cond_wait(&sbRespuestaInstancia, &mRespuestaInstancia);
+		recibirMensaje(instancia->socket,sizeof(header),(void *) &header);
+
+		if(header->protocolo == 12){
+			recibirMensaje(instancia->socket,sizeof(enum resultadoEjecucion),(void *) &resultado );
+
+			switch(*resultado){
+			case exito:
+					buffer = malloc(sizeof(header) + sizeof(enum resultadoEjecucion) );
+
+					memcpy(buffer , &header->protocolo , sizeof(header) );
+					memcpy(buffer+sizeof(header) , &resultado , sizeof(enum resultadoEjecucion));
+
+					enviado = enviarBuffer (instancia->esiTrabajando->socket , buffer , sizeof(header) + sizeof(enum resultadoEjecucion) );
+
+					while(enviado != 0){
+						error_show ("no se envio correctamente el informe de resultado al esi, enviando nuevamente");
+						enviado = enviarBuffer (instancia->esiTrabajando->socket , buffer , sizeof(header) + sizeof(enum resultadoEjecucion) );
+					}
+					free(buffer);
+				break;
+			case fallo:
+					buffer = malloc(sizeof(header) + sizeof(enum resultadoEjecucion) );
+
+					memcpy(buffer , &header->protocolo , sizeof(header) );
+					memcpy(buffer+sizeof(header) , &resultado , sizeof(enum resultadoEjecucion));
+
+					enviado = enviarBuffer (instancia->esiTrabajando->socket , buffer , sizeof(header) + sizeof(enum resultadoEjecucion) );
+
+					while(enviado != 0){
+						error_show ("no se envio correctamente el informe de resultado al esi, enviando nuevamente");
+						enviado = enviarBuffer (instancia->esiTrabajando->socket , buffer , sizeof(header) + sizeof(enum resultadoEjecucion) );
+					}
+					free(buffer);
+				break;
+			case necesitaCompactar:
+				// aun no voy a codear este caso
+				break;
+			}
+		}
+		pthread_mutex_unlock(&mRespuestaInstancia);
+}
+
+void escucharEsi (Esi * esi) {
 	header * header;
 	enum instruccion * instr = NULL;
 
-		/*
-		 * ¿Decime que es ese int?
-		 * Recibir mensaje deja una dirección a memoria dinamica en el
-		 * tercer parametro, por eso es void**, no copia el valor en la variable.
-		 * ¿Qué pasa si el ESI se desconecto?
-		 * y, ¿Para que mantener todas las demas variables del struct
-		 * en memoria si solo las usas una vez que el ESI envio un mensaje?
-		 * [MATI]
-		 */
-		recibirMensaje(esi.socket,sizeof(header),(void *) &header);
-		recibirMensaje(esi.socket,sizeof(int),(void *) &esi.idEsi);
+	if( !seDesconectoSocket(esi->socket) ){
 
-		if (header->protocolo == 8){
+		recibirMensaje(esi->socket,sizeof(header),(void *) &header);
+		recibirMensaje(esi->socket,sizeof(int),(void *) &esi->idEsi);
 
-			recibirMensaje(esi.socket,sizeof(enum instruccion),(void *) &instr );
+				if (header->protocolo == 8){
 
-			esi.instr = *instr;
+					recibirMensaje(esi->socket,sizeof(enum instruccion),(void *) &instr );
 
-			switch(esi.instr){
-			case get:
-				tratarGet(&esi);
-				break;
-			case set:
-				tratarSet(&esi);
-				break;
-			case store:
-				tratarStore(&esi);
-				break;
-			}
-		}
+					esi->instr = *instr;
+
+					switch(esi->instr){
+					case get:
+						free(header);
+						free(instr);
+						tratarGet(esi);
+						break;
+					case set:
+						free(header);
+						free(instr);
+						tratarSet(esi);
+						break;
+					case store:
+						free(header);
+						free(instr);
+						tratarStore(esi);
+						break;
+					}
+				}
+	}else{
+		error_show("se desconecto socket del esi, no se pudo recibir la instruccion ");
+		//puse un error, pero no estoy seguro respecto de cual es el trato indicado para la desconecxion de un esi
+	}
+
+
 }
 
 void tratarGet(Esi * esi){
 	tamClave_t * tamClave = NULL;
-	/*
-	 * ¿Para qué darle valor nueve al header si el
-	 * unico lugar donde lo usas lo reasignas a once?
-	 */
 	header header;
-	header.protocolo = 9;
 	int enviado;
 
 	recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
 
 	recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
 
+
 	if( dictionary_has_key(tablaDeClaves, esi->clave) ){
-
-		consultarPorClaveTomada(*esi);
-		// al consultar por la clave, el planificador sabe que se realizo una operacion bloqueante de tal clave en tal esi
-
+		setearEsiActual(*esi);
+		pthread_cond_signal(&sbConsultarPorClave);
 	}
 
 	else
@@ -161,22 +232,22 @@ void tratarGet(Esi * esi){
 
 		header.protocolo = 11;
 
-		int * buffer = malloc(sizeof(header) + sizeof(enum instruccion) + sizeof(int) + *tamClave);
+		void * buffer = malloc(sizeof(header) + sizeof(enum instruccion) + sizeof(tamClave_t) + *tamClave);
 		memcpy(buffer,&header.protocolo,sizeof(header));
 		memcpy(buffer+sizeof(header),&esi->instr,sizeof(enum instruccion));
-		memcpy(buffer+sizeof(header)+sizeof(enum instruccion),tamClave,sizeof(int));
-		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int),esi->clave,*tamClave);
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion),tamClave,sizeof(tamClave_t));
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(tamClave_t),esi->clave,*tamClave);
 
-		enviado = enviarBuffer(instancia->socket,buffer,sizeof(header) + sizeof(enum instruccion) + sizeof(int) + *tamClave);
+		enviado = enviarBuffer(instancia->socket,buffer,sizeof(header) + sizeof(enum instruccion) + sizeof(tamClave_t) + *tamClave);
 
 		while(enviado !=0 ){
 			error_show("no se envio correctamente la clave a la instancia, volviendo a intentar");
-			enviado = enviarBuffer(instancia->socket,buffer,sizeof(header) + sizeof(enum instruccion) + sizeof(int) + *tamClave);
+			enviado = enviarBuffer(instancia->socket,buffer,sizeof(header) + sizeof(enum instruccion) + sizeof(tamClave_t) + *tamClave);
 			}
 		free(buffer);
 
-		consultarPorClaveTomada(*esi);
-		// al consultar por la clave, el planificador sabe que se realizo una operacion bloqueante de tal clave en tal esi
+		setearEsiActual(*esi);
+		pthread_cond_signal(&sbConsultarPorClave);
 
 		list_add(listaClaves,esi->clave);
 	}
@@ -186,28 +257,37 @@ void tratarStore(Esi * esi) {
 	tamClave_t * tamClave = NULL;
 	header header;
 	header.protocolo = 11;
-	int * buffer;
+	void * buffer;
 	int estado;
 
 	recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
 
 	recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
 
-	if( consultarPorClaveTomada(*esi) == 0){
+	setearEsiActual(*esi);
+	pthread_cond_signal(&sbConsultarPorClave);
+
+	pthread_cond_wait(&sbRespuestaPlanificador,&mRespuestaPlanificador);
+
+	pthread_mutex_lock(&mRespuestaPlanificador);
+
+	if( respuestaPlanificador ){
+
+		pthread_mutex_unlock(&mRespuestaPlanificador);
 
 		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
 
-		buffer = malloc(sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int));
+		buffer = malloc(sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(tamClave_t));
 		memcpy(buffer , &header.protocolo , sizeof(header) );
 		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(enum instruccion) );
-		memcpy(buffer+sizeof(header)+sizeof(int) , tamClave , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int), &esi->clave , *tamClave );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion) , tamClave , sizeof(tamClave_t) );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(tamClave_t), &esi->clave , *tamClave );
 
-		estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
+		estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(tamClave_t) );
 
 		while(estado !=0){
 			error_show("no se pudo comunicar el store a la instancia, volviendo a intentar");
-			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
+			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(tamClave_t) );
 		}
 		free(buffer);
 
@@ -215,28 +295,23 @@ void tratarStore(Esi * esi) {
 
 		instancia->esiTrabajando = esi;
 
-		escucharInstancia(*instancia);
+		pthread_cond_signal(&sbRespuestaInstancia);
 
 	}else{
-		/*
-		 * Mostrar por pantalla es importante pero no cuando tenes que loggear en un
-		 * archivo y la función que lo hace tambien te muestra por pantalla.
-		 * [MATI]
-		 */
-		error_show("no se puede liberar una clave que nunca fue tomada por el esi. ");
+		pthread_mutex_unlock(&mRespuestaPlanificador);
 
 		header.protocolo = 12;
 
-		buffer = malloc(sizeof(header) + sizeof(int) );
-		int resultado = ERROR;
+		buffer = malloc(sizeof(header) + sizeof(booleano) );
+		booleano resultado = ERROR;
 		memcpy(buffer , &header.protocolo , sizeof(header) );
-		memcpy(buffer+sizeof(header) , &resultado , sizeof(int));
+		memcpy(buffer+sizeof(header) , &resultado , sizeof(booleano));
 
-		estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(int) );
+		estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(booleano) );
 
 		while(estado != 0){
 			error_show ("no se envio correctamente el informe de resultado al esi, enviando nuevamente");
-			estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(int) );
+			estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(booleano) );
 		}
 		free(buffer);
 
@@ -249,7 +324,7 @@ void tratarSet(Esi * esi){
 	tamValor_t * tamValor = NULL;
 	header header;
 	header.protocolo = 11;
-	int * buffer;
+	void * buffer;
 	int estado;
 
 	recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
@@ -257,111 +332,80 @@ void tratarSet(Esi * esi){
 	recibirMensaje(esi->socket,sizeof(tamValor_t),(void *) &tamValor );
 	recibirMensaje(esi->socket,*tamValor,(void *) &esi->valor);
 
-	if( consultarPorClaveTomada(*esi) == 0){
+	setearEsiActual(*esi);
+	pthread_cond_signal(&sbConsultarPorClave);
+
+	pthread_cond_wait(&sbRespuestaPlanificador,&mRespuestaPlanificador);
+
+	pthread_mutex_lock(&mRespuestaPlanificador);
+
+	if( respuestaPlanificador ){
+
+		pthread_mutex_unlock(&mRespuestaPlanificador);
 
 		Instancia * instancia = dictionary_get(tablaDeClaves, esi->clave);
 
-		buffer = malloc(sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(int) * 2);
+		buffer = malloc(sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(tamClave_t) + sizeof(tamValor_t));
 		memcpy(buffer , &header.protocolo , sizeof(header) );
 		memcpy(buffer+sizeof(header) , &esi->instr , sizeof(enum instruccion) );
-		memcpy(buffer+sizeof(header)+sizeof(enum instruccion) , tamClave , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int), &esi->clave , *tamClave );
-		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int)+*tamClave , tamValor , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(int)*2+*tamClave , &esi->valor , *tamValor );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion) , tamClave , sizeof(tamClave_t) );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(tamClave_t), &esi->clave , *tamClave );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(tamClave_t)+*tamClave , tamValor , sizeof(tamValor_t) );
+		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(tamClave_t)+*tamClave+sizeof(tamValor_t), &esi->valor , *tamValor );
 
 
-		estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(int) * 2);
+		estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(tamClave_t) + sizeof(tamValor_t));
 
 		while(estado !=0){
 			error_show("no se pudo comunicar el store a la instancia, volviendo a intentar");
-			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(int) );
+			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(tamClave_t) + sizeof(tamValor_t) );
 			}
 
 		instancia->esiTrabajando = esi;
 		free(buffer);
 		log_info(logOperaciones, "ESI %d SET %s %s " , esi->idEsi ,esi->clave ,esi->valor);
 
-		escucharInstancia(*instancia);
+		pthread_cond_signal(&sbRespuestaInstancia);
 
 	}else{
+		pthread_mutex_unlock(&mRespuestaPlanificador);
+
 		error_show("la clave no pertenece al esi "  );
 
 		header.protocolo = 12;
 
-		buffer = malloc(sizeof(header) + sizeof(int) );
-		int resultado = ERROR;
+		buffer = malloc(sizeof(header) + sizeof(booleano) );
+		booleano resultado = ERROR;
 		memcpy(buffer , &header.protocolo , sizeof(header) );
-		memcpy(buffer+sizeof(header) , &resultado , sizeof(int));
+		memcpy(buffer+sizeof(header) , &resultado , sizeof(booleano));
 
-		estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(int) );
+		estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(booleano) );
 
 		while(estado != 0){
 			error_show ("no se envio correctamente el informe de resultado al esi, enviando nuevamente");
-			estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(int) );
+			estado = enviarBuffer (esi->socket , buffer , sizeof(header) + sizeof(booleano) );
 		}
 		free(buffer);
 
 	}
 
 }
+
+void setearEsiActual(Esi esi){
+	pthread_mutex_lock(&mEsiActual);
+	esiActual->instr = esi.instr;
+	esiActual->idEsi = esi.idEsi;
+	esiActual->socket = esi.socket;
+	strcpy(esiActual->clave,esi.clave);
+	pthread_mutex_unlock(&mEsiActual);
+}
+
 /*
  * Acordate que todas las conexiones son hilos separadados,
  * incluida la del planificador por lo tanto no vas a llamar
  * una función sino sincronizarte con el hilo del planificador
  * para hacer la consulta.
  */
-int consultarPorClaveTomada(Esi esi){
-	header header;
-	header.protocolo = 9;
-	/*
-	 * Estás guardando el tamaño de un puntero, no el tamaño de la
-	 * clave, para eso tenes que recordarlo vos o usar una función
-	 * de strings
-	 * [MATI]
-	 */
-	tamClave_t  tamClave = sizeof(esi.clave);
-	enum tipoDeInstruccion tipo;
-	/*
-	 * Te falta un tipo de instrucción y las que están, están mal
-	 * [MATI]
-	 */
-	if(esi.instr == store){
-		tipo = bloqueante;
-	} else {
-		tipo = noDefinido;
-	}
-	/*
-	 * Seguis con los int
-	 * [MATI]
-	 */
-	int * buffer = malloc(sizeof(header) + sizeof(enum tipoDeInstruccion) + sizeof(int) * 2 + tamClave);
-	memcpy(buffer , &header.protocolo , sizeof(header) );
-	memcpy(buffer+sizeof(header) , &esi.idEsi, sizeof(int) );
-	memcpy(buffer+sizeof(header) + sizeof(int) , &tipo, sizeof(enum tipoDeInstruccion) );
-	memcpy(buffer+sizeof(header) + sizeof(int) + sizeof(enum tipoDeInstruccion)  , &tamClave, sizeof(int) );
-	memcpy(buffer+sizeof(header) + sizeof(int) + sizeof(enum tipoDeInstruccion) + sizeof(int) , &esi.clave, tamClave );
-
-
-	int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
-
-	while(estado !=0){
-		error_show("no se pudo preguntar por el estado de la clave al planificador, volviendo a intentar");
-		estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(int) + sizeof(int) + tamClave);
-		}
-	free(buffer);
-
-	buffer = malloc(sizeof(int));
-	recibirMensaje(socketPlanificador,sizeof(header),(void *) &header.protocolo);
-	recibirMensaje(socketPlanificador,sizeof(int),(void *) &buffer );
-
-	if (*buffer == 0){
-			free(buffer);
-			return 0;
-		} else {
-			free(buffer);
-			return 1;
-		}
-}
 
 void recibirConexiones() {
 
@@ -371,25 +415,22 @@ void recibirConexiones() {
 	while (1)
 		{
 			socketAceptado = esperarYaceptar(socketCoordinador ,&dirAceptado);
-			esESIoInstancia(socketAceptado,dirAceptado);
+			esESIoInstancia(socketAceptado);
 		}
 }
 
-void esESIoInstancia (socket_t socketAceptado,struct sockaddr_in dir)
+void esESIoInstancia (socket_t socketAceptado)
 {
 
-	header* header;
-	recibirMensaje(socketAceptado,1,(void *) &header);
+	header* Header;
+	recibirMensaje(socketAceptado,sizeof(header),(void *) &Header);
 
-	switch(header->protocolo){
-
+	switch(Header->protocolo){
 	case 2:
 		registrarInstancia(socketAceptado);
-		//registrarInstancia es quien verifica que las id sean 0 (instancia nueva) o una id asignada de una instancia que se reconecta
 		break;
 	case 3:
 		registrarEsi(socketAceptado);
-		//ahora registrar esi, ademas de registrarla crea un hilo que se encargara de atenderla
 		break;
 	default:
 		break;
@@ -411,20 +452,22 @@ void registrarEsi(socket_t socket){
 
 void registrarInstancia(socket_t socket)
 {
-	int * tamMensj = NULL;
-	int idInstancia;
+	tamNombreInstancia_t * tamNombre = NULL;
+	instancia_id * idInstancia;
 	Instancia * instanciaRecibida = malloc(sizeof(Instancia));
 	instanciaRecibida->esiTrabajando = NULL;
 	int enviado;
+	pthread_t hiloInstancia;
 
 	char * nombre = NULL;
 	recibirMensaje(socket,sizeof(int),(void*) &idInstancia );
 
-	if(idInstancia == 0){
+	if(*idInstancia == 0){
 
-		recibirMensaje(socket,sizeof(int),(void *) &tamMensj );
-		recibirMensaje(socket,*tamMensj,(void *) &nombre );
+		recibirMensaje(socket,sizeof(int),(void *) &tamNombre );
+		recibirMensaje(socket,*tamNombre,(void *) &nombre );
 
+		//¿ese strcpy no tiene problema con pasarle el puntero "nombre" ?
 		strcpy(instanciaRecibida->nombre , nombre);
 		instanciaRecibida->idinstancia = cantInstancias + 1;
 		instanciaRecibida->socket = socket;
@@ -437,90 +480,98 @@ void registrarInstancia(socket_t socket)
 		header.protocolo = 5;
 		cantEntradas_t cantEntradas = config_get_int_value(configuracion, "CantEntradas");
 		tamEntradas_t tamEntradas = config_get_int_value(configuracion, "TamEntradas");
-		int * buffer = malloc(sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
+
+		int * buffer = malloc(sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) );
 
 		memcpy(buffer , &header.protocolo , sizeof(header) );
 		memcpy(buffer+sizeof(header) , &instanciaRecibida->idinstancia , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(int) , &cantEntradas , sizeof(cantEntradas) );
-		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(cantEntradas) , &tamEntradas , sizeof(tamEntradas) );
+		memcpy(buffer+sizeof(header)+sizeof(int) , &cantEntradas , sizeof(cantEntradas_t) );
+		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(cantEntradas_t) , &tamEntradas , sizeof(tamEntradas_t) );
 
-		enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
+		enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) );
 
 
 		while(enviado != 0){
 			error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
-			enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
+			enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) );
 		}
 		//TODO hacer free en algun lugar de la instancia
 		free(buffer);
 
+		pthread_create(&hiloInstancia, NULL, (void*) escucharInstancia, instanciaRecibida);
+
 	}else{
 
-		auxiliarIdInstancia = idInstancia;
+		auxiliarIdInstancia = *idInstancia;
 		instanciaRecibida = list_find(listaInstancias,(void *) buscarInstanciaPorId);
 
 		instanciaRecibida->socket = socket;
 
 		header header;
 		header.protocolo = 4;
+
 		cantEntradas_t cantEntradas = config_get_int_value(configuracion, "CantEntradas");
 		tamEntradas_t tamEntradas = config_get_int_value(configuracion, "TamEntradas");
 
 		t_list * listaDeClaves = list_filter(listaClaves,(void*) buscarClaves );
 
-		int i,tamTodasClaves = 0,cantClaves = list_size(listaDeClaves),tamClave;
+		int i;
+		tamClave_t tamClave;
+		cantClaves_t cantClaves = list_size(listaDeClaves);
 		char * claveAux;
 
-		for(i=0; i<cantClaves ;i++){
-			claveAux = list_get(listaDeClaves, i);
-			tamTodasClaves += sizeof(claveAux);
-		}
-
-		int * buffer = malloc(sizeof(header) + sizeof(cantEntradas) + sizeof(tamEntradas) + sizeof(int)*2 + tamTodasClaves );
+		int * buffer = malloc(sizeof(header) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) + sizeof(cantClaves_t));
 
 		memcpy(buffer , &header.protocolo , sizeof(header) );
-		memcpy(buffer+sizeof(header) , &cantEntradas , sizeof(cantEntradas) );
-		memcpy(buffer+sizeof(header)+sizeof(cantEntradas) , &tamEntradas , sizeof(tamEntradas) );
-		memcpy(buffer+sizeof(header)+sizeof(cantEntradas)+sizeof(tamEntradas) , &cantClaves , sizeof(int) );
+		memcpy(buffer+sizeof(header) , &cantEntradas , sizeof(cantEntradas_t) );
+		memcpy(buffer+sizeof(header)+sizeof(cantEntradas_t) , &tamEntradas , sizeof(tamEntradas_t) );
+		memcpy(buffer+sizeof(header)+sizeof(cantEntradas_t)+sizeof(tamEntradas_t) , &cantClaves , sizeof(cantClaves_t) );
 
-		int tamanioClaveIteracion = 0, tamanioIntIteracion = 0;
-
-		for(i=0; i<cantClaves ;i++){
-			claveAux = list_get(listaDeClaves, i);
-			tamClave = sizeof(claveAux);
-
-			memcpy(buffer+sizeof(header)+sizeof(cantEntradas)+sizeof(tamEntradas)+sizeof(cantClaves) + tamanioClaveIteracion + tamanioIntIteracion, &tamClave , sizeof(int) );
-			memcpy(buffer+sizeof(header)+sizeof(cantEntradas)+sizeof(tamEntradas)+sizeof(cantClaves)+sizeof(tamClave)+ tamanioClaveIteracion + tamanioIntIteracion, claveAux, tamClave );
-
-			tamanioClaveIteracion += sizeof(claveAux);
-			tamanioIntIteracion += sizeof(tamClave);
-		}
-
-		enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
-
+		enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) + sizeof(cantClaves_t));
 
 		while(enviado != 0){
 			error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
-			enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas) + sizeof(tamEntradas) );
+			enviado = enviarBuffer (instanciaRecibida->socket , buffer ,sizeof(header) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) + sizeof(cantClaves_t));
 		}
+
+		free(buffer);
+
+		for(i=0; i<cantClaves ;i++){
+
+			claveAux = list_get(listaDeClaves, i);
+			tamClave = string_length(claveAux);
+
+			buffer = malloc(tamClave + sizeof(tamClave_t) );
+
+			memcpy(buffer, &tamClave , sizeof(tamClave_t) );
+			memcpy(buffer, claveAux, tamClave );
+
+			enviado = enviarBuffer (instanciaRecibida->socket , buffer , tamClave + sizeof(tamClave_t) );
+
+			while(enviado != 0){
+				error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
+				enviado = enviarBuffer (instanciaRecibida->socket , buffer , tamClave + sizeof(tamClave_t) );
+			}
+			free(buffer);
+		}
+
 	}
 }
 
 int buscarClaves(char * clave){
 	Instancia * instancia = dictionary_get( tablaDeClaves, clave);
-	if(instancia->idinstancia ==  auxiliarIdInstancia){
+	if(instancia->idinstancia ==  auxiliarIdInstancia)
 		return 1;
-	}else{
+	else
 		return 0;
-	}
+
 }
 
 int buscarInstanciaPorId(Instancia * instancia){
-	if(instancia->idinstancia == auxiliarIdInstancia){
+	if(instancia->idinstancia == auxiliarIdInstancia)
 		return 1;
-	}else{
+	else
 		return 0;
-	}
 
 }
 
@@ -537,7 +588,6 @@ Instancia * algoritmoUsado(void){
 
 	return instancia;
 }
-
 
 Instancia * algoritmoEquitativeLoad(void){
 
@@ -630,6 +680,17 @@ int crearConfiguracion(char* archivoConfig){
 	tablaDeClaves = dictionary_create();
 
 	pthread_mutex_init (&mListaInst, NULL);
+
+	pthread_mutex_init(&mEsiActual,NULL);
+
+	pthread_mutex_init (&mRespuestaInstancia, NULL);
+	pthread_cond_init (&sbRespuestaInstancia, NULL);
+
+	pthread_mutex_init (&mRespuestaPlanificador,NULL);
+	pthread_cond_init (&sbRespuestaPlanificador,NULL);
+
+	pthread_mutex_init (&mConsultarPorClave,NULL);
+	pthread_cond_init (&sbConsultarPorClave,NULL);
 
 	logOperaciones = log_create("archivoLog.txt","logOperaciones",1,LOG_LEVEL_INFO);
 
