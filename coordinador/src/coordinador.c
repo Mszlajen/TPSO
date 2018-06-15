@@ -18,6 +18,17 @@ t_dictionary * tablaDeClaves = NULL;
 socket_t  socketPlanificador;
 socket_t  socketCoordinador;
 
+/*
+ * Primero hago está aclaración, por lo que encontre de pthread_cond
+ * son más parecidos a los monitores que a los semaforos.
+ * Segundo, me parece que no estás entendiendo bien como usarlos, ahora
+ * mismo todos los hilos de instancias se quedan esperando por el mismo
+ * cond y no hay manera de decirle a la instancia particular que devolvio
+ * el algoritmo que se desbloquee (El cond te sirve para esto, pero no de
+ * está manera).
+ * Tambien me parece que hay recursos sincronizados de más pero no estoy seguro.
+ * [MATI]
+ */
 pthread_mutex_t mRespuestaPlanificador;
 pthread_cond_t sbRespuestaPlanificador;
 pthread_mutex_t mListaInst;
@@ -69,6 +80,13 @@ void hiloPlanificador (socket_t socket){
 
 	while(1){
 
+	/*
+	 * Acá vas a tener un problema que está sincronización no te va a salvar
+	 * de que el mensaje para el comando status te puede llegar en cualquier
+	 * momento y vos tendrias que estár escuchando por ese mensaje constantemente
+	 * ademas de que habiamos quedado que atendiamos las desconexiones apenas
+	 * pasan.
+	 */
 	pthread_mutex_lock(&mConsultarPorClave);
 	pthread_cond_wait(&sbConsultarPorClave, &mConsultarPorClave);
 
@@ -150,7 +168,17 @@ void hiloEsi (Esi * esi) {
 	enum instruccion * instr = NULL;
 
 	while(1){
-
+	/*
+	 * Esto está mal, lo hace ahora es:
+	 * -entrar en el while 1
+	 * -comprobar que el ESI está conectado EN ESE INSTANTE
+	 * -[Suponiendo que justo no se desconecto] bloquear el hilo hasta que haya un cambio en el socket
+	 * -Seguir ejecutando sin saber si ese cambio fue que llego un mensaje o que se desconecto el socket
+	 * Para solucionarlo, tenes que poner un listen antes del if para que bloquee
+	 * hasta haber un cambio o poner el primer recibirMensaje en el if y consultar
+	 * su valor de retorno.
+	 * [MATI]
+	 */
 	if( !seDesconectoSocket(esi->socket) ){
 
 		recibirMensaje(esi->socket,sizeof(header),(void *) &header);
@@ -192,12 +220,20 @@ void hiloEsi (Esi * esi) {
 			}
 		}else{
 			error_show("se desconecto socket del esi, no se pudo recibir la instruccion ");
-			//puse un error, pero no estoy seguro respecto de cual es el trato indicado para la desconecxion de un esi
+			//puse un error, pero no estoy seguro respecto de cual es el trato indicado para la desconexion de un esi
+			/*
+			 * Sí, va un error y te olvidas que ese ESI existe (o sea eliminas la información relacionada).
+			 * [MATI]
+			 */
 		}
 	}
 }
 
-
+/*
+ * Si entiendo bien, esto envia la clave a la instancia cuando recibe un get, no?
+ * Porque eso está mal, un get no llega a las instancias recien cuando se hace
+ * set se crea la información de la clave en la instancia.
+ */
 void tratarGetInstancia(Instancia * instancia){
 	tamClave_t * tamClave = NULL;
 	header header;
@@ -212,6 +248,11 @@ void tratarGetInstancia(Instancia * instancia){
 		memcpy(buffer+sizeof(header)+sizeof(enum instruccion),tamClave,sizeof(tamClave_t));
 		memcpy(buffer+sizeof(header)+sizeof(enum instruccion)+sizeof(tamClave_t),instancia->esiTrabajando->clave,*tamClave);
 
+		/*
+		 * Acá podes usar directamente el resultado de enviarBuffer en el while para evitar repetir codigo
+		 * (pero esto no está mal, solo tiene cosas de más)
+		 * [MATI]
+		 */
 		enviado = enviarBuffer(instancia->socket,buffer,sizeof(header) + sizeof(enum instruccion) + sizeof(tamClave_t) + *tamClave);
 
 		while(enviado !=0 ){
@@ -243,6 +284,11 @@ void tratarGetEsi(Esi * esi){
 	}
 	else
 	{
+		/*
+		 * Acá puede llegar a ser al reves, primero consulta
+		 * que el set sea valido y despues asigna la instancia
+		 * eso dependera de los test.
+		 */
 		Instancia * instancia = algoritmoUsado();
 		dictionary_put(tablaDeClaves, esi->clave, &instancia);
 
@@ -288,7 +334,10 @@ void tratarStoreInstancia(Instancia * instancia) {
 		estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) + *tamClave + sizeof(tamClave_t) );
 	}
 	free(buffer);
-
+	/*
+	 * El %d en formato es para double, te va funcionar pero te va a imprimir los id con coma
+	 * [MATI]
+	 */
 	log_info(logOperaciones, "ESI %d STORE %s " , instancia->esiTrabajando->idEsi , instancia->esiTrabajando->clave);
 }
 
@@ -400,7 +449,7 @@ void setearEsiActual(Esi esi){
 void recibirConexiones() {
 
 	socket_t socketAceptado;
-	struct sockaddr_in dirAceptado;
+	struct sockaddr_in dirAceptado; //¿Esto para qué lo queres? [MATI]
 
 	while (1)
 		{
@@ -601,6 +650,15 @@ Instancia * algoritmoEquitativeLoad(void){
 	 * desconectaron dos instancias?
 	 * ¿Qué pasa si reinicio el contador pero antes de volver
 	 * a llamar al algoritmo se conectaron más instancias?
+	 * [MATI]
+	 *
+	 * Esto sigue mal, así que lo voy a decir de otra manera:
+	 * El valor de las listas puede cambiar entre llamado y llamado por
+	 * lo que la comprobación de que el puntero este en un valor valido
+	 * tendria que ser antes de usar el algoritmo no despues.
+	 * Y así como está ahora no vas a poder implementar la respuesta de
+	 * status porque el llamar a la función que cambia el estado del
+	 * puntero y con status eso no deberia pasar.
 	 * [MATI]
 	 */
 	return instancia;
