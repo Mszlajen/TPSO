@@ -119,10 +119,10 @@ void leerSiguienteInstruccion(char** argv)
 	char * operacion;
 
 			while (*leido != '/0' || !feof(programa) || *leido != '\n' ){
-				fread(leido, sizeof("\n"),1,programa);
+				fread(leido, sizeof(char),1,programa);
 				string_append(*leido, *linea);
 			}
-			operacion = string_split(*linea,"");
+			operacion = string_split(*leido," ");
 
 			instr = dictionary_get(tablaDeInstrucciones,operacion[0]);
 			clave = operacion[1];
