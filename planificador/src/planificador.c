@@ -96,26 +96,20 @@ void ejecucionDeESI(ESI* esi)
 
 	free(resultado);
 
-	if(res == fallo)
-	{
-		terminarEjecucionESI(esi);
-		free(ultimaConsulta -> clave);
-		free(ultimaConsulta);
-		ultimaConsulta = NULL;
-		return;
-	}
-
 	switch(ultimaConsulta -> tipo)
 	{
 		case liberadora:
-			pthread_mutex_lock(&mBloqueados);
-			pthread_mutex_lock(&mReady);
-			ESI* esiLiberado = liberarClave(ultimaConsulta -> clave);
-			if(esiLiberado)
-				listarParaEjecucion(esiLiberado);
-			pthread_mutex_unlock(&mBloqueados);
-			pthread_mutex_unlock(&mReady);
-			printf("Se libero la clave %s del ESI %i", ultimaConsulta -> clave, esi -> id);
+			if(ultimaConsulta -> resultado)
+			{
+				pthread_mutex_lock(&mBloqueados);
+				pthread_mutex_lock(&mReady);
+				ESI* esiLiberado = liberarClave(ultimaConsulta -> clave);
+				if(esiLiberado)
+					listarParaEjecucion(esiLiberado);
+				pthread_mutex_unlock(&mBloqueados);
+				pthread_mutex_unlock(&mReady);
+				printf("Se libero la clave %s del ESI %i", ultimaConsulta -> clave, esi -> id);
+			}
 			break;
 		case bloqueante:
 			//En realidad acá están mal usados los semaforos porque no están pegados a la region critica.
@@ -137,7 +131,7 @@ void ejecucionDeESI(ESI* esi)
 			break;
 	}
 
-	if(res == fin)
+	if(res == fin || res == fallo)
 	{
 		finalizarESI(esi);
 		if(hayAvisoBloqueo())
