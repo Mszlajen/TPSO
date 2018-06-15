@@ -10,6 +10,7 @@ char * clave;
 char * valor;
 
 int id;
+int resultadoSocket = 1;
 
 int main(int argc, char **argv) {
 	inicializacion(argc, argv);
@@ -20,11 +21,28 @@ int main(int argc, char **argv) {
 
 	programa = abrirArchivoLectura(argv[1]);
 
-	leerSiguienteInstruccion(argv);
+	while ("terminoejecucion"){         //falta
+		while(resultadoSocket){
 
-	enviarInstruccionCoord();
+			leerSiguienteInstruccion(argv);
 
-	esperarRespuestaCoord();
+			esperarAvisoEjecucion();
+
+			enviarInstruccionCoord();
+
+			recibirRespuestaCoord();
+		}
+
+		if (ESIEstaEnLista(esi, colasBloqueados)){
+
+			esperarAvisoEjecucion();
+
+			enviarInstruccionCoord();
+
+			recibirRespuestaCoord();
+		}
+		//if termino ejecucion avisarPlanificador
+	}
 
 	puts("Salio todo bien\n");
 	liberarRecursos();
@@ -119,10 +137,10 @@ void leerSiguienteInstruccion(char** argv)
 	char * operacion;
 
 			while (*leido != '/0' || !feof(programa) || *leido != '\n' ){
-				fread(leido, sizeof("\n"),1,programa);
+				fread(leido, sizeof(char),1,programa);
 				string_append(*leido, *linea);
 			}
-			operacion = string_split(*linea,"");
+			operacion = string_split(*leido," ");
 
 			instr = dictionary_get(tablaDeInstrucciones,operacion[0]);
 			clave = operacion[1];
@@ -147,6 +165,10 @@ void leerSiguienteInstruccion(char** argv)
 		 * [MATI]
 		 */
 	}
+
+void esperarAvisoEjecucion(){
+	listen(socketPlan,5);
+}
 
 void enviarInstruccionCoord()
 {
@@ -196,9 +218,8 @@ void enviarInstruccionCoord()
 				}
 }
 
-void esperarRespuestaCoord(){
+void recibirRespuestaCoord(){
 	int * buffer = malloc(sizeof(header)+sizeof(int));
-	recibirMensaje(socketCoord,sizeof(header)+sizeof(int),(void*) &buffer);
-
+	resultadoSocket = recibirMensaje(socketCoord,sizeof(header)+sizeof(int),(void*) &buffer;
 }
 
