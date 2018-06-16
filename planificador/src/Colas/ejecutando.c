@@ -1,6 +1,8 @@
 #include "ejecutando.h"
 
 ESI* ejecutando = NULL;
+char* claveAvisoBloqueo;
+
 
 void ponerESIAEjecutar(ESI* esi)
 {
@@ -20,6 +22,21 @@ int esESIEnEjecucion(ESI_id idESI)
 ESI* ESIEjecutando ()
 {
 	return ejecutando;
+}
+
+void settearAvisoBloqueo(char* clave)
+{
+	claveAvisoBloqueo = clave;
+}
+
+booleano hayAvisoBloqueo()
+{
+	return claveAvisoBloqueo != NULL;
+}
+
+char* getClaveAvisoBloqueo()
+{
+	return claveAvisoBloqueo;
 }
 
 void cerrarEjecutando()

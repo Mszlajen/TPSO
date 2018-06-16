@@ -47,9 +47,10 @@ void escucharPorESI ();
 void comunicacionCoord(socket_t);
 void escucharPorFinESI();
 
-void comandoBloquear(char**);
-void comandoDesbloquear(char**);
-void comandoListar(char**);
+void comandoBloquear(char*, char*);
+void comandoDesbloquear(char*);
+void comandoListar(char*);
 
 int max (int, int);
+void terminarEjecucionESI(ESI*);
 #endif /* PLANIFICADOR_H_ */
