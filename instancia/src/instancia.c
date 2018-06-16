@@ -30,7 +30,7 @@ void inicializar(char* dirConfig, socket_t *socketCoord)
 	conectarConCoordinador(socketCoord);
 	recibirRespuestaHandshake(*socketCoord);
 	//Supuestamente al usar calloc, el valor inicial va a ser NULL de una.
-	tablaDeControl = calloc(sizeof(infoEntrada_t) * cantidadEntradas);
+	tablaDeControl = calloc(cantidadEntradas, sizeof(infoEntrada_t));
 }
 
 void dump()
@@ -65,7 +65,7 @@ void procesamientoInstrucciones(socket_t socketCoord)
 			break;
 		case compactacion:
 			break;
-		default:
+		case get:
 			/*
 			 * No me gustan los warnings al pepe.
 			 */
@@ -372,37 +372,56 @@ void desasociarEntradas(cantEntradas_t base, cantEntradas_t cantidad)
 
 void algoritmoDeReemplazo()
 {
+	infoClave_t* claveAReemplazar = NULL;
 	switch(obtenerAlgoritmoReemplazo())
 	{
 	case Circular:
-		reemplazoCircular();
+		claveAReemplazar = reemplazoCircular();
 		break;
 	case LRU:
 	case BSU:
 		break;
 	}
+	free(tablaDeControl[claveAReemplazar->entradaInicial].clave);
+	tablaDeControl[claveAReemplazar->entradaInicial].clave = NULL;
+	destruirClave(tablaDeControl[claveAReemplazar->entradaInicial].clave);
 }
 
-void reemplazoCircular()
+/*
+ * En todos los algoritmos asumo que existe al menos una clave reemplazable.
+ */
+
+infoClave_t* reemplazoCircular()
 {
-	infoClave_t* claveAReemplazar;
 	do
 	{
-		if(dictionary_has_key(infoClaves, tablaDeControl[punteroReemplazo].clave))
-			claveAReemplazar = dictionary_get(infoClaves, tablaDeControl[punteroReemplazo].clave);
-		else
+		if(tablaDeControl[punteroReemplazo].clave &&
+			((infoClave_t*) dictionary_get(infoClaves, tablaDeControl[punteroReemplazo].clave)) -> tamanio < tamanioEntradas)
 		{
 			incrementarPunteroReemplazo();
-			break;
+			continue;
 		}
-
-		if(claveAReemplazar -> tamanio < tamanioEntradas)
-			break;
 		incrementarPunteroReemplazo();
-	}while(1); //Asumo que va a existir al menos una clave con valor atomica para reemplazar.
+		break;
+	}while(1);
+	return (infoClave_t*) dictionary_get(infoClaves, tablaDeControl[punteroReemplazo].clave);
+}
 
-	destruirClave(tablaDeControl[punteroReemplazo].clave);
-	tablaDeControl[punteroReemplazo].clave = NULL;
+infoClave_t* reemplazoLRU()
+{
+	char* nombreClaveAReemplazar = NULL;
+	int tiempoMayor = 0;
+	void obtenerClaveAReemplazar(infoClave_t* infoClave)
+	{
+		if(infoClave -> tamanio < tamanioEntradas && infoClave -> tiempoUltimoUso > tiempoMayor)
+		{
+			nombreClaveAReemplazar = tablaDeControl[infoClave -> entradaInicial].clave;
+			tiempoMayor = infoClave -> tiempoUltimoUso;
+		}
+	}
+
+	dictionary_iterator(infoClaves, obtenerClaveAReemplazar);
+	return dictionary_get(infoClaves, nombreClaveAReemplazar);
 }
 
 void enviarResultadoEjecucion(socket_t socketCoord, enum resultadoEjecucion res)
@@ -508,6 +527,11 @@ void incrementarPunteroReemplazo()
 int min (int primerValor, int segundoValor)
 {
 	return primerValor < segundoValor? primerValor : segundoValor;
+}
+
+int max (int primerValor, int segundoValor)
+{
+	return primerValor > segundoValor? primerValor : segundoValor;
 }
 
 void liberarRecursosGlobales()

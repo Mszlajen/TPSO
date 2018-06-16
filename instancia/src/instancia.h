@@ -56,7 +56,8 @@ void algoritmoDeReemplazo();
 enum resultadoEjecucion actualizarValorMayorTamanio(char*, infoClave_t*, char*, tamValor_t);
 enum resultadoEjecucion actualizarValorMenorTamanio(char*, infoClave_t*, char*, tamValor_t);
 
-void reemplazoCircular();
+infoClave_t* reemplazoCircular();
+infoClave_t* reemplazoLRU();
 
 booleano almacenarID(instancia_id);
 void enviarResultadoEjecucion(socket_t, enum resultadoEjecucion);
