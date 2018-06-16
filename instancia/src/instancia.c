@@ -300,7 +300,7 @@ enum resultadoEjecucion actualizarValorMayorTamanio(char* clave, infoClave_t* in
 	 * Si quiero actualizar el valor de una clave por otro que requiere más entradas
 	 * elimino la información de esa Clave y le busco un lugar como si fuera una clave
 	 * nueva.
-	 * Habria que ver si tiene espacio contiguo para creecer inmediatamente sin hacer
+	 * Habria que ver si tiene espacio contiguo para creqcer inmediatamente sin hacer
 	 * todo el movimiento.
 	 */
 	cantEntradas_t cantEntradasClave = tamValorACantEntradas(informacionClave -> tamanio);
@@ -379,7 +379,10 @@ void algoritmoDeReemplazo()
 		claveAReemplazar = reemplazoCircular();
 		break;
 	case LRU:
+		claveAReemplazar = reemplazoLRU();
+		break;
 	case BSU:
+		claveAReemplazar = reemplazoBSU();
 		break;
 	}
 	free(tablaDeControl[claveAReemplazar->entradaInicial].clave);
@@ -417,6 +420,23 @@ infoClave_t* reemplazoLRU()
 		{
 			nombreClaveAReemplazar = tablaDeControl[infoClave -> entradaInicial].clave;
 			tiempoMayor = infoClave -> tiempoUltimoUso;
+		}
+	}
+
+	dictionary_iterator(infoClaves, obtenerClaveAReemplazar);
+	return dictionary_get(infoClaves, nombreClaveAReemplazar);
+}
+
+infoClave_t* reemplazoBSU()
+{
+	char* nombreClaveAReemplazar = NULL;
+	tamValor_t tamMayor = 0;
+	void obtenerClaveAReemplazar(infoClave_t* infoClave)
+	{
+		if(infoClave -> tamanio < tamanioEntradas && infoClave -> tamanio > tamMayor)
+		{
+			nombreClaveAReemplazar = tablaDeControl[infoClave -> entradaInicial].clave;
+			tamMayor = infoClave -> tiempoUltimoUso;
 		}
 	}
 

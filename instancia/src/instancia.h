@@ -58,6 +58,7 @@ enum resultadoEjecucion actualizarValorMenorTamanio(char*, infoClave_t*, char*, 
 
 infoClave_t* reemplazoCircular();
 infoClave_t* reemplazoLRU();
+infoClave_t* reemplazoBSU();
 
 booleano almacenarID(instancia_id);
 void enviarResultadoEjecucion(socket_t, enum resultadoEjecucion);
