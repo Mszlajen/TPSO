@@ -22,8 +22,9 @@ FILE* abrirArchivoLectura(char*);
 void enviarHandshake (socket_t);
 void liberarRecursos();
 void salirConError(char*);
+void esperarAvisoEjecucion();
 void leerSiguienteInstruccion(char** argv);
 void enviarInstruccionCoord();
-void esperarRespuestaCoord();
+void recibirRespuestaCoord();
 
 #endif /* ESI_H_ */
