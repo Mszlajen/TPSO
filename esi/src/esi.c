@@ -11,6 +11,8 @@ char * valor;
 
 int id;
 int resultadoSocket = 1;
+void * resultEjecucion = malloc(sizeof(header));
+
 
 int main(int argc, char **argv) {
 	inicializacion(argc, argv);
@@ -21,28 +23,31 @@ int main(int argc, char **argv) {
 
 	programa = abrirArchivoLectura(argv[1]);
 
-	while ("terminoejecucion"){         //falta
-		while(resultadoSocket){
+	while (1){
+		esperarAvisoEjecucion();
 
+		leerSiguienteInstruccion(argv);
+
+		enviarInstruccionCoord();
+
+		recibirRespuestaCoord();
+
+		if (resultadoSocket == 0 && resultEjecucion == exito){
 			leerSiguienteInstruccion(argv);
 
-			esperarAvisoEjecucion();
+			//avisar Planificador, si no hay más instrucciones aviso q terminó
 
-			enviarInstruccionCoord();
+			}else if (resultadoSocket == -1 && resultEjecucion == fallo){
 
-			recibirRespuestaCoord();
+			//avisar Planificador que falló
+
+			}else if (resultEjecucion == bloqueo){
+
+			//avisar Planificador que está bloqueado
+
+			}else if (resultadoSocket == 1){
+				printf("Se cerró el Socket durante la ejecución.");
 		}
-
-		if (ESIEstaEnLista(esi, colasBloqueados)){
-
-			esperarAvisoEjecucion();
-
-			enviarInstruccionCoord();
-
-			recibirRespuestaCoord();
-		}
-		//if termino ejecucion avisarPlanificador
-	}
 
 	puts("Salio todo bien\n");
 	liberarRecursos();
@@ -220,6 +225,7 @@ void enviarInstruccionCoord()
 
 void recibirRespuestaCoord(){
 	int * buffer = malloc(sizeof(header)+sizeof(int));
-	resultadoSocket = recibirMensaje(socketCoord,sizeof(header)+sizeof(int),(void*) &buffer;
+	resultadoSocket = recibirMensaje(socketCoord,sizeof(header)+sizeof(int),(void*) &buffer);
+	memcpy(resultEjecucion, &buffer, sizeof(enum resultadoEjecucion));
 }
 
