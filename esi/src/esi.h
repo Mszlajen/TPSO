@@ -28,3 +28,4 @@ void enviarInstruccionCoord();
 void recibirRespuestaCoord();
 
 #endif /* ESI_H_ */
+
