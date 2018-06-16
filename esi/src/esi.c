@@ -228,3 +228,4 @@ void recibirRespuestaCoord(){
 	resultadoSocket = recibirMensaje(socketCoord,sizeof(header)+sizeof(int),(void*) &buffer);
 	memcpy(resultEjecucion, &buffer, sizeof(enum resultadoEjecucion));
 }
+
