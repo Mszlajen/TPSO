@@ -11,6 +11,16 @@ char * valor;
 
 int id;
 int resultadoSocket = 1;
+/*
+ * Esto falla porque la inicialización de una variable global solo
+ * puede ser algo constante.
+ * Igual, ya que estoy, escribiendo acá me parece que esto usa
+ * demasiadas variables globales para un programa monohilo. Lo
+ * más importante es que ande, de ultima lo arreglamos despues,
+ * pero si queres anda revisandolo porque es mala practica usar
+ * variables globales cuando no hace falta.
+ * [MATI]
+ */
 void * resultEjecucion = malloc(sizeof(header));
 
 
@@ -47,7 +57,9 @@ int main(int argc, char **argv) {
 
 			}else if (resultadoSocket == 1){
 				printf("Se cerró el Socket durante la ejecución.");
+			//terminar la ejecución [MATI]
 		}
+	}//Faltaba está llave [MATI]
 
 	puts("Salio todo bien\n");
 	liberarRecursos();
@@ -64,6 +76,12 @@ void inicializacion(int argc, char** argv)
 	if(configuracion == NULL)
 		salirConError("Fallo al abrir el archivo de lectura\n");
 
+	/*
+	 * Dejando de lado lo que puse más abajo sobre el pase string a instrucción.
+	 * Los diccionarios y las listas de las commons reciben una dirección al dato
+	 * como parametro y no el dato en sí (porque ese puntero es lo que almacenan).
+	 * [MATI]
+	 */
 	dictionary_put(tablaDeInstrucciones,"GET",get);
 	dictionary_put(tablaDeInstrucciones,"SET", set);
 	dictionary_put(tablaDeInstrucciones,"STORE", store);
@@ -137,11 +155,24 @@ void leerSiguienteInstruccion(char** argv)
 	 * no la cantidad de peticiones encoladas.
 	 * [MATI]
 	 */
+	/*
+	 * No hace falta usar un puntero para el leer caracter leido
+	 * con una variable char alcanza (a fread se lo pasas usando el
+	 * operador de dirección &).
+	 * Y linea te combiene declararla usando string_create() para
+	 * asegurarte que funcione bien con las otras funciones de las
+	 * commons (porque creo que esperando un string en memoria
+	 * dinamica).
+	 * string_split devuelve un char** pero ademas todo el proceso de
+	 * dividir la linea y demás la hace el parse vos nada más tenes que
+	 * pasarle la linea y te devuelve toda la información de la instrucción
+	 * [MATI]
+	 */
 	char * linea = "";
 	char * leido = "";
 	char * operacion;
 
-			while (*leido != '/0' || !feof(programa) || *leido != '\n' ){
+			while (*leido != '\0' || !feof(programa) || *leido != '\n' ){
 				fread(leido, sizeof(char),1,programa);
 				string_append(*leido, *linea);
 			}
@@ -171,6 +202,15 @@ void leerSiguienteInstruccion(char** argv)
 		 */
 	}
 
+/*
+ * Si queres dejar esto, dejalo pero para hacer una función
+ * que se llama en un solo lugar y que lo unico que hace es
+ * llamar otra función, bien podes escribir la otra función
+ * y escribir un comentario de qué hace.
+ * Tambien podes usar directamente recibirMensaje para que
+ * se bloquee esperando al planificador.
+ * [MATI]
+ */
 void esperarAvisoEjecucion(){
 	listen(socketPlan,5);
 }
@@ -182,6 +222,13 @@ void enviarInstruccionCoord()
 	int * buffer;
 	header.protocolo = 8;
 	switch(*instr){
+			/*
+			 * Acá hay muchos int qué:
+			 * A - No sé entiende bien que son.
+			 * B - No deberian ser int, porque no usamos int
+			 * para enviar información atraves de sockets.
+			 * [MATI]
+			 */
 			case get:
 					buffer = malloc(sizeof(header) + sizeof(enum instruccion) + *tamClave + *tamValor + sizeof(int) * 3);
 
