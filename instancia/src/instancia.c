@@ -2,9 +2,14 @@
 
 char* tablaDeEntradas = NULL;
 t_dictionary* infoClaves = NULL;
+
+//Variables que podrian no ser globales
 infoEntrada_t* tablaDeControl = NULL;
 tamEntradas_t tamanioEntradas;
 cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
+//fin variables que podrian no ser globales
+
+pthread_mutex_t mEnEjecucion;
 
 int terminoEjecucion = 0;
 
@@ -31,11 +36,18 @@ void inicializar(char* dirConfig, socket_t *socketCoord)
 	recibirRespuestaHandshake(*socketCoord);
 	//Supuestamente al usar calloc, el valor inicial va a ser NULL de una.
 	tablaDeControl = calloc(cantidadEntradas, sizeof(infoEntrada_t));
+	pthread_mutex_init(&mEnEjecucion, NULL);
 }
 
 void dump()
 {
-
+	while(!terminoEjecucion)
+	{
+		sleep(obtenerIntervaloDeDump());
+		//Sincronizar con hilo principal
+		dictionary_iterator(infoClaves, guardarEnArchivo);
+		//Sincronizar con hilo principal
+	}
 }
 
 void procesamientoInstrucciones(socket_t socketCoord)
@@ -556,12 +568,21 @@ int max (int primerValor, int segundoValor)
 
 void liberarRecursosGlobales()
 {
+	void interacionLiberarNombres(void* infoClave)
+	{
+		free(tablaDeControl[((infoClave_t*) infoClave) -> entradaInicial].clave);
+	}
+
+	if(infoClaves)
+	{
+		dictionary_iterator(infoClaves,interacionLiberarNombres);
+		dictionary_destroy_and_destroy_elements(infoClaves, destruirInfoClave);
+	}
 	if(tablaDeControl)
 		free(tablaDeControl);
 	if(tablaDeEntradas)
 		free(tablaDeEntradas);
-	if(infoClaves)
-		dictionary_destroy_and_destroy_elements(infoClaves, destruirInfoClave);
+	pthread_mutex_destroy(&mEnEjecucion);
 }
 
 void salirConError(char* error)
