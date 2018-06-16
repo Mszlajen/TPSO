@@ -2,7 +2,7 @@
 
 char* tablaDeEntradas = NULL;
 t_dictionary* infoClaves = NULL;
-infoEntrada* tablaDeControl = NULL;
+infoEntrada_t* tablaDeControl = NULL;
 tamEntradas_t tamanioEntradas;
 cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
 
@@ -29,10 +29,8 @@ void inicializar(char* dirConfig, socket_t *socketCoord)
 	infoClaves = dictionary_create();
 	conectarConCoordinador(socketCoord);
 	recibirRespuestaHandshake(*socketCoord);
-	tablaDeControl = malloc(sizeof(infoEntrada) * cantidadEntradas);
-	int i;
-	for(i = 0; i < cantidadEntradas; i++)
-		tablaDeControl[i].clave = NULL;
+	//Supuestamente al usar calloc, el valor inicial va a ser NULL de una.
+	tablaDeControl = calloc(sizeof(infoEntrada_t) * cantidadEntradas);
 }
 
 void dump()
@@ -221,7 +219,7 @@ enum resultadoEjecucion instruccionStore(instruccion_t* instruccion)
 {
 	if(dictionary_has_key(infoClaves, instruccion -> clave))
 	{
-		infoClave *clave = dictionary_get(infoClaves, instruccion -> clave);
+		infoClave_t *clave = dictionary_get(infoClaves, instruccion -> clave);
 		clave -> tiempoUltimoUso = 0;
 		if(guardarEnArchivo(clave))
 			return exito;
@@ -231,7 +229,7 @@ enum resultadoEjecucion instruccionStore(instruccion_t* instruccion)
 
 enum resultadoEjecucion actualizarValorDeClave(char* clave, char* valor, tamValor_t tamValor)
 {
-	infoClave *informacionClave = dictionary_get(infoClaves, clave);
+	infoClave_t *informacionClave = dictionary_get(infoClaves, clave);
 	cantEntradas_t entradasNecesarias = tamValorACantEntradas(tamValor);
 	cantEntradas_t entradasUsadas = tamValorACantEntradas(informacionClave -> tamanio);
 	if(entradasNecesarias > entradasUsadas)
@@ -246,7 +244,7 @@ enum resultadoEjecucion actualizarValorDeClave(char* clave, char* valor, tamValo
 
 enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t tamValor)
 {
-	infoClave* nuevaClave = malloc(sizeof(infoClave));
+	infoClave_t* nuevaClave = malloc(sizeof(infoClave_t));
 
 	char* dirArchivo = obtenerDireccionArchivoMontaje(clave);
 	nuevaClave -> fd = open(dirArchivo, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH);
@@ -285,22 +283,25 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 	memcpy(tablaDeEntradas + posicion * tamanioEntradas, valor, tamValor);
 
 	tamValor_t tamValorRestante = tamValor;
+	char * claveAsociada = string_duplicate(clave);
 	int i;
 	for(i = 0; tamValorRestante > 0; i++)
 	{
-		tablaDeControl[posicion + i].clave = string_duplicate(clave);
+		tablaDeControl[posicion + i].clave = claveAsociada;
 		tamValorRestante -= tamanioEntradas;
 	}
 	dictionary_put(infoClaves, clave, nuevaClave);
 	return exito;
 }
 
-enum resultadoEjecucion actualizarValorMayorTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
+enum resultadoEjecucion actualizarValorMayorTamanio(char* clave, infoClave_t* informacionClave, char* valor, tamValor_t tamValor)
 {
 	/*
 	 * Si quiero actualizar el valor de una clave por otro que requiere más entradas
 	 * elimino la información de esa Clave y le busco un lugar como si fuera una clave
 	 * nueva.
+	 * Habria que ver si tiene espacio contiguo para creecer inmediatamente sin hacer
+	 * todo el movimiento.
 	 */
 	cantEntradas_t cantEntradasClave = tamValorACantEntradas(informacionClave -> tamanio);
 	desasociarEntradas(informacionClave -> entradaInicial, cantEntradasClave);
@@ -311,7 +312,7 @@ enum resultadoEjecucion actualizarValorMayorTamanio(char* clave, infoClave* info
 	return registrarNuevaClave(clave, valor, tamValor);
 }
 
-enum resultadoEjecucion actualizarValorMenorTamanio(char* clave, infoClave* informacionClave, char* valor, tamValor_t tamValor)
+enum resultadoEjecucion actualizarValorMenorTamanio(char* clave, infoClave_t* informacionClave, char* valor, tamValor_t tamValor)
 {
 	cantEntradas_t entradasRestantes = tamValorACantEntradas(tamValor);
 	//Coloco el nuevo valor en la tabla de entradas;
@@ -364,11 +365,9 @@ int haySuficienteEspacio(tamValor_t espacioRequerido)
 void desasociarEntradas(cantEntradas_t base, cantEntradas_t cantidad)
 {
 	int i;
+	free(tablaDeControl[base].clave);
 	for(i = 0; cantidad > i; i++)
-	{
-		free(tablaDeControl[base + i].clave);
 		tablaDeControl[base + i].clave = NULL;
-	}
 }
 
 void algoritmoDeReemplazo()
@@ -386,7 +385,7 @@ void algoritmoDeReemplazo()
 
 void reemplazoCircular()
 {
-	infoClave* claveAReemplazar;
+	infoClave_t* claveAReemplazar;
 	do
 	{
 		if(dictionary_has_key(infoClaves, tablaDeControl[punteroReemplazo].clave))
@@ -418,7 +417,7 @@ void incrementarUltimoUsoClaves()
 {
 	void incrementar(void *clave)
 	{
-		((infoClave*) clave) -> tiempoUltimoUso++;
+		((infoClave_t*) clave) -> tiempoUltimoUso++;
 	}
 	dictionary_iterator(infoClaves, incrementar);
 }
@@ -445,7 +444,7 @@ cantEntradas_t tamValorACantEntradas(tamValor_t v)
 
 void destruirClave(char* nombreClave)
 {
-	infoClave* claveADestruir = dictionary_get(infoClaves, nombreClave);
+	infoClave_t* claveADestruir = dictionary_get(infoClaves, nombreClave);
 	dictionary_remove(infoClaves, nombreClave);
 	destruirInfoClave(claveADestruir);
 	char* dirArchivo = string_from_format("%s%s", obtenerPuntoDeMontaje(), nombreClave);
@@ -453,27 +452,27 @@ void destruirClave(char* nombreClave)
 	free(dirArchivo);
 }
 
-void destruirInfoClave(infoClave* clave)
+void destruirInfoClave(infoClave_t* clave)
 {
 	destruirMappeado(clave);
 	close(clave -> fd);
 	free(clave);
 }
 
-int crearMappeado(infoClave* clave)
+int crearMappeado(infoClave_t* clave)
 {
 	clave -> mappeado = mmap(NULL, clave -> tamanio, PROT_WRITE, MAP_PRIVATE, clave -> fd, 0);
 	return clave -> mappeado == ERROR? ERROR : 0;
 }
 
-int destruirMappeado(infoClave* clave)
+int destruirMappeado(infoClave_t* clave)
 {
 	int resultado = munmap(clave -> mappeado, clave -> tamanio);
 	clave -> mappeado = NULL;
 	return resultado;
 }
 
-int guardarEnArchivo(infoClave* clave)
+int guardarEnArchivo(infoClave_t* clave)
 {
 	strcpy(clave -> mappeado, tablaDeEntradas + clave -> entradaInicial * tamanioEntradas);
 	return msync(clave -> mappeado, clave -> tamanio, MS_SYNC);

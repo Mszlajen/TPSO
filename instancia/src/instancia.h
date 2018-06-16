@@ -13,9 +13,10 @@
 
 #define nuevoID 0;
 
+
 typedef struct {
 	char* clave;
-} infoEntrada;
+} infoEntrada_t;
 
 typedef struct {
 	tamValor_t tamanio;
@@ -23,7 +24,7 @@ typedef struct {
 	int tiempoUltimoUso;
 	int fd;
 	void* mappeado;
-} infoClave;
+} infoClave_t;
 
 typedef struct {
 	enum instruccion tipo;
@@ -31,7 +32,6 @@ typedef struct {
 	tamValor_t tamValor;
 	char* valor;
 } instruccion_t;
-
 
 void inicializar(char*, socket_t*);
 void conectarConCoordinador(socket_t*);
@@ -53,8 +53,8 @@ cantEntradas_t encontrarEspacioLibreConsecutivo(tamValor_t);
 void desasociarEntradas (cantEntradas_t, cantEntradas_t);
 int haySuficienteEspacio(tamValor_t);
 void algoritmoDeReemplazo();
-enum resultadoEjecucion actualizarValorMayorTamanio(char*, infoClave*, char*, tamValor_t);
-enum resultadoEjecucion actualizarValorMenorTamanio(char*, infoClave*, char*, tamValor_t);
+enum resultadoEjecucion actualizarValorMayorTamanio(char*, infoClave_t*, char*, tamValor_t);
+enum resultadoEjecucion actualizarValorMenorTamanio(char*, infoClave_t*, char*, tamValor_t);
 
 void reemplazoCircular();
 
@@ -62,12 +62,12 @@ booleano almacenarID(instancia_id);
 void enviarResultadoEjecucion(socket_t, enum resultadoEjecucion);
 cantEntradas_t tamValorACantEntradas(tamValor_t);
 //Devuelve 0 en exito, ERROR si fallo
-int crearMappeado(infoClave*);
-int destruirMappeado(infoClave*);
-int guardarEnArchivo(infoClave*);
+int crearMappeado(infoClave_t*);
+int destruirMappeado(infoClave_t*);
+int guardarEnArchivo(infoClave_t*);
 tamValor_t leerDeArchivo(char*, char**);
 void destruirClave(char*);
-void destruirInfoClave(infoClave*);
+void destruirInfoClave(infoClave_t*);
 void incrementarPunteroReemplazo();
 int min (int, int);
 void liberarRecursosGlobales();
