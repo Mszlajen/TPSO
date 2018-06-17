@@ -45,12 +45,13 @@ instruccion_t* recibirInstruccionCoordinador(socket_t);
 void incrementarUltimoUsoClaves();
 enum resultadoEjecucion instruccionSet(instruccion_t*);
 enum resultadoEjecucion instruccionStore(instruccion_t*);
+enum resultadoEjecucion instruccionCompactacion();
 
 enum resultadoEjecucion actualizarValorDeClave(char*, char*, tamValor_t);
 enum resultadoEjecucion registrarNuevaClave(char*, char*, tamValor_t);
 
 cantEntradas_t encontrarEspacioLibreConsecutivo(tamValor_t);
-void desasociarEntradas (cantEntradas_t, cantEntradas_t);
+void asociarEntradas (cantEntradas_t, cantEntradas_t, char*);
 int haySuficienteEspacio(tamValor_t);
 void algoritmoDeReemplazo();
 enum resultadoEjecucion actualizarValorMayorTamanio(char*, infoClave_t*, char*, tamValor_t);

@@ -227,6 +227,46 @@ enum resultadoEjecucion instruccionSet(instruccion_t* instruccion)
 		return fallo;
 }
 
+enum resultadoEjecucion instruccionCompactacion()
+{
+	cantEntradas_t punteroVacio = 0, punteroEntrada = 0, distancia;
+	infoClave_t *claveAMover;
+	while(1)
+	{
+		//Busco el proximo espacio vacio
+		//Desde la segunda iteracion puntero vacio va a empezar en el valor correspondiente
+		for(;punteroVacio < cantidadEntradas && tablaDeControl[punteroVacio]; punteroVacio++);
+		//Compruebo si salio por encontrar un espacio vacio o porque termino de compactar
+		if(punteroVacio == cantidadEntradas)
+			break;
+
+		//Busco el proximo espacio ocupado empezando por el siguiente al vacio que ya encontre
+		punteroEntrada = punteroVacio + 1;
+		for(;punteroEntrada < cantidadEntradas && !tablaDeControl[punteroEntrada]; punteroEntrada++);
+		//Compruebo si salio por encontrar un espacio ocupado o porque termino de compactar
+		if(punteroEntrada == cantidadEntradas)
+			break;
+
+		//Recupero la información de la clave ocupando el espacio
+		claveAMover = dictionary_get(infoClaves, tablaDeControl[punteroEntrada]);
+
+		//Muevo la informacion de manera que empiece en el lugar vacio
+		memcpy(tablaDeEntradas + punteroVacio * tamanioEntradas,
+				tablaDeEntradas + punteroEntrada * tamanioEntradas,
+				claveAMover -> tamanio);
+
+		//Actualizo los valores de la tabla de control
+		distancia = punteroEntrada - punteroVacio;
+		asociarEntradas(punteroVacio, distancia, tablaDeControl[punteroEntrada]);
+		punteroVacio = claveAMover -> entradaInicial + tamValorACantEntradas(claveAMover->tamanio);
+		asociarEntradas(punteroVacio, distancia, NULL);
+
+		//Actualizo la información de la clave
+		claveAMover -> entradaInicial = punteroVacio;
+	}
+	return exito;
+}
+
 enum resultadoEjecucion instruccionStore(instruccion_t* instruccion)
 {
 	if(dictionary_has_key(infoClaves, instruccion -> clave))
@@ -316,7 +356,8 @@ enum resultadoEjecucion actualizarValorMayorTamanio(char* clave, infoClave_t* in
 	 * todo el movimiento.
 	 */
 	cantEntradas_t cantEntradasClave = tamValorACantEntradas(informacionClave -> tamanio);
-	desasociarEntradas(informacionClave -> entradaInicial, cantEntradasClave);
+	free(tablaDeControl[informacionClave->entradaInicial].clave);
+	asociarEntradas(informacionClave -> entradaInicial, cantEntradasClave, NULL);
 	destruirMappeado(informacionClave);
 	close(informacionClave -> fd); //¿Hace falta cerrar el archivo o gasto tiempo innecesariamente?
 	free(informacionClave);
@@ -332,12 +373,12 @@ enum resultadoEjecucion actualizarValorMenorTamanio(char* clave, infoClave_t* in
 
 	/*
 	 * Libero las entradas sobrantes.
-	 * En caso de que requiera la misma cantidad de entradas no va a entrar al for
-	 * haciendo que la función sirva para ese caso tambien.
+	 * En caso de que requiera la misma cantidad de entradas, entradas restantes va a ser 0
+	 * y asociarEntradas no va a hacer nada.
 	 */
 	cantEntradas_t finNuevaClave = informacionClave -> entradaInicial + tamValorACantEntradas(tamValor);
 	entradasRestantes = tamValorACantEntradas(informacionClave -> tamanio) - tamValorACantEntradas(tamValor);
-	desasociarEntradas(finNuevaClave, entradasRestantes);
+	asociarEntradas(finNuevaClave, entradasRestantes, NULL);
 
 	destruirMappeado(informacionClave);
 	informacionClave -> tamanio = tamValor;
@@ -374,12 +415,11 @@ int haySuficienteEspacio(tamValor_t espacioRequerido)
 	return entradasRequeridas <= entradasDisponibles;
 }
 
-void desasociarEntradas(cantEntradas_t base, cantEntradas_t cantidad)
+void asociarEntradas(cantEntradas_t base, cantEntradas_t cantidad, char* clave)
 {
 	int i;
-	free(tablaDeControl[base].clave);
 	for(i = 0; cantidad > i; i++)
-		tablaDeControl[base + i].clave = NULL;
+		tablaDeControl[base + i].clave = clave;
 }
 
 void algoritmoDeReemplazo()
