@@ -54,6 +54,10 @@ int main(int argc, char **argv) {
 
 	inicializacion(argv[1]);
 
+	/*
+	 * El IP escucha tambien viene por configuración
+	 * [MATI]
+	 */
 	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
 
 	 do {
@@ -87,13 +91,24 @@ void hiloPlanificador (socket_t socket){
 		if(FD_ISSET(socketPlanificador, &read))
 		{
 			if(seDesconectoSocket(socketPlanificador)){
-				//status
+
 			}
+			//status [MATI]
 		}
 		else if(FD_ISSET(socketConsultaClave, &read)){
+			/*
+			 * ¿Para qué es este mutex si el unico recurso que usas es el socket del planificador
+			 * que solo se usa en este hilo y bien podria ser un recurso local?
+			 * [MATI]
+			 */
 			pthread_mutex_lock(&mConsultarPorClave);
 			consultarPorClave();
 			pthread_mutex_unlock(&mConsultarPorClave);
+			/*
+			 * Estás señalizando la condición acá y dentro de la función
+			 * consultarPorClave, una de las dos está mal.
+			 * [MATI]
+			 */
 			pthread_cond_signal(&sbRespuestaPlanificador);
 
 		}
@@ -103,9 +118,18 @@ void hiloPlanificador (socket_t socket){
 void hiloInstancia (Instancia * instancia) {
 
 	while(1){
-
+	/*
+	 * Una de dos:
+	 * 1- [Si es un hilo por instancia]
+	 * Seguis teniendo el problema de controlar una vez si la instancia se desconecto
+	 * y despues quedarte esperando a que le toque ser usada.
+	 * Tenes que o bien estár controlando constantemente si se desconecto o bien
+	 * bloquear el hilo hasta que toque ejecutar y ahí comprobar que siga viva.
+	 * 2- [Si es un hilo al tener que comunicarte]
+	 * No es lo que pide la consigna.
+	 * [MATI]
+	 */
 	if( seDesconectoSocket(instancia->socket) ){
-
 		pthread_mutex_lock(&mAuxiliarIdInstancia);
 		auxiliarIdInstancia = instancia->idinstancia;
 		list_remove_by_condition(listaInstancias, (void*)buscarInstanciaPorId );
@@ -385,6 +409,10 @@ void consultarPorClave(){
 	int *respuesta;
 	enum tipoDeInstruccion tipo;
 
+	/*
+	 * Acordate que string_length no cuenta el \0
+	 * [MATI]
+	 */
 	tamClave_t tamClave = string_length(esiActual->clave);
 
 	switch(esiActual->instr){
@@ -495,6 +523,13 @@ void recibirConexiones() {
 	// para hacer accept le tengo que dar un sockaddr_in, aunque la verdad lo hice hace tanto que no recuerdo para que es
 	// si me estoy equivocando, bienvenida sea la correcion
 
+	/*
+	 * Sí, pero para que lo queres aca si no lo usas
+	 * cuando lo podrias tener como una variable local
+	 * en la función donde sí lo usas.
+	 * [MATI]
+	 */
+
 	while (1)
 		{
 			socketAceptado = esperarYaceptar(socketCoordinador ,&dirAceptado);
@@ -551,6 +586,11 @@ void registrarInstancia(socket_t socket)
 		recibirMensaje(socket,*tamNombre,(void *) &nombre );
 
 		//¿ese strcpy no tiene problema con pasarle el puntero "nombre" ?
+		/*
+		 * El problema lo vas a tener al tratar de copiar a un lugar de memoria
+		 * que no existe porque nunca asignaste memoria a instanciaRecibida->nombre
+		 * [MATI]
+		 */
 		strcpy(instanciaRecibida->nombre , nombre);
 		instanciaRecibida->idinstancia = contadorIdInstancias;
 		instanciaRecibida->socket = socket;
@@ -723,6 +763,12 @@ Instancia * algoritmoEquitativeLoad(void){
 
 	//respecto de lo del status, cuando llame al algoritmo para saber que instancia asignaria, dejo que mueva el contador y despues de obtener
 	// la instancia, en el mismo lugar donde la llame le resto 1 al contador del algoritmo, y de esa manera es lo mismo que no haber echo nada
+
+	/*
+	 * ¿Y si te lo dejo en 0? ¿Ahí tambien lo arreglas restando uno al contador?
+	 *
+	 * [MATI]
+	 */
 	return instancia;
 }
 
