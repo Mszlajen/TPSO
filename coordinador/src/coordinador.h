@@ -43,10 +43,10 @@ void registrarInstancia(socket_t socket);
 bool idInstancia(Instancia * instancia);
 void tratarGetInstancia(Instancia * instancia);
 void tratarGetEsi(Esi * esi);
-void tratarSetStoreEsi(Esi * esi);
+void tratarSetEsi(Esi * esi);
+void tratarStoreEsi(Esi * esi);
 void tratarSetInstancia(Instancia * instancia);
 void tratarStoreInstancia(Instancia * instancia);
-int consultarPorClaveTomada(Esi esi);
 void hiloInstancia (Instancia * instancia);
 void hiloEsi (Esi * esi);
 void hiloPlanificador (socket_t socket);
@@ -56,12 +56,13 @@ Instancia * algoritmoEquitativeLoad(void);
 int crearConfiguracion(char * archivoConfig);
 int buscarClaves(char * clave);
 int buscarInstanciaPorId(Instancia * instancia);
+int buscarEsiPorId(Esi * esi);
 void setearEsiActual(Esi esi);
 void recibirResultadoInstancia(Instancia * instancia);
 void enviarResultadoEsi(Esi * esi);
-
-
-
+void consultarPorClave();
+void pedirConsultaClave();
+int max (int v1, int v2);
 
 
 
