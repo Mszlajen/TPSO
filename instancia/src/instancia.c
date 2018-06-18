@@ -235,20 +235,20 @@ enum resultadoEjecucion instruccionCompactacion()
 	{
 		//Busco el proximo espacio vacio
 		//Desde la segunda iteracion puntero vacio va a empezar en el valor correspondiente
-		for(;punteroVacio < cantidadEntradas && tablaDeControl[punteroVacio]; punteroVacio++);
+		for(;punteroVacio < cantidadEntradas && tablaDeControl[punteroVacio].clave; punteroVacio++);
 		//Compruebo si salio por encontrar un espacio vacio o porque termino de compactar
 		if(punteroVacio == cantidadEntradas)
 			break;
 
 		//Busco el proximo espacio ocupado empezando por el siguiente al vacio que ya encontre
 		punteroEntrada = punteroVacio + 1;
-		for(;punteroEntrada < cantidadEntradas && !tablaDeControl[punteroEntrada]; punteroEntrada++);
+		for(;punteroEntrada < cantidadEntradas && !tablaDeControl[punteroEntrada].clave; punteroEntrada++);
 		//Compruebo si salio por encontrar un espacio ocupado o porque termino de compactar
 		if(punteroEntrada == cantidadEntradas)
 			break;
 
 		//Recupero la información de la clave ocupando el espacio
-		claveAMover = dictionary_get(infoClaves, tablaDeControl[punteroEntrada]);
+		claveAMover = dictionary_get(infoClaves, tablaDeControl[punteroEntrada].clave);
 
 		//Muevo la informacion de manera que empiece en el lugar vacio
 		memcpy(tablaDeEntradas + punteroVacio * tamanioEntradas,
@@ -257,7 +257,7 @@ enum resultadoEjecucion instruccionCompactacion()
 
 		//Actualizo los valores de la tabla de control
 		distancia = punteroEntrada - punteroVacio;
-		asociarEntradas(punteroVacio, distancia, tablaDeControl[punteroEntrada]);
+		asociarEntradas(punteroVacio, distancia, tablaDeControl[punteroEntrada].clave);
 		punteroVacio = claveAMover -> entradaInicial + tamValorACantEntradas(claveAMover->tamanio);
 		asociarEntradas(punteroVacio, distancia, NULL);
 
@@ -462,38 +462,86 @@ infoClave_t* reemplazoCircular()
 	return (infoClave_t*) dictionary_get(infoClaves, tablaDeControl[punteroReemplazo].clave);
 }
 
+//BSU y LRU repiten (mucho) codigo, ver que se puede hacer.
 infoClave_t* reemplazoLRU()
 {
-	char* nombreClaveAReemplazar = NULL;
+	t_list* candidatos = list_create();
+	infoClave_t* claveAReemplazar = NULL;
 	int tiempoMayor = 0;
 	void obtenerClaveAReemplazar(infoClave_t* infoClave)
 	{
-		if(infoClave -> tamanio < tamanioEntradas && infoClave -> tiempoUltimoUso > tiempoMayor)
+		if(infoClave -> tamanio < tamanioEntradas && infoClave -> tiempoUltimoUso >= tiempoMayor)
 		{
-			nombreClaveAReemplazar = tablaDeControl[infoClave -> entradaInicial].clave;
-			tiempoMayor = infoClave -> tiempoUltimoUso;
+			if(infoClave -> tiempoUltimoUso > tiempoMayor)
+			{
+				list_clean(candidatos);
+				tiempoMayor = infoClave -> tiempoUltimoUso;
+			}
+			list_add(candidatos, infoClave);
 		}
 	}
 
 	dictionary_iterator(infoClaves, obtenerClaveAReemplazar);
-	return dictionary_get(infoClaves, nombreClaveAReemplazar);
+	if(list_size(candidatos) == 1)
+		claveAReemplazar = list_get(candidatos, 0);
+	else
+		claveAReemplazar = desempatePorCircular(candidatos);
+	list_destroy(candidatos);
+	return claveAReemplazar;
 }
 
 infoClave_t* reemplazoBSU()
 {
-	char* nombreClaveAReemplazar = NULL;
+	t_list* candidatos = list_create();
+	infoClave_t* claveAReemplazar = NULL;
 	tamValor_t tamMayor = 0;
 	void obtenerClaveAReemplazar(infoClave_t* infoClave)
 	{
-		if(infoClave -> tamanio < tamanioEntradas && infoClave -> tamanio > tamMayor)
+		if(infoClave -> tamanio < tamanioEntradas && infoClave -> tiempoUltimoUso >= tamMayor)
 		{
-			nombreClaveAReemplazar = tablaDeControl[infoClave -> entradaInicial].clave;
-			tamMayor = infoClave -> tiempoUltimoUso;
+			if(infoClave -> tiempoUltimoUso > tamMayor)
+			{
+				list_clean(candidatos);
+				tamMayor = infoClave -> tiempoUltimoUso;
+			}
+			list_add(candidatos, infoClave);
 		}
 	}
 
 	dictionary_iterator(infoClaves, obtenerClaveAReemplazar);
-	return dictionary_get(infoClaves, nombreClaveAReemplazar);
+	if(list_size(candidatos) == 1)
+		claveAReemplazar = list_get(candidatos, 0);
+	else
+		claveAReemplazar = desempatePorCircular(candidatos);
+	list_destroy(candidatos);
+	return claveAReemplazar;
+}
+
+infoClave_t* desempatePorCircular(t_list* candidatos)
+{
+	infoClave_t* claveAReemplazar = NULL;
+	cantEntradas_t posicionMejorCandidato = cantidadEntradas;
+	void esMasCercano(infoClave_t *candidatoActual)
+	{
+		if(punteroReemplazo <= candidatoActual -> entradaInicial && candidatoActual -> entradaInicial <= posicionMejorCandidato)
+		{
+			claveAReemplazar = candidatoActual;
+			posicionMejorCandidato = candidatoActual -> entradaInicial;
+		}
+	}
+	void menorPosicion(infoClave_t *candidatoActual)
+	{
+		if(candidatoActual -> entradaInicial < posicionMejorCandidato)
+		{
+			claveAReemplazar = candidatoActual;
+			posicionMejorCandidato = candidatoActual -> entradaInicial;
+		}
+	}
+
+	list_iterate(candidatos, esMasCercano);
+	if(!claveAReemplazar)
+		list_iterate(candidatos, menorPosicion);
+	return claveAReemplazar;
 }
 
 void enviarResultadoEjecucion(socket_t socketCoord, enum resultadoEjecucion res)

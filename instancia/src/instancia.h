@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <commons/string.h>
+#include <commons/collections/list.h>
 #include <commons/collections/dictionary.h>
 #include <biblio.h>
 #include "configuracion.h"
@@ -60,6 +61,8 @@ enum resultadoEjecucion actualizarValorMenorTamanio(char*, infoClave_t*, char*, 
 infoClave_t* reemplazoCircular();
 infoClave_t* reemplazoLRU();
 infoClave_t* reemplazoBSU();
+
+infoClave_t* desempatePorCircular(t_list*);
 
 booleano almacenarID(instancia_id);
 void enviarResultadoEjecucion(socket_t, enum resultadoEjecucion);
