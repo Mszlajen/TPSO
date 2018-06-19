@@ -46,6 +46,11 @@ Instancia * instanciaActual;
 t_log * logOperaciones;
 Esi * esiActual;
 
+/* ToDo
+ * 1) Hacer una lista de historial de instancias y un instancias conectadas
+ */
+
+
 int main(int argc, char **argv) {
 
 	struct sockaddr_in dirPlanificador;
@@ -54,11 +59,7 @@ int main(int argc, char **argv) {
 
 	inicializacion(argv[1]);
 
-	/*
-	 * El IP escucha tambien viene por configuración
-	 * [MATI]
-	 */
-	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
+	socketCoordinador = crearSocketServer (config_get_string_value(configuracion,IPEscucha),config_get_string_value(configuracion, Puerto));
 
 	 do {
 		socketPlanificador = esperarYaceptar(socketCoordinador ,&dirPlanificador);
@@ -96,20 +97,9 @@ void hiloPlanificador (socket_t socket){
 			//status [MATI]
 		}
 		else if(FD_ISSET(socketConsultaClave, &read)){
-			/*
-			 * ¿Para qué es este mutex si el unico recurso que usas es el socket del planificador
-			 * que solo se usa en este hilo y bien podria ser un recurso local?
-			 * [MATI]
-			 */
-			pthread_mutex_lock(&mConsultarPorClave);
+
 			consultarPorClave();
-			pthread_mutex_unlock(&mConsultarPorClave);
-			/*
-			 * Estás señalizando la condición acá y dentro de la función
-			 * consultarPorClave, una de las dos está mal.
-			 * [MATI]
-			 */
-			pthread_cond_signal(&sbRespuestaPlanificador);
+
 
 		}
 	}
