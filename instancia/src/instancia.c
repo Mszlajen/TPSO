@@ -307,19 +307,30 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 	cantEntradas_t posicion = encontrarEspacioLibreConsecutivo(tamValor);
 	if(posicion == cantidadEntradas)
 	{
+		cantEntradas_t entradasDisponibles = obtenerEntradasDisponibles();
 		do
 		{
-			if(haySuficienteEspacio(tamValor))
+			if(entradasDisponibles >= tamValorACantEntradas(tamValor))
 			{
-				//Compactacion
 				posicion = encontrarEspacioLibreConsecutivo(tamValor);
 				if(posicion == cantidadEntradas)
+				{
+					/*
+					 * Acá podria borrar el archivo, pero como igual lo voy a rehacer
+					 * seria procesamiento adicional.
+					*/
+					close(nuevaClave -> fd);
+					free(nuevaClave);
 					return necesitaCompactar;
+				}
 				else
 					break;
 			}
 			else
+			{
 				algoritmoDeReemplazo();
+				entradasDisponibles++;
+			}
 		}while(1);
 		/*
 		 * Reemplaza claves hasta tener espacio suficiente para guardar la clave.
@@ -402,9 +413,8 @@ cantEntradas_t encontrarEspacioLibreConsecutivo(tamValor_t tamValor)
 	return i==cantidadEntradas? cantidadEntradas : i - libresConsecutivos;
 }
 
-int haySuficienteEspacio(tamValor_t espacioRequerido)
+cantEntradas_t obtenerEntradasDisponibles()
 {
-	cantEntradas_t entradasRequeridas = tamValorACantEntradas(espacioRequerido);
 	cantEntradas_t entradasDisponibles = 0;
 	int i;
 	for(i = 0; i < cantidadEntradas; i++)
@@ -412,7 +422,7 @@ int haySuficienteEspacio(tamValor_t espacioRequerido)
 		if(!tablaDeControl[i].clave)
 			entradasDisponibles++;
 	}
-	return entradasRequeridas <= entradasDisponibles;
+	return entradasDisponibles;
 }
 
 void asociarEntradas(cantEntradas_t base, cantEntradas_t cantidad, char* clave)

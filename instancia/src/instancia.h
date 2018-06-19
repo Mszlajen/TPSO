@@ -53,7 +53,7 @@ enum resultadoEjecucion registrarNuevaClave(char*, char*, tamValor_t);
 
 cantEntradas_t encontrarEspacioLibreConsecutivo(tamValor_t);
 void asociarEntradas (cantEntradas_t, cantEntradas_t, char*);
-int haySuficienteEspacio(tamValor_t);
+cantEntradas_t obtenerEntradasDisponibles();
 void algoritmoDeReemplazo();
 enum resultadoEjecucion actualizarValorMayorTamanio(char*, infoClave_t*, char*, tamValor_t);
 enum resultadoEjecucion actualizarValorMenorTamanio(char*, infoClave_t*, char*, tamValor_t);
