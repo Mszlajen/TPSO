@@ -37,8 +37,6 @@ int main(int argc, char** argv) {
 		pthread_cancel(esiAEjecutar -> hiloDeFin);
 		ejecucionDeESI(esiAEjecutar);
 
-		crearFinEjecucion(esiAEjecutar);
-
 		pthread_mutex_lock(&mESIEjecutando);
 		pthread_mutex_unlock(&enPausa);
 	}
@@ -96,6 +94,24 @@ void ejecucionDeESI(ESI* esi)
 
 	free(resultado);
 
+	//Controlo que el ESI haya terminado correctamente la instrucción.
+	if(res == fallo)
+	{
+		//Esto se repite despues, podria modulizarlo.
+		if(hayAvisoBloqueo())
+		{
+			printf("El ESI %i finalizo y no pudo ser bloqueado", esi -> id);
+			settearAvisoBloqueo(NULL);
+		}
+		printf("El ESI %i tuvo un fallo en su ejecución y fue terminado.", esi -> id);
+		free(ultimaConsulta -> clave);
+		free(ultimaConsulta);
+		ultimaConsulta = NULL;
+		finalizarESI(esi);
+		return;
+	}
+
+	//Actualizo el estado del sistema en base a la instrucción.
 	switch(ultimaConsulta -> tipo)
 	{
 		case liberadora:
@@ -127,20 +143,27 @@ void ejecucionDeESI(ESI* esi)
 			}
 			pthread_mutex_unlock(&mBloqueados);
 			break;
-		default:
+		case noDefinido:
 			break;
 	}
 
-	if(res == fin || res == fallo)
+	//Compruebo si el ESI termino su ejecución.
+	if(res == fin)
 	{
-		finalizarESI(esi);
+		free(ultimaConsulta -> clave);
+		free(ultimaConsulta);
+		ultimaConsulta = NULL;
 		if(hayAvisoBloqueo())
 		{
 			printf("El ESI %i finalizo y no pudo ser bloqueado", esi -> id);
 			settearAvisoBloqueo(NULL);
 		}
+		printf("El ESI %i finalizo su ejecución.", esi -> id);
+		finalizarESI(esi);
+		return;
 	}
 
+	//Comprobar si hubo y responder comando bloquear.
 	if(hayAvisoBloqueo())
 	{
 		if(seBloqueo)
@@ -156,6 +179,9 @@ void ejecucionDeESI(ESI* esi)
 	free(ultimaConsulta -> clave);
 	free(ultimaConsulta);
 	ultimaConsulta = NULL;
+
+	//El ESI sigue siendo valido para el planificador por lo tanto se puede llegar a desconectar.
+	crearFinEjecucion(esi);
 }
 
 void escucharPorESI ()
@@ -197,6 +223,7 @@ void escucharPorFinESI(ESI* esi)
 		listen(esi -> socket, 5);
 		if(seDesconectoSocket(esi -> socket))
 		{
+			printf("El ESI %i se desconecto.", esi -> id);
 			terminarEjecucionESI(esi);
 			pthread_exit(NULL);
 		}
@@ -494,15 +521,11 @@ enum comandos convertirComando(char* linea)
 
 int max (int v1, int v2)
 {
-	if(v1 > v2)
-		return v1;
-	else
-		return v2;
+	return v1 > v2? v1 : v2;
 }
 
 void terminarEjecucionESI(ESI* esi)
 {
-	printf("Se termino el esi %i", esi -> id);
 	pthread_mutex_lock(&mBloqueados);
 	pthread_mutex_lock(&mReady);
 	finalizarESI(esi);
