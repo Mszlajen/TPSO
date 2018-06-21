@@ -42,26 +42,24 @@ int contadorEquitativeLoad = 0;
 int contadorIdInstancias = 1;
 int cantInstancias = 0;
 int respuestaPlanificador;
+int hayCompactacion = 0;
+int instanciasCompactadas= 0;
 Instancia * instanciaActual;
 t_log * logOperaciones;
 Esi * esiActual;
 
+
 int main(int argc, char **argv) {
 
-	struct sockaddr_in dirPlanificador;
 	int esPlanificador;
 	pthread_t hiloRecibeConexiones;
 
 	inicializacion(argv[1]);
 
-	/*
-	 * El IP escucha tambien viene por configuración
-	 * [MATI]
-	 */
-	socketCoordinador = crearSocketServer (IPEscucha,config_get_string_value(configuracion, Puerto));
+	socketCoordinador = crearSocketServer (config_get_string_value(configuracion,IPEscucha),config_get_string_value(configuracion, Puerto));
 
 	 do {
-		socketPlanificador = esperarYaceptar(socketCoordinador ,&dirPlanificador);
+		socketPlanificador = esperarYaceptar(socketCoordinador);
 		esPlanificador = validarPlanificador(socketPlanificador );
 	} while (esPlanificador);
 
@@ -96,20 +94,9 @@ void hiloPlanificador (socket_t socket){
 			//status [MATI]
 		}
 		else if(FD_ISSET(socketConsultaClave, &read)){
-			/*
-			 * ¿Para qué es este mutex si el unico recurso que usas es el socket del planificador
-			 * que solo se usa en este hilo y bien podria ser un recurso local?
-			 * [MATI]
-			 */
-			pthread_mutex_lock(&mConsultarPorClave);
+
 			consultarPorClave();
-			pthread_mutex_unlock(&mConsultarPorClave);
-			/*
-			 * Estás señalizando la condición acá y dentro de la función
-			 * consultarPorClave, una de las dos está mal.
-			 * [MATI]
-			 */
-			pthread_cond_signal(&sbRespuestaPlanificador);
+
 
 		}
 	}
@@ -118,50 +105,73 @@ void hiloPlanificador (socket_t socket){
 void hiloInstancia (Instancia * instancia) {
 
 	while(1){
-	/*
-	 * Una de dos:
-	 * 1- [Si es un hilo por instancia]
-	 * Seguis teniendo el problema de controlar una vez si la instancia se desconecto
-	 * y despues quedarte esperando a que le toque ser usada.
-	 * Tenes que o bien estár controlando constantemente si se desconecto o bien
-	 * bloquear el hilo hasta que toque ejecutar y ahí comprobar que siga viva.
-	 * 2- [Si es un hilo al tener que comunicarte]
-	 * No es lo que pide la consigna.
-	 * [MATI]
-	 */
-	if( seDesconectoSocket(instancia->socket) ){
-		pthread_mutex_lock(&mAuxiliarIdInstancia);
-		auxiliarIdInstancia = instancia->idinstancia;
-		list_remove_by_condition(listaInstancias, (void*)buscarInstanciaPorId );
-		free(instancia);
-		pthread_mutex_unlock(&mAuxiliarIdInstancia);
-		cantInstancias--;
+
+	if( comprobarEstadoDeInstancia(instancia) ){
 		break;
-		//el break es para que corte el ciclo del while y termine el hilo
 	}
 		pthread_mutex_lock(&mInstanciaActual);
 
 		pthread_cond_wait(&sbInstanciaActual,&mInstanciaActual);
-		if(instanciaActual->idinstancia == instancia->idinstancia){
 
-				switch(instancia->esiTrabajando->instr){
-					case get:
-						//lo dejo para que no joda con el warning
-						break;
-					case set:
-						tratarSetInstancia(instancia);
-						break;
-					case store:
-						tratarStoreInstancia(instancia);
+		if(hayCompactacion){
+
+			header header;
+			header.protocolo = 11;
+			void * buffer;
+			enum instruccion compac = compactacion ;
+			int estado;
+
+			buffer = malloc(sizeof(header) + sizeof(enum instruccion));
+
+			memcpy(buffer , &header.protocolo , sizeof(header) );
+			memcpy(buffer+sizeof(header) , &compac , sizeof(enum instruccion) );
+
+			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) );
+
+			while(estado !=0){
+				error_show("no se pudo comunicar compactacion a la instancia, volviendo a intentar");
+				estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) );
+			}
+			free(buffer);
+
+			instanciasCompactadas++;
+			if(instanciasCompactadas == cantInstancias){
+				hayCompactacion = 0;
+				instanciasCompactadas = 0;
+			}
+
+
+		}else{
+
+
+			if(instanciaActual->idinstancia == instancia->idinstancia){
+
+				if( comprobarEstadoDeInstancia(instancia) ){
 						break;
 					}
 
-				pthread_mutex_lock(&mRespuestaInstancia);
-				recibirResultadoInstancia(instancia);
-				pthread_mutex_unlock(&mRespuestaInstancia);
-				pthread_cond_signal(&sbRespuestaInstancia);
-			}
-		pthread_mutex_unlock(&mInstanciaActual);
+					switch(instancia->esiTrabajando->instr){
+						case get:
+							break;
+						case set:
+							tratarSetInstancia(instancia);
+							break;
+						case store:
+							tratarStoreInstancia(instancia);
+							break;
+						}
+
+					pthread_mutex_lock(&mRespuestaInstancia);
+					if( comprobarEstadoDeInstancia(instancia) ){
+							break;
+						}
+					recibirResultadoInstancia(instancia);
+					pthread_mutex_unlock(&mRespuestaInstancia);
+					pthread_cond_signal(&sbRespuestaInstancia);
+				}
+			pthread_mutex_unlock(&mInstanciaActual);
+
+		}
 	}
 }
 
@@ -198,6 +208,17 @@ void hiloEsi (Esi * esi) {
 							pthread_mutex_lock(&mRespuestaInstancia);
 							tratarSetEsi(esi);
 							pthread_cond_wait(&sbRespuestaInstancia,&mRespuestaInstancia);
+
+							if(esi->res == necesitaCompactar){
+								hayCompactacion = 1;
+								pthread_cond_broadcast(&sbInstanciaActual); // signal a todos los hilos de instancia para que revisen si deben compactar
+
+								while(instanciasCompactadas != cantInstancias){} //espera activa
+
+								pthread_cond_broadcast(&sbInstanciaActual); // signal a todos los de instancia para que revisen si les toca ejecutar
+								pthread_cond_wait(&sbRespuestaInstancia,&mRespuestaInstancia);
+							}
+
 							pthread_mutex_unlock(&mRespuestaInstancia);
 							enviarResultadoEsi(esi);
 							break;
@@ -247,11 +268,6 @@ void tratarGetEsi(Esi * esi){
 	}
 	else
 	{
-		/*
-		 * Acá puede llegar a ser al reves, primero consulta
-		 * que el set sea valido y despues asigna la instancia
-		 * eso dependera de los test.
-		 */
 
 		esiActual = esi;
 
@@ -303,7 +319,6 @@ void tratarStoreInstancia(Instancia * instancia) {
 void tratarStoreEsi(Esi * esi) {
 	Instancia * instancia;
 
-
 	esiActual = esi;
 
 	pthread_mutex_lock(&mConsultarPorClave);
@@ -328,7 +343,6 @@ void tratarStoreEsi(Esi * esi) {
 void tratarSetEsi(Esi * esi) {
 	Instancia * instancia;
 
-
 	esiActual = esi;
 
 	pthread_mutex_lock(&mConsultarPorClave);
@@ -338,6 +352,7 @@ void tratarSetEsi(Esi * esi) {
 	pthread_mutex_unlock(&mConsultarPorClave);
 
 	if(respuestaPlanificador){
+		//este es el caso en que la instancia no tiene la clave, el coordinador le retorna un fallo
 		esi->res = fallo;
 	}else{
 		instancia = dictionary_get(tablaDeClaves, esi->clave);
@@ -409,11 +424,7 @@ void consultarPorClave(){
 	int *respuesta;
 	enum tipoDeInstruccion tipo;
 
-	/*
-	 * Acordate que string_length no cuenta el \0
-	 * [MATI]
-	 */
-	tamClave_t tamClave = string_length(esiActual->clave);
+	tamClave_t tamClave = string_length(esiActual->clave) + sizeof("\0");
 
 	switch(esiActual->instr){
 	case store:
@@ -456,6 +467,25 @@ void consultarPorClave(){
 	free(respuesta);
 }
 
+int comprobarEstadoDeInstancia (Instancia * instancia){
+
+	if( seDesconectoSocket(instancia->socket) ){
+
+		pthread_mutex_lock(&mAuxiliarIdInstancia);
+		auxiliarIdInstancia = instancia->idinstancia;
+		list_remove_by_condition(listaInstancias, (void*)buscarInstanciaPorId );
+		free(instancia);
+		pthread_mutex_unlock(&mAuxiliarIdInstancia);
+		cantInstancias--;
+
+		return 1;
+		}else{
+		return 0;
+		}
+
+
+}
+
 void recibirResultadoInstancia(Instancia * instancia){
 	header * header;
 	int * resultado;
@@ -478,7 +508,7 @@ void recibirResultadoInstancia(Instancia * instancia){
 			instancia->esiTrabajando->res = fallo;
 			break;
 		case necesitaCompactar:
-			// aun no voy a codear este caso
+			instancia->esiTrabajando->res = necesitaCompactar;
 			break;
 		}
 	}
@@ -518,21 +548,9 @@ void setearEsiActual(Esi esi){
 void recibirConexiones() {
 
 	socket_t socketAceptado;
-	struct sockaddr_in dirAceptado; //¿Esto para qué lo queres? [MATI]
-
-	// para hacer accept le tengo que dar un sockaddr_in, aunque la verdad lo hice hace tanto que no recuerdo para que es
-	// si me estoy equivocando, bienvenida sea la correcion
-
-	/*
-	 * Sí, pero para que lo queres aca si no lo usas
-	 * cuando lo podrias tener como una variable local
-	 * en la función donde sí lo usas.
-	 * [MATI]
-	 */
-
 	while (1)
 		{
-			socketAceptado = esperarYaceptar(socketCoordinador ,&dirAceptado);
+			socketAceptado = esperarYaceptar(socketCoordinador);
 			esESIoInstancia(socketAceptado);
 		}
 }
@@ -577,21 +595,14 @@ void registrarInstancia(socket_t socket)
 	int enviado;
 	pthread_t hiloInstancia;
 
-	char * nombre = NULL;
+
 	recibirMensaje(socket,sizeof(int),(void*) &idInstancia );
 
 	if(*idInstancia == 0){
 
 		recibirMensaje(socket,sizeof(int),(void *) &tamNombre );
-		recibirMensaje(socket,*tamNombre,(void *) &nombre );
+		recibirMensaje(socket,*tamNombre,(void *) &instanciaRecibida->nombre );
 
-		//¿ese strcpy no tiene problema con pasarle el puntero "nombre" ?
-		/*
-		 * El problema lo vas a tener al tratar de copiar a un lugar de memoria
-		 * que no existe porque nunca asignaste memoria a instanciaRecibida->nombre
-		 * [MATI]
-		 */
-		strcpy(instanciaRecibida->nombre , nombre);
 		instanciaRecibida->idinstancia = contadorIdInstancias;
 		instanciaRecibida->socket = socket;
 
@@ -772,9 +783,10 @@ Instancia * algoritmoEquitativeLoad(void){
 	return instancia;
 }
 
-int esperarYaceptar(socket_t socketCoordinador,struct sockaddr_in* dir)
+int esperarYaceptar(socket_t socketCoordinador)
 {
 	unsigned int tam;
+	struct sockaddr_in dir;
 	listen(socketCoordinador , 5);
 	int socket = accept(socketCoordinador, (void*)&dir, &tam);
 	return socket;
@@ -841,13 +853,13 @@ int crearConfiguracion(char* archivoConfig){
 	if(crearConfiguracion(dirConfig))
 		salirConError("Fallo al leer el archivo de configuracion del planificador.\n ");
 	Algoritmo = config_get_string_value(configuracion, "Algoritmo");
+
+	socketConsultaClave = crearSocketServer(NULL, "0");
+
 	listaEsi = list_create();
 	listaInstancias = list_create();
 	listaClaves = list_create();
 	tablaDeClaves = dictionary_create();
-
-	pthread_mutex_t mInstanciaActual, mEsiActual, mRespuestaInstancia, mConsultarPorClave , mListaInst, mAuxiliarIdInstancia;
-	pthread_cond_t sbInstanciaActual, sbEsiActual, sbRespuestaInstancia, sbConsultarPorClave , sbRespuestaPlanificador;
 
 	pthread_mutex_init (&mAuxiliarIdInstancia, NULL);
 
