@@ -286,6 +286,10 @@ enum resultadoEjecucion actualizarValorDeClave(char* clave, char* valor, tamValo
 	cantEntradas_t entradasUsadas = tamValorACantEntradas(informacionClave -> tamanio);
 	if(entradasNecesarias > entradasUsadas)
 	{
+		/*
+		 * Este es un caso que no está definido y, por lo tanto,
+		 * no van a probar pero lo dejo porque ya está todo hecho.
+		 */
 		return actualizarValorMayorTamanio(clave, informacionClave, valor, tamValor);
 	}
 	else
@@ -298,11 +302,6 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 {
 	infoClave_t* nuevaClave = malloc(sizeof(infoClave_t));
 
-	char* dirArchivo = obtenerDireccionArchivoMontaje(clave);
-	nuevaClave -> fd = open(dirArchivo, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH);
-	free(dirArchivo);
-
-	ftruncate(nuevaClave -> fd, nuevaClave -> tamanio);
 
 	cantEntradas_t posicion = encontrarEspacioLibreConsecutivo(tamValor);
 	if(posicion == cantidadEntradas)
@@ -336,23 +335,26 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 		 * Reemplaza claves hasta tener espacio suficiente para guardar la clave.
 		 */
 	}
+	//Abro el archivo o lo creo si no existe
+	char* dirArchivo = obtenerDireccionArchivoMontaje(clave);
+	nuevaClave -> fd = open(dirArchivo, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH);
+	free(dirArchivo);
 
 	nuevaClave -> entradaInicial = posicion;
-	nuevaClave -> tamanio = tamValor;
-	crearMappeado(nuevaClave);
-
+	nuevaClave -> tamanio = tamValor - 1;
 	nuevaClave ->tiempoUltimoUso = 0;
 
-	memcpy(tablaDeEntradas + posicion * tamanioEntradas, valor, tamValor);
+	ftruncate(nuevaClave -> fd, nuevaClave -> tamanio);
+	crearMappeado(nuevaClave);
 
-	tamValor_t tamValorRestante = tamValor;
+	//Coloco el valor en la tabla de entradas.
+	memcpy(tablaDeEntradas + posicion * tamanioEntradas, valor, nuevaClave -> tamanio);
+
+	//Actualizo la tabla de control
 	char * claveAsociada = string_duplicate(clave);
-	int i;
-	for(i = 0; tamValorRestante > 0; i++)
-	{
-		tablaDeControl[posicion + i].clave = claveAsociada;
-		tamValorRestante -= tamanioEntradas;
-	}
+	asociarEntradas(nuevaClave -> entradaInicial, tamValorACantEntradas(nuevaClave -> tamanio), claveAsociada);
+
+	//Guardo la información de la clave.
 	dictionary_put(infoClaves, clave, nuevaClave);
 	return exito;
 }
@@ -393,6 +395,7 @@ enum resultadoEjecucion actualizarValorMenorTamanio(char* clave, infoClave_t* in
 
 	destruirMappeado(informacionClave);
 	informacionClave -> tamanio = tamValor;
+	ftruncate(informacionClave -> fd, informacionClave -> tamanio);
 	crearMappeado(informacionClave);
 
 	return exito;
