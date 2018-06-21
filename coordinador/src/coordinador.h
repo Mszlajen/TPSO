@@ -33,7 +33,7 @@ typedef struct {
 #define Puerto "Puerto"
 
 void esESIoInstancia (socket_t socketAceptado);
-int esperarYaceptar(socket_t socketCoordinador,struct sockaddr_in* dir);
+int esperarYaceptar(socket_t socketCoordinador);
 int validarPlanificador (socket_t socket);
 void liberarRecursos();
 void salirConError(char * error);
@@ -63,6 +63,7 @@ void enviarResultadoEsi(Esi * esi);
 void consultarPorClave();
 void pedirConsultaClave();
 int max (int v1, int v2);
+int comprobarEstadoDeInstancia (Instancia * instancia);
 
 
 
