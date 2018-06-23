@@ -112,15 +112,15 @@ void quitarESIDeBloqueados(ESI_id idAQuitar)
 		list_remove(colaConESI, indiceAQuitar);
 
 }
+void* convertirESIaID(void* esi)
+{
+	ESI_id *id = malloc(sizeof(ESI_id));
+	*id = ((ESI*) esi) -> id;
+	return (void*) id;
+}
 
 t_list* listarID(char *clave)
 {
-	void* convertirESIaID(void* esi)
-	{
-		ESI_id *id = malloc(sizeof(ESI_id));
-		*id = ((ESI*) esi) -> id;
-		return (void*) id;
-	}
 	t_list* listaDeID = NULL;
 	if(!dictionary_has_key(colasBloqueados, clave))
 		return listaDeID;
@@ -164,3 +164,58 @@ int ESIEstaEnLista(ESI* esi, t_list * lista)
 	}
 	return list_any_satisfy(lista, &esEsteESI);
 }
+
+booleano existeCandidatoBloqueadoPorClave(t_list* candidatos, t_list* claves)
+{
+	int i_cand, i_clav;
+	for(i_cand = 0; i_cand < list_size(candidatos); i_cand++)
+	{
+		for(i_clav = 0; i_clav < list_size(claves); i_clav)
+		{
+			if(ESIEstaBloqueadoPorClave(list_get(candidatos, i_cand), list_get(claves, i_clav)))
+				return 1;
+		}
+	}
+	return 0;
+}
+
+t_list* detectarDeadlock()
+{
+	//Creo la lista de candidatos y el retorno para el caso de no haber deadlock.
+	t_list *candidatos = list_create(), *retorno = NULL;
+
+	//Coloco en la lista a los candidatos filtrando las claves bloqueadas por el sistema.
+	//Solo puede estar una vez cada ESI.
+	void filtrarClavesBloqueadasPorSistema(void *esi)
+	{
+		if(esi && !esiEnLista(candidatos, (ESI*) esi))
+			list_add(candidatos, esi);
+	}
+	dictionary_iterator(tablaBloqueos, filtrarClavesBloqueadasPorSistema);
+
+	//Elimino a los candidatos que no bloquean a otros ESI y repito hasta que no puedo eliminar más.
+	int cantCandidatosAnt;
+	int i;
+	ESI* candidatoActual = NULL;
+	do
+	{
+		cantCandidatosAnt = list_size(candidatos);
+		//Empiezo por el final para que al borrar los candidatos que no fueron, no se corra el puntero indice(i)
+		for(i = list_size(candidatos) - 1; i >= 0; i--)
+		{
+			candidatoActual = list_get(candidatos, i);
+			if(!existeCandidatoBloqueadoPorClave(candidatos, candidatoActual -> recursos))
+				list_remove(candidatos, i);
+		}
+	}while(list_size(candidatos) > cantCandidatosAnt);
+
+	//Compruebo si quedan candidatos, es decir, compruebo si hay deadlock y creo la lista con ID.
+	if(!list_is_empty(candidatos))
+		retorno = list_map(candidatos, convertirESIaID);
+
+	list_destroy(candidatos);
+	return retorno;
+
+}
+
+

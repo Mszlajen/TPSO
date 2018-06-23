@@ -71,3 +71,12 @@ void destruirESI(ESI* esi)
 	list_destroy_and_destroy_elements(esi -> recursos, free);
 	free(esi);
 }
+
+booleano esiEnLista(t_list* lista, ESI* esi)
+{
+	bool esESI(void* elemento)
+	{
+		return esi -> id == ((ESI*) elemento) -> id;
+	}
+	return list_any_satisfy(lista, esESI);
+}

@@ -50,6 +50,7 @@ void escucharPorFinESI();
 void comandoBloquear(char*, char*);
 void comandoDesbloquear(char*);
 void comandoListar(char*);
+void comandoDeadlock();
 
 int max (int, int);
 void terminarEjecucionESI(ESI*);

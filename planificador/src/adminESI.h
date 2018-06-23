@@ -27,4 +27,6 @@ void ejecutarInstruccion(ESI*);
 int calcularVejez(ESI*);
 void agregarRecurso(ESI*, char*);
 void quitarRecurso(ESI*, char*);
+
+booleano esiEnLista(t_list*, ESI*);
 #endif /* ADMINESI_H_ */

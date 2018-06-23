@@ -69,6 +69,9 @@ void terminal()
 		case listar:
 			comandoListar(palabras[1]);
 			break;
+		case deadlock:
+			comandoDeadlock();
+			break;
 		default:
 			system(linea);
 		}
@@ -323,21 +326,45 @@ void comandoListar(char* clave)
 {
 	void imprimirID(void* id)
 	{
-		printf("%i", * (ESI_id*) id);
+		printf("-%i\n", *((ESI_id*) id));
 	}
 	t_list* listaDeID;
 
 	pthread_mutex_lock(&mBloqueados);
 	listaDeID = listarID(clave);
+	pthread_mutex_unlock(&mBloqueados);
+
 	if(!listaDeID)
 	{
 		printf("No hay ESI bloqueados con esa clave.\n");
-		return;
 	}
-	list_iterate(listaDeID, imprimirID);
-	pthread_mutex_unlock(&mBloqueados);
+	else
+	{
+		printf("Los ESI bloqueados para la clave \"%s\" son:\n", clave);
+		list_iterate(listaDeID, imprimirID);
+		list_destroy_and_destroy_elements(listaDeID, free);
+	}
+}
 
-	list_destroy_and_destroy_elements(listaDeID, free);
+void comandoDeadlock()
+{
+	void imprimirID(void* id)
+	{
+		printf("-%i\n", *((ESI_id*) id));
+	}
+	t_list* esiEnDeadlock = NULL;
+	printf("Analizando existencia de deadlock...\n");
+	pthread_mutex_lock(&mBloqueados);
+	esiEnDeadlock = detectarDeadlock();
+	pthread_mutex_unlock(&mBloqueados);
+	if(!esiEnDeadlock)
+		printf("No hay deadlock");
+	else
+	{
+		printf("Existe deadlock. ESI involucrados:\n");
+		list_iterate(esiEnDeadlock, imprimirID);
+	}
+	list_destroy_and_destroy_elements(esiEnDeadlock, free);
 }
 
 void inicializacion (char* dirConfig)
