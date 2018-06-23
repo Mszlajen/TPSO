@@ -79,6 +79,14 @@ ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo algoritmo)
 			return ESIEjecutando();
 		}
 	case hrrn:
+		if(ESIEjecutando())
+			return ESIEjecutando();
+		else
+		{
+			ponerESIAEjecutar(encontrarPorHRRN());
+			return ESIEjecutando();
+
+		}
 	default: //Devuelve FCFS
 		if(ESIEjecutando())
 			return ESIEjecutando();

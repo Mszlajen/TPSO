@@ -7,9 +7,12 @@
 #include "../adminESI.h"
 #include "../configuracion.h"
 
+#define RR(pESI, vejez) (vejez / pESI -> estimacion)
+
 typedef struct {
 	ESI* esi;
 	int indice;
+	int responseRatio;
 }posicionESI;
 
 void listarParaEjecucion(ESI*);
@@ -17,6 +20,7 @@ void listarParaEjecucion(ESI*);
 /*Los algoritmos quitan al ESI de la cola*/
 ESI* encontrarPorFCFS();
 ESI* encontrarPorSJF();
+ESI* encontrarPorHRRN();
 
 booleano readyVacio();
 ESI* ESIEnReady(ESI_id);

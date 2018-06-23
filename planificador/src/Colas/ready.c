@@ -43,16 +43,40 @@ ESI* encontrarPorFCFS()
 
 ESI* encontrarPorSJF()
 {
+	int indice = 0;
 	posicionESI res;
 	res.esi = list_get(listos, 0);
-	res.indice = 0;
+	res.indice = indice;
 	void compararESI(void* esi)
 	{
 		if(((ESI*) esi) -> estimacion < res.esi -> estimacion)
 		{
 			res.esi = (ESI*) esi;
-			res.indice++;
+			res.indice = indice;
 		}
+		indice++;
+	}
+	list_iterate(listos, compararESI);
+	list_remove(listos, res.indice);
+	return res.esi;
+}
+
+ESI* encontrarPorHRRN()
+{
+	int indice = 0;
+	posicionESI res;
+	res.esi = list_get(listos, 0);
+	res.indice = indice;
+	res.responseRatio = RR(res.esi, calcularVejez(res.esi));
+	void compararESI(void* esi)
+	{
+		int responseRatioESI = RR(((ESI*) esi), calcularVejez((ESI*) esi));
+		if(res.responseRatio < responseRatioESI)
+		{
+			res.esi = (ESI*) esi;
+			res.indice = indice;
+		}
+		indice++;
 	}
 	list_iterate(listos, compararESI);
 	list_remove(listos, res.indice);
