@@ -29,6 +29,17 @@ typedef struct {
 	Esi * esiTrabajando;
 } Instancia;
 
+typedef struct {
+
+	tamClave_t * tamClave;
+	char* clave;
+	int * existe;
+	tamValor_t * tamValor;
+	char* valor;
+} RespuestaStatus;
+
+
+
 #define IPEscucha "127.0.0.2"
 #define Puerto "Puerto"
 
@@ -64,6 +75,8 @@ void consultarPorClave();
 void pedirConsultaClave();
 int max (int v1, int v2);
 int comprobarEstadoDeInstancia (Instancia * instancia);
+void tratarStatusPlanificador ();
+void tratarStatusInstancia (Instancia * instancia);
 
 
 

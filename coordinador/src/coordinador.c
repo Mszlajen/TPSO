@@ -44,10 +44,12 @@ int cantInstancias = 0;
 int respuestaPlanificador;
 int hayCompactacion = 0;
 int instanciasCompactadas= 0;
+int hayQueSimular = 0;
+int hayStatusEnIdInstancia = 0;
 Instancia * instanciaActual;
 t_log * logOperaciones;
 Esi * esiActual;
-
+RespuestaStatus RespStatus;
 
 int main(int argc, char **argv) {
 
@@ -88,12 +90,10 @@ void hiloPlanificador (socket_t socket){
 
 		if(FD_ISSET(socketPlanificador, &read))
 		{
-			if(seDesconectoSocket(socketPlanificador)){
 
-			}
-			//status [MATI]
-		}
-		else if(FD_ISSET(socketConsultaClave, &read)){
+			tratarStatusPlanificador();
+
+		}else if(FD_ISSET(socketConsultaClave, &read)){
 
 			consultarPorClave();
 
@@ -103,6 +103,7 @@ void hiloPlanificador (socket_t socket){
 }
 
 void hiloInstancia (Instancia * instancia) {
+	header header;
 
 	while(1){
 
@@ -113,66 +114,73 @@ void hiloInstancia (Instancia * instancia) {
 
 		pthread_cond_wait(&sbInstanciaActual,&mInstanciaActual);
 
-		if(hayCompactacion){
+		if(hayStatusEnIdInstancia == instancia->idinstancia ){
 
-			header header;
-			header.protocolo = 11;
-			void * buffer;
-			enum instruccion compac = compactacion ;
-			int estado;
-
-			buffer = malloc(sizeof(header) + sizeof(enum instruccion));
-
-			memcpy(buffer , &header.protocolo , sizeof(header) );
-			memcpy(buffer+sizeof(header) , &compac , sizeof(enum instruccion) );
-
-			estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) );
-
-			while(estado !=0){
-				error_show("no se pudo comunicar compactacion a la instancia, volviendo a intentar");
-				estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) );
-			}
-			free(buffer);
-
-			instanciasCompactadas++;
-			if(instanciasCompactadas == cantInstancias){
-				hayCompactacion = 0;
-				instanciasCompactadas = 0;
-			}
-
+			tratarStatusInstancia(instancia);
 
 		}else{
+			if(hayCompactacion){
+
+						header.protocolo = 11;
+						void * buffer;
+						enum instruccion compac = compactacion ;
+						int estado;
+
+						buffer = malloc(sizeof(header) + sizeof(enum instruccion));
+
+						memcpy(buffer , &header.protocolo , sizeof(header) );
+						memcpy(buffer+sizeof(header) , &compac , sizeof(enum instruccion) );
+
+						estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) );
+
+						while(estado !=0){
+							error_show("no se pudo comunicar compactacion a la instancia, volviendo a intentar");
+							estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(enum instruccion) );
+						}
+						free(buffer);
+
+						instanciasCompactadas++;
+						if(instanciasCompactadas == cantInstancias){
+							hayCompactacion = 0;
+							instanciasCompactadas = 0;
+						}
 
 
-			if(instanciaActual->idinstancia == instancia->idinstancia){
+					}else{
 
-				if( comprobarEstadoDeInstancia(instancia) ){
-						break;
+
+						if(instanciaActual->idinstancia == instancia->idinstancia){
+
+							if( comprobarEstadoDeInstancia(instancia) ){
+									break;
+								}
+
+								switch(instancia->esiTrabajando->instr){
+									case get:
+										break;
+									case set:
+										tratarSetInstancia(instancia);
+										break;
+									case store:
+										tratarStoreInstancia(instancia);
+										break;
+									}
+
+								pthread_mutex_lock(&mRespuestaInstancia);
+								if( comprobarEstadoDeInstancia(instancia) ){
+										break;
+									}
+								recibirResultadoInstancia(instancia);
+								pthread_mutex_unlock(&mRespuestaInstancia);
+								pthread_cond_signal(&sbRespuestaInstancia);
+							}
+						pthread_mutex_unlock(&mInstanciaActual);
+
 					}
-
-					switch(instancia->esiTrabajando->instr){
-						case get:
-							break;
-						case set:
-							tratarSetInstancia(instancia);
-							break;
-						case store:
-							tratarStoreInstancia(instancia);
-							break;
-						}
-
-					pthread_mutex_lock(&mRespuestaInstancia);
-					if( comprobarEstadoDeInstancia(instancia) ){
-							break;
-						}
-					recibirResultadoInstancia(instancia);
-					pthread_mutex_unlock(&mRespuestaInstancia);
-					pthread_cond_signal(&sbRespuestaInstancia);
 				}
-			pthread_mutex_unlock(&mInstanciaActual);
 
 		}
-	}
+
 }
 
 
@@ -467,6 +475,124 @@ void consultarPorClave(){
 	free(respuesta);
 }
 
+void tratarStatusPlanificador () {
+	Instancia * instancia;
+	header * header;
+	int estado;
+
+	if(seDesconectoSocket(socketPlanificador)){
+		hayQueSimular = 1;
+		// TODO seguir el caso en que la instancia esta desconectada y el caso en que la clave no tiene instancia asignada (simulo en ambos)
+		}
+
+	recibirMensaje(socketPlanificador,sizeof(header),(void *) &header);
+	if(header->protocolo == 13){
+		recibirMensaje(socketPlanificador,sizeof(tamClave_t),(void *) &RespStatus.tamClave );
+		recibirMensaje(socketPlanificador,RespStatus.tamClave,(void *) &RespStatus.clave);
+
+		instancia = dictionary_get(tablaDeClaves,RespStatus.clave);
+		hayStatusEnIdInstancia = instancia->idinstancia;
+
+		pthread_mutex_lock(&mRespuestaInstancia);
+
+		pthread_cond_broadcast(&sbInstanciaActual); // signal a todos los hilos de instancia para que revisen si deben consultar por status
+
+		pthread_cond_wait(&sbRespuestaInstancia,&mRespuestaInstancia);
+
+		if(RespStatus.existe == 1){
+			header->protocolo = 14;
+			tamNombreInstancia_t tamNombre = sizeof(*instancia->nombre);
+
+			void * buffer = malloc(sizeof(header)
+					+ sizeof(instancia_id)
+					+ tamNombre
+					+ sizeof(tamNombreInstancia_t)
+					+ sizeof(tamValor_t)
+					+ RespStatus.tamValor);
+
+			memcpy(buffer , &header , sizeof(header) );
+			memcpy(buffer+sizeof(header) , &instancia->idinstancia , sizeof(instancia_id) );
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id) , &tamNombre, sizeof(tamNombreInstancia_t) );
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t) , &instancia->nombre, tamNombre );
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre , &RespStatus.tamValor, sizeof(tamValor_t));
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre+sizeof(tamValor_t), &RespStatus.valor, RespStatus.tamValor );
+
+			estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t)+RespStatus.tamValor);
+
+			while(estado !=0){
+				error_show("no se pudo comunicar respuesta status al Planificador, volviendo a intentar");
+				estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t)+RespStatus.tamValor);
+			}
+
+			free(buffer);
+
+		}else{
+
+			header->protocolo = 14;
+			tamNombreInstancia_t tamNombre = sizeof(*instancia->nombre);
+
+			void * buffer = malloc(sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t));
+
+			memcpy(buffer , &header , sizeof(header) );
+			memcpy(buffer+sizeof(header) , &instancia->idinstancia , sizeof(instancia_id) );
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id) , &tamNombre, sizeof(tamNombreInstancia_t) );
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t) , &instancia->nombre, tamNombre );
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre , &RespStatus.tamValor, sizeof(tamValor_t));
+
+
+			estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t) );
+
+			while(estado !=0){
+				error_show("no se pudo comunicar respuesta status al Planificador, volviendo a intentar");
+				estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t) );
+			}
+
+			free(buffer);
+		}
+
+		pthread_mutex_unlock(&mRespuestaInstancia);
+	}
+}
+
+void tratarStatusInstancia (Instancia * instancia) {
+	header header;
+	void * buffer ;
+	header.protocolo = 13;
+	int estado;
+
+	buffer = malloc(sizeof(header) + sizeof(tamClave_t) + RespStatus.tamClave );
+
+	memcpy(buffer , &header.protocolo , sizeof(header) );
+	memcpy(buffer+sizeof(header) , &RespStatus.tamClave , sizeof(tamClave_t) );
+	memcpy(buffer+sizeof(header)+sizeof(tamClave_t) , &RespStatus.clave, RespStatus.tamClave );
+
+	estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(tamClave_t) + RespStatus.tamClave );
+
+	while(estado !=0){
+		error_show("no se pudo preguntar por valor a la instancia, volviendo a intentar");
+		estado = enviarBuffer (instancia->socket , buffer , sizeof(header) + sizeof(tamClave_t) + RespStatus.tamClave );
+	}
+
+	free(buffer);
+
+	hayStatusEnIdInstancia = 0;
+
+	recibirMensaje(instancia->socket,sizeof(header),(void *) &header );
+	if(header.protocolo == 15){
+		// TODO cambiar ese sizeof(int), representa si existe o no el valor en la instancia
+		recibirMensaje(instancia->socket,sizeof(int),(void *) &RespStatus.existe);
+		if(RespStatus.existe == 0){
+			RespStatus.tamValor = 0;
+			pthread_cond_signal(&sbRespuestaInstancia);
+		}else{
+			recibirMensaje(instancia->socket,sizeof(tamValor_t),(void *) &RespStatus.tamValor);
+			recibirMensaje(instancia->socket,RespStatus.tamValor,(void *) &RespStatus.valor );
+			pthread_cond_signal(&sbRespuestaInstancia);
+		}
+
+	}
+}
+
 int comprobarEstadoDeInstancia (Instancia * instancia){
 
 	if( seDesconectoSocket(instancia->socket) ){
@@ -738,48 +864,34 @@ Instancia * algoritmoEquitativeLoad(void){
 
 	Instancia * instancia;
 	pthread_mutex_lock(&mListaInst);
-	do{
-		if(contadorEquitativeLoad >= cantInstancias){
-				contadorEquitativeLoad = 0;
-			}else{
-				contadorEquitativeLoad++;
-			}
+	if (hayQueSimular){ // si hay que simular, hace lo mismo pero con una copia del contador, de modo que no afecta al algoritmo
+		int copiaContador = contadorEquitativeLoad;
+		do{
+			if(copiaContador >= cantInstancias){
+				copiaContador = 0;
+				}else{
+					copiaContador++;
+				}
 
-		instancia = list_get(listaInstancias, contadorEquitativeLoad);
+			instancia = list_get(listaInstancias, contadorEquitativeLoad);
 
-	}while( seDesconectoSocket( instancia->socket) );
+		}while( seDesconectoSocket( instancia->socket) );
+		hayQueSimular = 0;
+
+	}else{
+		do{
+			if(contadorEquitativeLoad >= cantInstancias){
+					contadorEquitativeLoad = 0;
+				}else{
+					contadorEquitativeLoad++;
+				}
+
+			instancia = list_get(listaInstancias, contadorEquitativeLoad);
+
+		}while( seDesconectoSocket( instancia->socket) );
+	}
 	pthread_mutex_unlock(&mListaInst);
 
-	//ahora cuando el hilo de una instancia reconoce que se desconecto la misma,
-	//el hilo elimina la instancia de la lista, no del dictionari por que este es necesario para el caso de reconexion
-	//y le resta a cantInstancias
-
-	/*
-	 * ¿Qué pasa si el contador está en 8 con 9 instancia
-	 * y la siguiente vez que se llama al algoritmo se
-	 * desconectaron dos instancias?
-	 * ¿Qué pasa si reinicio el contador pero antes de volver
-	 * a llamar al algoritmo se conectaron más instancias?
-	 * [MATI]
-	 *
-	 * Esto sigue mal, así que lo voy a decir de otra manera:
-	 * El valor de las listas puede cambiar entre llamado y llamado por
-	 * lo que la comprobación de que el puntero este en un valor valido
-	 * tendria que ser antes de usar el algoritmo no despues.
-	 * Y así como está ahora no vas a poder implementar la respuesta de
-	 * status porque el llamar a la función que cambia el estado del
-	 * puntero y con status eso no deberia pasar.
-	 * [MATI]
-	 */
-
-	//respecto de lo del status, cuando llame al algoritmo para saber que instancia asignaria, dejo que mueva el contador y despues de obtener
-	// la instancia, en el mismo lugar donde la llame le resto 1 al contador del algoritmo, y de esa manera es lo mismo que no haber echo nada
-
-	/*
-	 * ¿Y si te lo dejo en 0? ¿Ahí tambien lo arreglas restando uno al contador?
-	 *
-	 * [MATI]
-	 */
 	return instancia;
 }
 
