@@ -25,6 +25,9 @@ void * resultEjecucion = malloc(sizeof(header));
 
 
 int main(int argc, char **argv) {
+
+	struct t_esi_operacion operacionESI;
+
 	inicializacion(argc, argv);
 
 	conectarConCoordinador();
@@ -36,7 +39,9 @@ int main(int argc, char **argv) {
 	while (1){
 		esperarAvisoEjecucion();
 
-		leerSiguienteInstruccion(argv);
+		operacionESI = leerSiguienteInstruccion(argv);
+
+		if (operacionESI.valido){		//el ESI tiene una sentencia valida
 
 		enviarInstruccionCoord();
 
@@ -50,18 +55,24 @@ int main(int argc, char **argv) {
 			}else if (resultadoSocket == -1 && resultEjecucion == fallo){
 
 			//avisar Planificador que falló
+				//ver en operacionESI.
 
 			}else if (resultEjecucion == bloqueo){
 
 			//avisar Planificador que está bloqueado
 
 			}else if (resultadoSocket == 1){
-				printf("Se cerró el Socket durante la ejecución.");
+				printf("Se cerró el Socket durante la ejecución.\n");
 			//terminar la ejecución [MATI]
+			}
+		puts("Salio todo bien\n");
 		}
-	}//Faltaba está llave [MATI]
+		else {					//si el ESI tiene una sentencia invalida
+			salirConError()
+		}
 
-	puts("Salio todo bien\n");
+	}
+
 	liberarRecursos();
 	exit(0);
 }
@@ -148,13 +159,8 @@ void liberarRecursos()
  * PD: Si sos de los que escriben todo y despues
  * lo declaran, ignora esto.
  */
-void leerSiguienteInstruccion(char** argv)
+struct t_esi_operacion leerSiguienteInstruccion(char** argv)
 {
-	/*
-	 * Listen devuelve 1 o 0 para error y exito respectivamente,
-	 * no la cantidad de peticiones encoladas.
-	 * [MATI]
-	 */
 	/*
 	 * No hace falta usar un puntero para el leer caracter leido
 	 * con una variable char alcanza (a fread se lo pasas usando el
@@ -168,39 +174,24 @@ void leerSiguienteInstruccion(char** argv)
 	 * pasarle la linea y te devuelve toda la información de la instrucción
 	 * [MATI]
 	 */
-	char * linea = "";
-	char * leido = "";
+	char * linea = string_new();
+	char leido = "";
 	char * operacion;
 
-			while (*leido != '\0' || !feof(programa) || *leido != '\n' ){
-				fread(leido, sizeof(char),1,programa);
-				string_append(*leido, *linea);
+			while (leido != '\0' || !feof(programa) || leido != '\n' ){
+				fread(&leido, sizeof(char),1,programa);
+				string_append(*linea, leido);
 			}
-			operacion = string_split(*leido," ");
 
-			instr = dictionary_get(tablaDeInstrucciones,operacion[0]);
-			clave = operacion[1];
-			valor = operacion[2];
-		/*
-		 * Lo que tenes que leer no tiene un tamaño fijo sino
-		 * que tenes que leer hasta encontrar el caracter de
-		 * fin de linea o fin de archivo, lo que pase primero.
-		 *
-		 * Ademas el primer paramentro de fread recibe la
-		 * dirección de memoria donde se va a guardar la
-		 * informacion.
-		 * [MATI]
-		 *
-		 * PD: para solucionar esto va a tener que usar la
-		 * biblioteca de strings de las commons.
-		 */
+			operacion = string_split(*linea," ");
 
+			return parse(operacion);
 		/*
 		 * Parse recibe una linea (char*) y devuelve el valor
 		 * de un t_esi_operacion (definido en el parser).
 		 * [MATI]
 		 */
-	}
+}
 
 /*
  * Si queres dejar esto, dejalo pero para hacer una función
