@@ -33,7 +33,7 @@ typedef struct {
 
 	tamClave_t * tamClave;
 	char* clave;
-	int * existe;
+	booleano * existe;
 	tamValor_t * tamValor;
 	char* valor;
 } RespuestaStatus;
