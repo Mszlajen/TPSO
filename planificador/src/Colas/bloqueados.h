@@ -22,4 +22,5 @@ int ESIEstaEnLista(ESI*, t_list*);
 void colocarEnColaESI(ESI*, char*);
 t_list* listarID(char*);
 t_list* detectarDeadlock();
+void entregarRecursosAlSistema(ESI*);
 #endif /* COLAS_BLOQUEADOS_H_ */

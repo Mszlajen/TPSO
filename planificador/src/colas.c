@@ -17,7 +17,6 @@ void cerrarColas()
 
 void finalizarESI(ESI* esi)
 {
-	liberarRecursosDeESI(esi);
 	agregarAFinalizadosESI(esi);
 	if(esESIEnEjecucion(esi->id))
 		quitarESIEjecutando(esi);

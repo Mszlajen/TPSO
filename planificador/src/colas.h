@@ -11,6 +11,7 @@ void inicializarColas();
 void cerrarColas();
 ESI* seleccionarESIPorAlgoritmo(enum t_algoritmo);
 void liberarRecursosDeESI(ESI*);
+//No libera los recursos del ESI
 void finalizarESI(ESI*);
 void bloquearESI(ESI*, char*);
 

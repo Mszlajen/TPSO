@@ -110,6 +110,7 @@ void ejecucionDeESI(ESI* esi)
 		free(ultimaConsulta -> clave);
 		free(ultimaConsulta);
 		ultimaConsulta = NULL;
+		entregarRecursosAlSistema(esi);
 		finalizarESI(esi);
 		return;
 	}
@@ -141,7 +142,7 @@ void ejecucionDeESI(ESI* esi)
 			}
 			else
 			{
-				reservarClave(esi, ultimaConsulta -> clave);
+				reservarClave(esi, string_duplicate(ultimaConsulta -> clave));
 				printf("El ESI %i tomo poseción de la clave %s", esi -> id, ultimaConsulta -> clave);
 			}
 			pthread_mutex_unlock(&mBloqueados);
@@ -162,6 +163,7 @@ void ejecucionDeESI(ESI* esi)
 			settearAvisoBloqueo(NULL);
 		}
 		printf("El ESI %i finalizo su ejecución.", esi -> id);
+		liberarRecursosDeESI(esi);
 		finalizarESI(esi);
 		return;
 	}
