@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/select.h>
+#include <pthread.h>
+#include <semaphore.h>
 #include <readline/readline.h>
 #include <commons/collections/list.h>
 #include <commons/error.h>
@@ -51,6 +53,9 @@ void comandoBloquear(char*, char*);
 void comandoDesbloquear(char*);
 void comandoListar(char*);
 void comandoDeadlock();
+
+void finalizarESIBien(ESI* esi);
+void finalizarESIMal(ESI* esi);
 
 int max (int, int);
 void terminarEjecucionESI(ESI*);
