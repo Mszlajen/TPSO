@@ -2,12 +2,15 @@
 #include "configuracion.h"
 #include "colas.h"
 
-sem_t corriendo, esiEjecutando;
+sem_t corriendo, contESIEnReady;
 
 pthread_mutex_t mReady = PTHREAD_MUTEX_INITIALIZER,
 				mBloqueados = PTHREAD_MUTEX_INITIALIZER,
 				mFinalizados = PTHREAD_MUTEX_INITIALIZER,
-				mESIEjecutando = PTHREAD_MUTEX_INITIALIZER;
+				mEjecutando = PTHREAD_MUTEX_INITIALIZER,
+				mEnEjecucion = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_cond_t cFinEjecucion = PTHREAD_COND_INITIALIZER;
 
 socket_t socketLlegadaNuevaESI = ERROR, socketEjecucionDeCoordinador = ERROR;
 
@@ -29,20 +32,27 @@ int main(int argc, char** argv) {
 	ESI * esiAEjecutar;
 	while(!terminoEjecucion)
 	{
-		sem_wait(&esiEjecutando);
+		sem_wait(&contESIEnReady);
 		sem_wait(&corriendo);
 
-		pthread_mutex_lock(&mESIEjecutando);
+		pthread_mutex_lock(&mEjecutando);
 		pthread_mutex_lock(&mReady);
 		esiAEjecutar = seleccionarESIPorAlgoritmo(obtenerAlgoritmo());
 		pthread_mutex_unlock(&mReady);
+		pthread_mutex_unlock(&mEjecutando);
+
+		/*
+		 * Este if es porque mientras estaba pausado los ESI en ready
+		 * pudieron haberse desconectado o ser bloqueados por consola.
+		 */
 		if(!esiAEjecutar)
 			continue;
-
 		pthread_cancel(esiAEjecutar -> hiloDeFin);
-		ejecucionDeESI(esiAEjecutar);
 
-		pthread_mutex_unlock(&mESIEjecutando);
+		pthread_mutex_lock(&mEnEjecucion);
+		ejecucionDeESI(esiAEjecutar);
+		pthread_cond_signal(&cFinEjecucion);
+		pthread_mutex_unlock(&mEnEjecucion);
 
 		sem_post(&corriendo);
 	}
@@ -90,7 +100,6 @@ void ejecucionDeESI(ESI* esi)
 {
 	enum resultadoEjecucion res;
 	void* resultado = NULL;
-	booleano seBloqueo = 0;
 
 	enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
 
@@ -107,11 +116,6 @@ void ejecucionDeESI(ESI* esi)
 	if(res == fallo)
 	{
 		//Esto se repite despues, podria modulizarlo.
-		if(hayAvisoBloqueo())
-		{
-			printf("El ESI %i finalizo y no pudo ser bloqueado", esi -> id);
-			settearAvisoBloqueo(NULL);
-		}
 		printf("El ESI %i tuvo un fallo en su ejecución y fue terminado.", esi -> id);
 		free(ultimaConsulta -> clave);
 		free(ultimaConsulta);
@@ -132,7 +136,7 @@ void ejecucionDeESI(ESI* esi)
 				if(esiLiberado)
 				{
 					listarParaEjecucion(esiLiberado);
-					sem_post(&esiEjecutando);
+					sem_post(&contESIEnReady);
 				}
 				pthread_mutex_unlock(&mBloqueados);
 				pthread_mutex_unlock(&mReady);
@@ -145,8 +149,6 @@ void ejecucionDeESI(ESI* esi)
 			if(ultimaConsulta -> resultado)
 			{
 				colocarEnColaESI(esi, ultimaConsulta -> clave);
-				seBloqueo = 1;
-				sem_wait(&esiEjecutando);
 				printf("El ESI %i se bloqueo por la clave %s", esi -> id, ultimaConsulta -> clave);
 			}
 			else
@@ -166,29 +168,9 @@ void ejecucionDeESI(ESI* esi)
 		free(ultimaConsulta -> clave);
 		free(ultimaConsulta);
 		ultimaConsulta = NULL;
-		if(hayAvisoBloqueo())
-		{
-			printf("El ESI %i finalizo y no pudo ser bloqueado", esi -> id);
-			settearAvisoBloqueo(NULL);
-		}
 		printf("El ESI %i finalizo su ejecución.", esi -> id);
 		finalizarESIBien(esi);
-		sem_wait(&esiEjecutando);
 		return;
-	}
-
-	//Comprobar si hubo y responder comando bloquear.
-	if(hayAvisoBloqueo())
-	{
-		if(seBloqueo)
-			printf("El ESI %i ya se encuentra bloqueado por la clave %s", esi -> id, ultimaConsulta -> clave);
-		else
-		{
-			colocarEnColaESI(esi, getClaveAvisoBloqueo());
-			sem_wait(&esiEjecutando);
-			printf("El ESI %i se bloqueo por la clave %s", esi -> id, getClaveAvisoBloqueo());
-		}
-		settearAvisoBloqueo(NULL);
 	}
 
 	free(ultimaConsulta -> clave);
@@ -196,7 +178,7 @@ void ejecucionDeESI(ESI* esi)
 	ultimaConsulta = NULL;
 
 	//El ESI sigue siendo valido para el planificador por lo tanto se puede llegar a desconectar.
-	sem_post(&esiEjecutando);
+	sem_post(&contESIEnReady);
 	crearFinEjecucion(esi);
 }
 
@@ -223,7 +205,7 @@ void escucharPorESI ()
 			pthread_mutex_lock(&mReady);
 			listarParaEjecucion(nuevaESI);
 			pthread_mutex_unlock(&mReady);
-			sem_post(&esiEjecutando);
+			sem_post(&contESIEnReady);
 		}
 		else
 		{
@@ -242,7 +224,7 @@ void escucharPorFinESI(ESI* esi)
 		{
 			printf("El ESI %i se desconecto.", esi -> id);
 			finalizarESIMal(esi);
-			sem_wait(&esiEjecutando);
+			sem_wait(&contESIEnReady);
 			pthread_exit(NULL);
 		}
 	}
@@ -287,31 +269,32 @@ void comandoBloquear(char* clave, char* IdESI)
 		return;
 	}
 
+	pthread_mutex_lock(&mEjecutando);
 	if(esESIEnEjecucion(IDparaBloquear))
 	{
-		settearAvisoBloqueo(clave);
 		printf("El ESI a bloquear está ejecutando, esperando fin de ejecución.\n");
-		while(hayAvisoBloqueo());
+		pthread_mutex_lock(&mEnEjecucion);
+		pthread_cond_wait(&cFinEjecucion, &mEnEjecucion);
+		ESIParaBloquear = ESIEjecutando();
 	}
-	else
+	pthread_mutex_lock(&mBloqueados);
+	pthread_mutex_lock(&mReady);
+	if(!ESIParaBloquear || !(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
 	{
-		pthread_mutex_lock(&mBloqueados);
-		pthread_mutex_lock(&mReady);
-		if(!(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
-		{
-			printf("El ESI no se encuentra en ready o ejecutando.\n");
-			pthread_mutex_unlock(&mReady);
-			pthread_mutex_unlock(&mBloqueados);
-			return;
-		}
-
-		bloquearESI(ESIParaBloquear, clave);
-		sem_wait(&esiEjecutando);
+		printf("El ESI no se encuentra en ready o ejecutando.\n");
 		pthread_mutex_unlock(&mReady);
-
 		pthread_mutex_unlock(&mBloqueados);
-
+		pthread_mutex_unlock(&mEjecutando);
+		return;
 	}
+
+	bloquearESI(ESIParaBloquear, clave);
+	printf("El ESI fue bloqueado exitosamente");
+
+	pthread_mutex_unlock(&mReady);
+	pthread_mutex_unlock(&mBloqueados);
+	pthread_mutex_unlock(&mEjecutando);
+	sem_wait(&contESIEnReady);
 }
 
 void comandoDesbloquear(char* clave)
@@ -335,7 +318,7 @@ void comandoDesbloquear(char* clave)
 	pthread_mutex_lock(&mReady);
 	listarParaEjecucion(ESIDesbloqueado);
 	pthread_mutex_unlock(&mReady);
-	sem_post(&esiEjecutando);
+	sem_post(&contESIEnReady);
 }
 
 void comandoListar(char* clave)
@@ -391,7 +374,7 @@ void inicializacion (char* dirConfig)
 
 	//El tercer parametro es el valor inicial del semaforo
 	sem_init(&corriendo, 0, 0);
-	sem_init(&esiEjecutando, 0, 0);
+	sem_init(&contESIEnReady, 0, 0);
 
 	/*
 	 * Crea los socket en cualquier IP y puerto que el SO
@@ -604,9 +587,9 @@ void liberarRecursos()
 	pthread_mutex_destroy(&mReady);
 	pthread_mutex_destroy(&mBloqueados);
 	pthread_mutex_destroy(&mFinalizados);
-	pthread_mutex_destroy(&mESIEjecutando);
+	pthread_mutex_destroy(&mEjecutando);
 	sem_destroy(&corriendo);
-	sem_destroy(&esiEjecutando);
+	sem_destroy(&contESIEnReady);
 
 }
 
