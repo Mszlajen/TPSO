@@ -89,6 +89,12 @@ void terminal()
 		case listar:
 			comandoListar(palabras[1]);
 			break;
+		case kill:
+			comandoKill(palabras[1]);
+			break;
+		case status:
+			comandoStatus(palabras[1]);
+			break;
 		case deadlock:
 			comandoDeadlock();
 			break;
@@ -384,6 +390,45 @@ void comandoListar(char* clave)
 		list_iterate(listaDeID, imprimirID);
 		list_destroy_and_destroy_elements(listaDeID, free);
 	}
+}
+
+void comandoKill(char *IdESI)
+{
+	ESI_id IDparaMatar = atoi(IdESI);
+	ESI* ESIParaMatar = NULL;
+
+	//Compruebo que parametro ID haya sido un posible ID
+	if(IDparaMatar > 0)
+	{
+		printf("El parametro ID no es valido.\n");
+		return;
+	}
+
+	//Compruebo que sea el ESI ejecutando, espero a que termine la ejecución
+	//y despues compruebo que lo siga siendo
+	pthread_mutex_lock(&mEjecutando);
+	if(esESIEnEjecucion(IDparaMatar))
+	{
+		printf("El ESI a matar está ejecutando, esperando fin de ejecución.\n");
+		pthread_mutex_lock(&mEnEjecucion);
+		pthread_cond_wait(&cFinEjecucion, &mEnEjecucion);
+		if(esESIEnEjecucion(IDparaMatar))
+			ESIParaMatar = ESIEjecutando();
+	}
+	if(ESIParaMatar || (ESIParaMatar = ESIEnReady(IDparaMatar)) || (ESIParaMatar = ESIEstaBloqueado(IDparaMatar)))
+	{
+		finalizarESIBien(ESIParaMatar);
+		printf("El ESI %s fue finalizado.\n", IdESI);
+	}
+	else if(estaEnFinalizados(IDparaMatar))
+	{
+		printf("El ESI %i ya está finalizado.\n", IdESI);
+	}
+	else
+	{
+		printf("El ESI %i no existe en el sistema.\n");
+	}
+	pthread_mutex_unlock(&mEjecutando);
 }
 
 void comandoStatus(char* clave)

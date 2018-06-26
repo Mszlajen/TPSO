@@ -64,6 +64,7 @@ void escucharPorFinESI();
 void comandoBloquear(char*, char*);
 void comandoDesbloquear(char*);
 void comandoListar(char*);
+void comandoKill(char*);
 void comandoStatus(char*);
 void comandoDeadlock();
 
