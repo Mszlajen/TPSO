@@ -37,6 +37,14 @@ typedef struct {
 enum instruccion {get, set, store, compactacion, create};
 enum tipoDeInstruccion {bloqueante, liberadora, noDefinido};
 enum resultadoEjecucion {exito, bloqueo, fallo, fin, necesitaCompactar};
+/*
+ * Descripción de los estados:
+ * existente - Tiene instancia asignada y un valor.
+ * innexistente - No tiene instancia asignada.
+ * caida - Tiene instancia asignada pero está desconectada.
+ * sinValor - Tiene instancia asignada pero está no tiene su valor.
+ */
+enum estadoClave {existente, innexistente, caida, sinValor};
 
 void salir_agraciadamente(int);
 //-1 en error o fileDescriptor en exito
