@@ -8,13 +8,17 @@ pthread_mutex_t mReady = PTHREAD_MUTEX_INITIALIZER,
 				mBloqueados = PTHREAD_MUTEX_INITIALIZER,
 				mFinalizados = PTHREAD_MUTEX_INITIALIZER,
 				mEjecutando = PTHREAD_MUTEX_INITIALIZER,
-				mEnEjecucion = PTHREAD_MUTEX_INITIALIZER;
+				mEnEjecucion = PTHREAD_MUTEX_INITIALIZER,
+				mCondicionStatus = PTHREAD_MUTEX_INITIALIZER;
 
-pthread_cond_t cFinEjecucion = PTHREAD_COND_INITIALIZER;
+pthread_cond_t cFinEjecucion = PTHREAD_COND_INITIALIZER,
+				cRecibioStatus = PTHREAD_COND_INITIALIZER;
 
-socket_t socketLlegadaNuevaESI = ERROR, socketEjecucionDeCoordinador = ERROR;
+socket_t socketLlegadaNuevaESI = ERROR, socketConsultarStatus = ERROR;
 
 consultaCoord *ultimaConsulta = NULL;
+
+consultaStatus *status = NULL;
 
 int terminoEjecucion = 0;
 
@@ -232,12 +236,12 @@ void escucharPorFinESI(ESI* esi)
 
 void comunicacionCoord(socket_t socketCoord)
 {
-	int maxFd = max(socketCoord, socketEjecucionDeCoordinador);
+	int maxFd = max(socketCoord, socketConsultarStatus);
 	fd_set master, read;
 
 	FD_ZERO(&master);
 	FD_SET(socketCoord, &master);
-	FD_SET(socketEjecucionDeCoordinador, &master);
+	FD_SET(socketConsultarStatus, &master);
 	while(1)
 	{
 		read = master;
@@ -250,11 +254,19 @@ void comunicacionCoord(socket_t socketCoord)
 			//Consulta estado clave
 			ultimaConsulta = recibirConsultaCoord(socketCoord);
 			enviarRespuestaConsultaCoord(socketCoord,
-						claveTomadaPorESI(ultimaConsulta -> clave, ultimaConsulta -> id_esi));
+										claveTomadaPorESI(ultimaConsulta -> clave, ultimaConsulta -> id_esi));
 		}
 		else
 		{
-			//status
+			enviarHeader(socketCoord, 13);
+			enviarBuffer(socketCoord, (void*) &(status -> tamClave), sizeof(tamClave_t));
+			enviarBuffer(socketCoord, (void*) status -> clave, status -> tamClave);
+
+			recibirRespuestaStatus(socketCoord, status);
+
+			pthread_mutex_lock(&mCondicionStatus);
+			pthread_cond_signal(&cRecibioStatus);
+			pthread_mutex_unlock(&mCondicionStatus);
 		}
 	}
 }
@@ -374,6 +386,45 @@ void comandoListar(char* clave)
 	}
 }
 
+void comandoStatus(char* clave)
+{
+	printf("Preguntando al coordinador por el estado de la clave %s", clave);
+
+	status = malloc(sizeof(consultaStatus));
+	status -> clave = clave;
+	status -> tamClave = string_length(clave) + 1;
+
+	enviarHeader(socketConsultarStatus, 0);
+
+	pthread_mutex_lock(&mCondicionStatus);
+	pthread_cond_wait(&cRecibioStatus, &mCondicionStatus);
+	pthread_mutex_unlock(&mCondicionStatus);
+
+	switch(status -> estado)
+	{
+	case existente:
+		printf("La clave %s se encuentra en la instancia %i (%s) y su valor actual %s.\n", clave,
+				status -> id, status -> nombre, status -> valor);
+		free(status -> valor);
+		break;
+	case innexistente:
+		printf("La clave %s no tiene instacia asignada, actualmente iria a la %i (%s).\n", clave,
+				status -> id, status -> nombre);
+		break;
+	case caida:
+		printf("La clave %s se encuentra en la instancia %i (%s) que está desconectada.\n", clave,
+				status -> id, status -> nombre);
+		break;
+	case sinValor:
+		printf("La clave %s se encontraba en la instancia %i (%s) pero fue reemplazada.\n", clave,
+				status -> id, status -> nombre);
+		break;
+	}
+	comandoListar(clave);
+	free(status -> nombre);
+	free(status);
+}
+
 void comandoDeadlock()
 {
 	void imprimirID(void* id)
@@ -410,7 +461,7 @@ void inicializacion (char* dirConfig)
 	 * tenga disponible.
 	 */
 	socketLlegadaNuevaESI = crearSocketServer(NULL, "0");
-	socketEjecucionDeCoordinador = crearSocketServer(NULL, "0");
+	socketConsultarStatus = crearSocketServer(NULL, "0");
 
 }
 
@@ -480,6 +531,39 @@ consultaCoord* recibirConsultaCoord(socket_t socketCoord)
 	recibirMensaje(socketCoord, consulta -> tamClave, (void**) &consulta -> clave);
 
 	return consulta;
+}
+
+void recibirRespuestaStatus(socket_t socketCoord, consultaStatus* status)
+{
+	void *buffer = NULL;
+	recibirMensaje(socketCoord, sizeof(header) + sizeof(instancia_id) + sizeof(tamNombreInstancia_t), &buffer);
+	if(((header*) buffer) -> protocolo != 14)
+	{ /*ERROR*/}
+	free(buffer);
+
+	recibirMensaje(socketCoord, sizeof(instancia_id) + sizeof(tamNombreInstancia_t), &buffer);
+	status -> id = *((instancia_id*) buffer);
+	status -> tamNombre = *((tamNombreInstancia_t*) buffer + sizeof(instancia_id));
+	free(buffer);
+
+	recibirMensaje(socketCoord, status -> tamNombre, &buffer);
+	status -> nombre = string_duplicate((char*) buffer);
+	free(buffer);
+
+	recibirMensaje(socketCoord, sizeof(enum estadoClave), &buffer);
+	status -> estado = *((enum estadoClave*) buffer);
+	free(buffer);
+
+	if(status -> estado == existente)
+	{
+		recibirMensaje(socketCoord, sizeof(tamValor_t), &buffer);
+		status -> tamValor = *((tamValor_t*) buffer);
+		free(buffer);
+
+		recibirMensaje(socketCoord, status -> tamValor, &buffer);
+		status -> valor = string_duplicate((char*) buffer);
+		free(buffer);
+	}
 }
 
 socket_t crearServerESI ()
