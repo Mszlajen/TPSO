@@ -7,7 +7,7 @@
 #include <biblio.h>
 
 typedef struct {
-	id_t id;
+	ESI_id id;
 	socket_t socket;
 	int estimacion;
 	int ultimaEstimacion;

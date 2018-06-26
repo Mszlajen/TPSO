@@ -13,6 +13,16 @@ void agregarAFinalizadosESI(ESI* esi)
 	list_add(finalizados, id);
 }
 
+booleano estaEnFinalizados(ESI_id id)
+{
+	bool esESI(void *data)
+	{
+		return *((ESI_id*)data) == id;
+	}
+
+	return list_any_satisfy(finalizados, esESI);
+}
+
 void crearListaFinalizados()
 {
 	if(!finalizados)

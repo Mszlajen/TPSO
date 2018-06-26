@@ -6,6 +6,7 @@
 #include "../adminESI.h"
 
 void agregarAFinalizadosESI(ESI*);
+booleano estaEnFinalizados(ESI_id);
 
 void crearListaFinalizados();
 void cerrarListaFinalizados();

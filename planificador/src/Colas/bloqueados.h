@@ -9,6 +9,8 @@
 
 int ESIEstaBloqueadoPorClave(ESI*, char*);
 int ESITieneClave(ESI*, char*);
+//Devuelve NULL en false y la referencia al ESI en true
+ESI* ESIEstaBloqueado(ESI_id);
 booleano claveTomada (char*);
 booleano claveTomadaPorESI (char*, ESI_id);
 void reservarClave(ESI*, char*);
@@ -18,7 +20,7 @@ ESI* desbloquearESIDeClave(char*);
 void quitarESIDeBloqueados(ESI_id);
 void crearColasBloqueados();
 void cerrarColasBloqueados();
-int ESIEstaEnLista(ESI*, t_list*);
+booleano ESIEstaEnLista(ESI*, t_list*);
 void colocarEnColaESI(ESI*, char*);
 t_list* listarID(char*);
 t_list* detectarDeadlock();

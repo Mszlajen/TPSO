@@ -263,53 +263,81 @@ void comandoBloquear(char* clave, char* IdESI)
 {
 	ESI_id IDparaBloquear = atoi(IdESI);
 	ESI* ESIParaBloquear = NULL;
-	if(!IDparaBloquear)
+
+	//Compruebo que parametro ID haya sido un posible ID
+	if(IDparaBloquear > 0)
 	{
 		printf("El parametro ID no es valido.\n");
 		return;
 	}
 
+	//Compruebo que sea el ESI ejecutando, espero a que termine la ejecución
+	//y despues compruebo que lo siga siendo
 	pthread_mutex_lock(&mEjecutando);
 	if(esESIEnEjecucion(IDparaBloquear))
 	{
 		printf("El ESI a bloquear está ejecutando, esperando fin de ejecución.\n");
 		pthread_mutex_lock(&mEnEjecucion);
 		pthread_cond_wait(&cFinEjecucion, &mEnEjecucion);
-		ESIParaBloquear = ESIEjecutando();
+		if(esESIEnEjecucion(IDparaBloquear))
+			ESIParaBloquear = ESIEjecutando();
 	}
 	pthread_mutex_lock(&mBloqueados);
 	pthread_mutex_lock(&mReady);
-	if(!ESIParaBloquear || !(ESIParaBloquear = ESIEnReady(IDparaBloquear)))
+	if(ESIParaBloquear || (ESIParaBloquear = ESIEnReady(IDparaBloquear)))
 	{
-		printf("El ESI no se encuentra en ready o ejecutando.\n");
-		pthread_mutex_unlock(&mReady);
-		pthread_mutex_unlock(&mBloqueados);
-		pthread_mutex_unlock(&mEjecutando);
-		return;
+		if(claveTomada(clave))
+		{
+			bloquearESI(ESIParaBloquear, clave);
+			printf("La clave %s ya se encuentra tomada, el ESI %i fue bloqueada.\n", clave, ESIParaBloquear -> id);
+		}
+		else
+		{
+			reservarClave(ESIParaBloquear, clave);
+			printf("La clave %s fue tomada por el ESI %i.\n", clave, ESIParaBloquear -> id);
+		}
 	}
-
-	bloquearESI(ESIParaBloquear, clave);
-	printf("El ESI fue bloqueado exitosamente");
-
+	else if(estaEnFinalizados(IDparaBloquear))
+	{
+		printf("El ESI %i ya está finalizado.\n", IDparaBloquear);
+	}
+	else if((ESIParaBloquear = ESIEstaBloqueado(IDparaBloquear)))
+	{
+		if(claveTomada(clave))
+		{
+			printf("La clave %s ya se encuentra tomada, el ESI %i ya se encontraba bloqueado.\n", clave, ESIParaBloquear -> id);
+		}
+		else
+		{
+			reservarClave(ESIParaBloquear, clave);
+			printf("La clave %s fue tomada por el ESI %i.\n", clave, ESIParaBloquear -> id);
+		}
+	}
+	else
+	{
+		printf("El ESI %i no existe en el sistema.\n");
+	}
 	pthread_mutex_unlock(&mReady);
 	pthread_mutex_unlock(&mBloqueados);
 	pthread_mutex_unlock(&mEjecutando);
-	sem_wait(&contESIEnReady);
 }
 
 void comandoDesbloquear(char* clave)
 {
-	/*
-	 * Si la clave que se le pasa es inexistente, el comando no hace
-	 * nada y tampoco avisa al usuario.
-	 * (Revisar, tal vez)
-	 */
 	pthread_mutex_lock(&mBloqueados);
 	ESI* ESIDesbloqueado = desbloquearESIDeClave(clave);
 	if(!ESIDesbloqueado)
 	{
-		printf("No hay ESI bloqueados para esa clave\n");
-		liberarClave(clave); //No necesito leer el valor de retorno porque sé que es NULL
+		printf("No hay ESI bloqueados para la clave %s.\n", clave);
+		if(claveTomada(clave))
+		{
+			liberarClave(clave); //No necesito leer el valor de retorno porque sé que es NULL
+			printf("Se libero la clave %s.\n", clave);
+		}
+		else
+		{
+			printf("La clave %s no se encuentra tomada.\n", clave);
+		}
 		pthread_mutex_unlock(&mBloqueados);
 		return;
 	}
@@ -319,6 +347,7 @@ void comandoDesbloquear(char* clave)
 	listarParaEjecucion(ESIDesbloqueado);
 	pthread_mutex_unlock(&mReady);
 	sem_post(&contESIEnReady);
+	printf("Se agrego a Ready el ESI %i", ESIDesbloqueado -> id);
 }
 
 void comandoListar(char* clave)

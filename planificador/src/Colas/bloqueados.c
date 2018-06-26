@@ -45,6 +45,27 @@ int ESITieneClave(ESI* esi, char* clave)
 	else return 1;
 }
 
+ESI* ESIEstaBloqueado(ESI_id esiId)
+{
+	/*
+	 * La falta optimicidad (eso es una palabra?)
+	 * porque necesita revisar todos los ESI
+	 * bloqueados siempre.
+	 */
+	ESI* retorno = NULL;
+	void comprobarESI(void* esi)
+	{
+		if(((ESI*) esi) -> id == esiId)
+			retorno = esi;
+	}
+	void buscarESIenCola(void* cola)
+	{
+		list_iterate((t_list*) cola, comprobarESI);
+	}
+	dictionary_iterator(colasBloqueados, buscarESIenCola);
+	return retorno;
+}
+
 void colocarEnColaESI(ESI* esi, char* clave)
 {
 	if(dictionary_has_key(colasBloqueados, clave))
@@ -168,7 +189,7 @@ void cerrarColasBloqueados()
 	}
 }
 
-int ESIEstaEnLista(ESI* esi, t_list * lista)
+booleano ESIEstaEnLista(ESI* esi, t_list * lista)
 {
 	bool esEsteESI(void* data)
 	{
@@ -182,7 +203,7 @@ booleano existeCandidatoBloqueadoPorClave(t_list* candidatos, t_list* claves)
 	int i_cand, i_clav;
 	for(i_cand = 0; i_cand < list_size(candidatos); i_cand++)
 	{
-		for(i_clav = 0; i_clav < list_size(claves); i_clav)
+		for(i_clav = 0; i_clav < list_size(claves); i_clav++)
 		{
 			if(ESIEstaBloqueadoPorClave(list_get(candidatos, i_cand), list_get(claves, i_clav)))
 				return 1;
