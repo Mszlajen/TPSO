@@ -40,6 +40,7 @@ void recibirRespuestaHandshake(socket_t);
 
 void dump();
 void procesamientoInstrucciones(socket_t);
+void procesamientoStatus(socket_t);
 
 
 instruccion_t* recibirInstruccionCoordinador(socket_t);

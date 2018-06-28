@@ -18,9 +18,28 @@ int main(int argc, char** argv) {
 
 	inicializar(argv[1], &socketCoord);
 
-	procesamientoInstrucciones(socketCoord);
 	/*pthread_t hiloDump;
 	pthread_create(&hiloDump, NULL, (void*) dump, NULL);*/
+
+	while(!terminoEjecucion)
+	{
+		header* encabezado;
+		recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado);
+		switch(encabezado -> protocolo)
+		{
+		case 11:
+			procesamientoInstrucciones(socketCoord);
+			break;
+		case 13:
+			//Status
+			procesamientoStatus(socketCoord);
+			break;
+		default:
+			//Error
+			break;
+		}
+	}
+
 	//pthread_join(hiloDump, NULL);
 
 	liberarRecursosGlobales();
@@ -50,44 +69,74 @@ void dump()
 	}
 }
 
+void procesamientoStatus(socket_t socketCoord)
+{
+	tamClave_t *tamClave = NULL;
+	char* clave = NULL;
+	recibirMensaje(socketCoord, sizeof(tamClave_t), (void**) &tamClave);
+	recibirMensaje(socketCoord, *tamClave, (void**) &clave);
+	free(tamClave);
+
+	header head;
+	head.protocolo = 15;
+	enviarHeader(socketCoord, head);
+
+	booleano existe = dictionary_has_key(infoClaves, clave);
+	enviarBuffer(socketCoord, (void*) &existe, sizeof(booleano));
+
+	if(existe)
+	{
+		//El valor existe
+
+		//Recupero el Valor de la clave
+		infoClave_t *infoClave = dictionary_get(infoClaves, clave);
+		tamValor_t tamValor = infoClave -> tamanio + 1;
+		char* valor = malloc(tamValor);
+		char nulo = '\0';
+		memcpy(valor, tablaDeEntradas + infoClave -> entradaInicial * tamanioEntradas, infoClave -> tamanio);
+		memcpy(valor + tamValor - 1, (void*) &nulo, sizeof(char));
+
+		enviarBuffer(socketCoord, (void*) &tamValor, sizeof(tamValor));
+		enviarBuffer(socketCoord, (void*) valor, tamValor);
+
+		free(valor);
+	}
+}
+
 void procesamientoInstrucciones(socket_t socketCoord)
 {
-	instruccion_t* instruc;
+	instruccion_t* instruc = recibirInstruccionCoordinador(socketCoord);
 	enum resultadoEjecucion res;
 	booleano esLRU = obtenerAlgoritmoReemplazo() == LRU;
-	while(!terminoEjecucion)
+	switch(instruc -> tipo)
 	{
-		instruc = recibirInstruccionCoordinador(socketCoord);
-		switch(instruc -> tipo)
-		{
-		case set:
-			if(esLRU)
-				incrementarUltimoUsoClaves();
-			res = instruccionSet(instruc);
-			break;
-		case store:
-			if(esLRU)
-				incrementarUltimoUsoClaves();
-			res = instruccionStore(instruc);
-			break;
-		case create:
-			if(esLRU)
-				incrementarUltimoUsoClaves();
-			res = registrarNuevaClave(instruc -> clave, instruc -> valor, instruc -> tamValor);
-			break;
-		case compactacion:
-			break;
-		case get:
-			/*
-			 * No me gustan los warnings al pepe.
-			 */
-			break;
-		}
-		enviarResultadoEjecucion(socketCoord, res);
-		free(instruc -> clave);
-		free(instruc -> valor);
-		free(instruc);
+	case set:
+		if(esLRU)
+			incrementarUltimoUsoClaves();
+		res = instruccionSet(instruc);
+		break;
+	case store:
+		if(esLRU)
+			incrementarUltimoUsoClaves();
+		res = instruccionStore(instruc);
+		break;
+	case create:
+		if(esLRU)
+			incrementarUltimoUsoClaves();
+		res = registrarNuevaClave(instruc -> clave, instruc -> valor, instruc -> tamValor);
+		break;
+	case compactacion:
+		break;
+	case get:
+		/*
+		 * No me gustan los warnings al pepe.
+		 */
+		break;
 	}
+	enviarResultadoEjecucion(socketCoord, res);
+	free(instruc -> clave);
+	free(instruc -> valor);
+	free(instruc);
 }
 
 void conectarConCoordinador(socket_t *socketCoord)
@@ -186,14 +235,7 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 
 instruccion_t* recibirInstruccionCoordinador(socket_t socketCoord)
 {
-	listen(socketCoord, 5);
 	instruccion_t *instruccion = malloc(sizeof(instruccion_t));
-
-	header* encabezado;
-	recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado);
-	if(encabezado->protocolo != 11)
-	{	/*error*/ }
-	free(encabezado);
 
 	enum tipoDeInstruccion *tipo;
 	recibirMensaje(socketCoord, sizeof(enum tipoDeInstruccion), (void**) &tipo);
