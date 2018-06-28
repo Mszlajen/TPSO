@@ -18,7 +18,7 @@ socket_t socketLlegadaNuevaESI = ERROR, socketConsultarStatus = ERROR;
 
 consultaCoord *ultimaConsulta = NULL;
 
-consultaStatus *status = NULL;
+consultaStatus *consStatus = NULL;
 
 int terminoEjecucion = 0;
 
@@ -233,8 +233,9 @@ void escucharPorFinESI(ESI* esi)
 		if(seDesconectoSocket(esi -> socket))
 		{
 			printf("El ESI %i se desconecto.", esi -> id);
+			if(ESIEnReady(esi -> id))
+				sem_wait(&contESIEnReady);
 			finalizarESIMal(esi);
-			sem_wait(&contESIEnReady);
 			pthread_exit(NULL);
 		}
 	}
@@ -265,10 +266,10 @@ void comunicacionCoord(socket_t socketCoord)
 		else
 		{
 			enviarHeader(socketCoord, 13);
-			enviarBuffer(socketCoord, (void*) &(status -> tamClave), sizeof(tamClave_t));
-			enviarBuffer(socketCoord, (void*) status -> clave, status -> tamClave);
+			enviarBuffer(socketCoord, (void*) &(consStatus -> tamClave), sizeof(tamClave_t));
+			enviarBuffer(socketCoord, (void*) consStatus -> clave, consStatus -> tamClave);
 
-			recibirRespuestaStatus(socketCoord, status);
+			recibirRespuestaStatus(socketCoord, consStatus);
 
 			pthread_mutex_lock(&mCondicionStatus);
 			pthread_cond_signal(&cRecibioStatus);
@@ -435,39 +436,51 @@ void comandoStatus(char* clave)
 {
 	printf("Preguntando al coordinador por el estado de la clave %s", clave);
 
-	status = malloc(sizeof(consultaStatus));
-	status -> clave = clave;
-	status -> tamClave = string_length(clave) + 1;
+	consStatus = malloc(sizeof(consultaStatus));
+	consStatus -> clave = clave;
+	consStatus -> tamClave = string_length(clave) + 1;
 
 	enviarHeader(socketConsultarStatus, 0);
 
 	pthread_mutex_lock(&mCondicionStatus);
 	pthread_cond_wait(&cRecibioStatus, &mCondicionStatus);
 	pthread_mutex_unlock(&mCondicionStatus);
-
-	switch(status -> estado)
+	ESI *dueno;
+	if(claveTomadaPor(clave, &dueno))
+	{
+		printf("La clave %s se encuentra tomada por el ", clave);
+		if(dueno)
+			printf("ESI %i", dueno -> id);
+		else
+			printf("sistema");
+		printf(".\n");
+	}
+	else
+		printf("La clave %s no se encuentra tomada por nadie.\n", clave);
+	switch(consStatus -> estado)
 	{
 	case existente:
 		printf("La clave %s se encuentra en la instancia %i (%s) y su valor actual %s.\n", clave,
-				status -> id, status -> nombre, status -> valor);
-		free(status -> valor);
+				consStatus -> id, consStatus -> nombre, consStatus -> valor);
+		free(consStatus -> valor);
 		break;
 	case innexistente:
 		printf("La clave %s no tiene instacia asignada, actualmente iria a la %i (%s).\n", clave,
-				status -> id, status -> nombre);
+				consStatus -> id, consStatus -> nombre);
 		break;
 	case caida:
 		printf("La clave %s se encuentra en la instancia %i (%s) que está desconectada.\n", clave,
-				status -> id, status -> nombre);
+				consStatus -> id, consStatus -> nombre);
 		break;
 	case sinValor:
 		printf("La clave %s se encontraba en la instancia %i (%s) pero fue reemplazada.\n", clave,
-				status -> id, status -> nombre);
+				consStatus -> id, consStatus -> nombre);
 		break;
 	}
 	comandoListar(clave);
-	free(status -> nombre);
-	free(status);
+	free(consStatus -> nombre);
+	free(consStatus);
+	consStatus = NULL;
 }
 
 void comandoDeadlock()

@@ -91,6 +91,17 @@ booleano claveTomadaPorESI (char* clave, ESI_id ID)
 		return 0;
 }
 
+booleano claveTomadaPor(char* clave, ESI** tomador)
+{
+	if(dictionary_has_key(tablaBloqueos, clave))
+	{
+		*tomador = dictionary_get(tablaBloqueos, clave);
+		return 1;
+	}
+	else
+		return 0;
+}
+
 ESI* liberarClave(char* clave)
 {
 	ESI* poseedorActual = dictionary_get(tablaBloqueos, clave);

@@ -13,6 +13,9 @@ int ESITieneClave(ESI*, char*);
 ESI* ESIEstaBloqueado(ESI_id);
 booleano claveTomada (char*);
 booleano claveTomadaPorESI (char*, ESI_id);
+//Si el retorno es verdadero, el segundo parametro tiene la referencia al ESI o NULL (para el sistema).
+//Si el retorno es falso, la clave no está tomada por nadie.
+booleano claveTomadaPor(char*, ESI**);
 void reservarClave(ESI*, char*);
 void reservarClaveSinESI(char*);
 ESI* liberarClave(char*);
