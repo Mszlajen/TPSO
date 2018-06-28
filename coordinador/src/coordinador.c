@@ -500,10 +500,10 @@ void tratarStatusPlanificador () {
 			hayQueSimular = 1;
 			instancia = algoritmoUsado();
 			RespStatus.existe = 0;
-			RespStatus.tamValor = 0;
+			RespStatus.estado = innexistente;
 		}else if(seDesconectoSocket(instancia->socket) ){
 				RespStatus.existe = 0;
-				RespStatus.tamValor = 0;
+				RespStatus.estado = caida;
 			}else{
 				hayStatusEnIdInstancia = instancia->idinstancia;
 				pthread_cond_broadcast(&sbInstanciaActual); // signal a todos los hilos de instancia para que revisen si deben consultar por status
@@ -520,20 +520,22 @@ void tratarStatusPlanificador () {
 					+ tamNombre
 					+ sizeof(tamNombreInstancia_t)
 					+ sizeof(tamValor_t)
-					+ *RespStatus.tamValor);
+					+ *RespStatus.tamValor)
+					+ sizeof(enum estadoClave);
 
 			memcpy(buffer , &header , sizeof(header) );
 			memcpy(buffer+sizeof(header) , &instancia->idinstancia , sizeof(instancia_id) );
 			memcpy(buffer+sizeof(header)+sizeof(instancia_id) , &tamNombre, sizeof(tamNombreInstancia_t) );
 			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t) , &instancia->nombre, tamNombre );
-			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre , &RespStatus.tamValor, sizeof(tamValor_t));
-			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre+sizeof(tamValor_t), &RespStatus.valor, *RespStatus.tamValor );
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre , &RespStatus.estado, sizeof(enum estadoClave));
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre+sizeof(enum estadoClave) , &RespStatus.tamValor, sizeof(tamValor_t));
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre+sizeof(enum estadoClave)+sizeof(tamValor_t), &RespStatus.valor, *RespStatus.tamValor );
 
-			estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t)+*RespStatus.tamValor);
+			estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t)+*RespStatus.tamValor+sizeof(enum estadoClave));
 
 			while(estado !=0){
 				error_show("no se pudo comunicar respuesta status al Planificador, volviendo a intentar");
-				estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t)+*RespStatus.tamValor);
+				estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t)+*RespStatus.tamValor+sizeof(enum estadoClave));
 			}
 
 			free(buffer);
@@ -543,20 +545,20 @@ void tratarStatusPlanificador () {
 			header->protocolo = 14;
 			tamNombreInstancia_t tamNombre = sizeof(*instancia->nombre);
 
-			void * buffer = malloc(sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t));
+			void * buffer = malloc(sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t)+sizeof(enum estadoClave));
 
 			memcpy(buffer , &header , sizeof(header) );
 			memcpy(buffer+sizeof(header) , &instancia->idinstancia , sizeof(instancia_id) );
 			memcpy(buffer+sizeof(header)+sizeof(instancia_id) , &tamNombre, sizeof(tamNombreInstancia_t) );
 			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t) , &instancia->nombre, tamNombre );
-			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre , &RespStatus.tamValor, sizeof(tamValor_t));
+			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t)+tamNombre , &RespStatus.estado, sizeof(enum estadoClave));
 
 
-			estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t) );
+			estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t) +sizeof(enum estadoClave));
 
 			while(estado !=0){
 				error_show("no se pudo comunicar respuesta status al Planificador, volviendo a intentar");
-				estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t) );
+				estado = enviarBuffer (instancia->socket , buffer , sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t)+sizeof(enum estadoClave) );
 			}
 
 			free(buffer);
@@ -593,11 +595,12 @@ void tratarStatusInstancia (Instancia * instancia) {
 	if(header.protocolo == 15){
 		recibirMensaje(instancia->socket,sizeof(booleano),(void *) &RespStatus.existe);
 		if(*RespStatus.existe == 0){
-			*RespStatus.tamValor = 0;
+			RespStatus.estado = sinValor;
 			pthread_cond_signal(&sbRespuestaInstancia);
 		}else{
 			recibirMensaje(instancia->socket,sizeof(tamValor_t),(void *) &RespStatus.tamValor);
 			recibirMensaje(instancia->socket,*RespStatus.tamValor,(void *) &RespStatus.valor );
+			RespStatus.estado = existente;
 			pthread_cond_signal(&sbRespuestaInstancia);
 		}
 

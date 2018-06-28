@@ -36,6 +36,7 @@ typedef struct {
 	booleano * existe;
 	tamValor_t * tamValor;
 	char* valor;
+	enum estadoClave estado;
 } RespuestaStatus;
 
 
