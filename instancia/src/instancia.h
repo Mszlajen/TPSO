@@ -66,7 +66,7 @@ infoClave_t* reemplazoBSU();
 infoClave_t* desempatePorCircular(t_list*);
 
 booleano almacenarID(instancia_id);
-void enviarResultadoEjecucion(socket_t, enum resultadoEjecucion);
+void enviarResultadoEjecucion(socket_t, enum resultadoEjecucion, booleano, cantEntradas_t);
 cantEntradas_t tamValorACantEntradas(tamValor_t);
 //Devuelve 0 en exito, ERROR si fallo
 int crearMappeado(infoClave_t*);

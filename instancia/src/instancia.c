@@ -107,25 +107,31 @@ void procesamientoInstrucciones(socket_t socketCoord)
 {
 	instruccion_t* instruc = recibirInstruccionCoordinador(socketCoord);
 	enum resultadoEjecucion res;
-	booleano esLRU = obtenerAlgoritmoReemplazo() == LRU;
+	booleano esLRU = obtenerAlgoritmoReemplazo() == LRU, cambioEspacio = 1;
+	cantEntradas_t entradasLibres;
 	switch(instruc -> tipo)
 	{
 	case set:
 		if(esLRU)
 			incrementarUltimoUsoClaves();
 		res = instruccionSet(instruc);
+		entradasLibres = obtenerEntradasDisponibles();
 		break;
 	case store:
 		if(esLRU)
 			incrementarUltimoUsoClaves();
 		res = instruccionStore(instruc);
+		cambioEspacio = 0;
 		break;
 	case create:
 		if(esLRU)
 			incrementarUltimoUsoClaves();
 		res = registrarNuevaClave(instruc -> clave, instruc -> valor, instruc -> tamValor);
+		entradasLibres = obtenerEntradasDisponibles();
 		break;
 	case compactacion:
+		instruccionCompactacion();
+		cambioEspacio = 0;
 		break;
 	case get:
 		/*
@@ -133,7 +139,7 @@ void procesamientoInstrucciones(socket_t socketCoord)
 		 */
 		break;
 	}
-	enviarResultadoEjecucion(socketCoord, res);
+	enviarResultadoEjecucion(socketCoord, res, cambioEspacio, entradasLibres);
 	free(instruc -> clave);
 	free(instruc -> valor);
 	free(instruc);
@@ -599,12 +605,14 @@ infoClave_t* desempatePorCircular(t_list* candidatos)
 	return claveAReemplazar;
 }
 
-void enviarResultadoEjecucion(socket_t socketCoord, enum resultadoEjecucion res)
+void enviarResultadoEjecucion(socket_t socketCoord, enum resultadoEjecucion res, booleano enviarEspacio, cantEntradas_t espacio)
 {
-	void* buffer = malloc(sizeof(header) + sizeof(enum resultadoEjecucion));
-	((header*) buffer) -> protocolo = 12;
-	*((enum resultadoEjecucion*) buffer + sizeof(header)) = res;
-	enviarBuffer(socketCoord, buffer, sizeof(header) + sizeof(enum resultadoEjecucion));
+	header head;
+	head.protocolo = 12;
+	enviarHeader(socketCoord, head);
+	enviarBuffer(socketCoord, (void*) &res, sizeof(res));
+	if(enviarEspacio)
+		enviarBuffer(socketCoord, (void*) &espacio, sizeof(espacio));
 }
 
 void incrementarUltimoUsoClaves()
