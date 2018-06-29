@@ -630,11 +630,17 @@ void recibirResultadoInstancia(Instancia * instancia){
 	header * header;
 	int * resultado;
 	int estadoInstancia;
+	cantEntradas_t * entradas;
 
 	estadoInstancia = recibirMensaje(instancia->socket,sizeof(header),(void *) &header);
 
 	if(header->protocolo == 12){
 		recibirMensaje(instancia->socket,sizeof(enum resultadoEjecucion),(void *) &resultado );
+
+		if(instancia->esiTrabajando->instr == set || instancia->esiTrabajando->instr == create ){
+			recibirMensaje(instancia->socket,sizeof(cantEntradas_t),(void *) &entradas);
+			instancia->entradasLibres = entradas;
+		}
 
 		if (estadoInstancia == 1){
 			*resultado = fallo; // esto sucede cuando la instancia se cae durante la ejecucion y el esi debe abortar
@@ -746,6 +752,7 @@ void registrarInstancia(socket_t socket)
 		instanciaRecibida->idinstancia = contadorIdInstancias;
 		instanciaRecibida->socket = socket;
 
+
 		contadorIdInstancias ++;
 
 		pthread_mutex_lock(&mListaInst);
@@ -756,6 +763,8 @@ void registrarInstancia(socket_t socket)
 		header.protocolo = 5;
 		cantEntradas_t cantEntradas = config_get_int_value(configuracion, "CantEntradas");
 		tamEntradas_t tamEntradas = config_get_int_value(configuracion, "TamEntradas");
+
+		instanciaRecibida->entradasLibres = cantEntradas;
 
 		int * buffer = malloc(sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) );
 
@@ -860,18 +869,46 @@ int buscarEsiPorId(Esi * esi){
 		return 0;
 }
 
+bool compararPorEntradasLibres(Instancia instancia1,Instancia instancia2){
+	return instancia1.entradasLibres >= instancia2.entradasLibres;
+}
+
 Instancia * algoritmoUsado(void){
 
 	Instancia * instancia;
 	if(strcmp("EL", Algoritmo) == 0){
 		instancia = algoritmoEquitativeLoad();
-	}/*else if(strcmp("LSU",*Algoritmo) == 0){
+	}else if(strcmp("LSU", Algoritmo) == 0){
 		return algoritmoLastStatementUsed();
-	}else if(strcmp("KE",*Algoritmo) == 0){
+	}/*else if(strcmp("KE",*Algoritmo) == 0){
 		return algoritmoKeyExplicit();
 	} no voy a hacer estos algoritmos para este sabado*/
 
 	return instancia;
+}
+
+
+
+Instancia * algoritmoLastStatementUsed(void){
+
+	Instancia * instancia;
+	t_list * listaAuxiliarLSU = list_duplicate(listaInstancias);
+	pthread_mutex_lock(&mListaInst);
+
+	if (hayQueSimular){
+		hayQueSimular = 0;
+	}
+
+	list_sort(listaAuxiliarLSU, compararPorEntradasLibres);
+
+	instancia = list_get(listaAuxiliarLSU, 0);
+
+	return instancia;
+	pthread_mutex_unlock(&mListaInst);
+	//TODO falta el caso de empate en donde debo llamar a equitative load
+
+	//TODO falta liberar la listaAuxiliarLSU
+
 }
 
 Instancia * algoritmoEquitativeLoad(void){
@@ -1029,3 +1066,4 @@ int crearConfiguracion(char* archivoConfig){
 	logOperaciones = log_create("archivoLog.txt","logOperaciones",1,LOG_LEVEL_INFO);
 
 }
+

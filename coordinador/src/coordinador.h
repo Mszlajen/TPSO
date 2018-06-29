@@ -27,6 +27,7 @@ typedef struct {
 	instancia_id idinstancia;
 	char* nombre;
 	Esi * esiTrabajando;
+	cantEntradas_t entradasLibres;
 } Instancia;
 
 typedef struct {
@@ -65,6 +66,7 @@ void hiloPlanificador (socket_t socket);
 void recibirConexiones();
 Instancia * algoritmoUsado(void);
 Instancia * algoritmoEquitativeLoad(void);
+Instancia * algoritmoLastStatementUsed(void);
 int crearConfiguracion(char * archivoConfig);
 int buscarClaves(char * clave);
 int buscarInstanciaPorId(Instancia * instancia);
