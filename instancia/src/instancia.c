@@ -697,6 +697,7 @@ tamValor_t leerDeArchivo(char* clave, char** valor)
 		string_append_with_format(valor, "%c", aux);
 		tamValor += 1;
 	}
+	fclose(archivo);
 	return tamValor;
 }
 
