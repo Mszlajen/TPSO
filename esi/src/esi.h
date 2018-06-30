@@ -22,7 +22,6 @@ FILE* abrirArchivoLectura(char*);
 void enviarHandshake (socket_t);
 void liberarRecursos();
 void salirConError(char*);
-void esperarAvisoEjecucion();
 struct t_esi_operacion leerSiguienteInstruccion(char** argv);
 void enviarInstruccionCoord();
 void recibirRespuestaCoord();

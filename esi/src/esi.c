@@ -37,7 +37,12 @@ int main(int argc, char **argv) {
 	programa = abrirArchivoLectura(argv[1]);
 
 	while (1){
-		esperarAvisoEjecucion();
+		while (recibirMensaje(socketPlan,sizeof(header),"")){    //espera aviso de Ejecucion del planificador
+
+			 /* No estoy seguro que puntero pasarle como 3er parametro
+			 * a recibirMensaje.
+			 * [ARIEL]
+			 */
 
 		operacionESI = leerSiguienteInstruccion(argv);
 
@@ -47,34 +52,51 @@ int main(int argc, char **argv) {
 
 		recibirRespuestaCoord();
 
-		if (resultadoSocket == 0 && resultEjecucion == exito){
-			leerSiguienteInstruccion(argv);
+			if (resultadoSocket == 0 && resultEjecucion == exito){
+				leerSiguienteInstruccion(argv);
 
-			//avisar Planificador, si no hay más instrucciones aviso q terminó
+				send(socketPlan,resultEjecucion,sizeof(enum resultadoEjecucion),0);
+
+				printf("La instruccion se ejecuto con exito\n");
+
+					if (feof){
+
+						printf("Se terminaron de ejecutar las instrucciones del ESI\n");
+
+						break;
+					}
 
 			}else if (resultadoSocket == -1 && resultEjecucion == fallo){
 
-			//avisar Planificador que falló
-				//ver en operacionESI.
+
+				send(socketPlan,resultEjecucion,sizeof(enum resultadoEjecucion),0);
+
+				printf("La sentencia falló\n");
 
 			}else if (resultEjecucion == bloqueo){
 
-			//avisar Planificador que está bloqueado
+			send(socketPlan,resultEjecucion,sizeof(enum resultadoEjecucion),0);
+
+			printf("El ESI se encuentra bloqueado\n");
 
 			}else if (resultadoSocket == 1){
 				printf("Se cerró el Socket durante la ejecución.\n");
+
+
 			//terminar la ejecución [MATI]
 			}
-		puts("Salio todo bien\n");
+
+			puts("Salio todo bien\n");
 		}
 		else {					//si el ESI tiene una sentencia invalida
-			salirConError()
+			salirConError();
 		}
 
-	}
+		}
 
 	liberarRecursos();
 	exit(0);
+	}
 }
 
 void inicializacion(int argc, char** argv)
@@ -202,9 +224,6 @@ struct t_esi_operacion leerSiguienteInstruccion(char** argv)
  * se bloquee esperando al planificador.
  * [MATI]
  */
-void esperarAvisoEjecucion(){
-	listen(socketPlan,5);
-}
 
 void enviarInstruccionCoord()
 {
