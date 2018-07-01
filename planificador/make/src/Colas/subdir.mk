@@ -4,20 +4,29 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../src/coordinador.c 
+../src/Colas/bloqueados.c \
+../src/Colas/ejecutando.c \
+../src/Colas/finalizados.c \
+../src/Colas/ready.c 
 
 OBJS += \
-./src/coordinador.o 
+./src/Colas/bloqueados.o \
+./src/Colas/ejecutando.o \
+./src/Colas/finalizados.o \
+./src/Colas/ready.o 
 
 C_DEPS += \
-./src/coordinador.d 
+./src/Colas/bloqueados.d \
+./src/Colas/ejecutando.d \
+./src/Colas/finalizados.d \
+./src/Colas/ready.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
-src/coordinador.o: ../src/coordinador.c
+src/Colas/%.o: ../src/Colas/%.c
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C Compiler'
-	gcc -I"../../biblioCompartida" -O0 -g3 -Wall -c -fmessage-length=0 -pthread -MMD -MP -MF"$(@:%.o=%.d)" -MT"src/coordinador.d" -o "$@" "$<"
+	gcc -I"../../../../biblioCompartida" -O0 -g3 -Wall -c -fmessage-length=0 -pthread -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
