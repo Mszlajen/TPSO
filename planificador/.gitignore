@@ -1,1 +1,10 @@
-/Debug/
+#Debug folder with exception of makefile and related
+/Debug/*
+!/Debug/makefile
+!/Debug/*.mk
+!/Debug/src
+/Debug/src/*
+!/Debug/src/*.mk
+!/Debug/src/Colas
+/Debug/src/Colas/*
+!/Debug/src/Colas/*.mk
