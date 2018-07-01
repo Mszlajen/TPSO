@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
 
 				printf("La instruccion se ejecuto con exito\n");
 
-					if (feof){
+					if (feof(programa)){
 
 						printf("Se terminaron de ejecutar las instrucciones del ESI\n");
 
