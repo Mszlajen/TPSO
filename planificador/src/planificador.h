@@ -45,6 +45,7 @@ int enviarIdESI(socket_t, int);
 int enviarRespuestaConsultaCoord(socket_t, booleano);
 consultaCoord* recibirConsultaCoord(socket_t);
 void recibirRespuestaCoordinador(socket_t, consultaStatus*);
+void recibirRespuestaStatus(socket_t, consultaStatus*);
 socket_t crearServerESI();
 
 pthread_t crearHiloTerminal ();

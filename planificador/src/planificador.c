@@ -265,7 +265,9 @@ void comunicacionCoord(socket_t socketCoord)
 		}
 		else
 		{
-			enviarHeader(socketCoord, 13);
+			header head;
+			head.protocolo = 13;
+			enviarHeader(socketCoord, head);
 			enviarBuffer(socketCoord, (void*) &(consStatus -> tamClave), sizeof(tamClave_t));
 			enviarBuffer(socketCoord, (void*) consStatus -> clave, consStatus -> tamClave);
 
@@ -440,7 +442,9 @@ void comandoStatus(char* clave)
 	consStatus -> clave = clave;
 	consStatus -> tamClave = string_length(clave) + 1;
 
-	enviarHeader(socketConsultarStatus, 0);
+	header head;
+	head.protocolo = 0;
+	enviarHeader(socketConsultarStatus, head);
 
 	pthread_mutex_lock(&mCondicionStatus);
 	pthread_cond_wait(&cRecibioStatus, &mCondicionStatus);
