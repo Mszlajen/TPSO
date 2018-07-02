@@ -25,9 +25,14 @@ char* obtenerPuerto()
 	return config_get_string_value(configuracion, Puerto);
 }
 
+char* obtenerIPInterna()
+{
+	return config_get_string_value(configuracion, IPinterna);
+}
+
 char* obtenerDireccionCoordinador()
 {
-	return config_get_string_value(configuracion, PuertoCoord);
+	return config_get_string_value(configuracion, IPCoord);
 }
 
 char* obtenerPuertoCoordinador()

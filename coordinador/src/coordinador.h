@@ -42,7 +42,7 @@ typedef struct {
 
 
 
-#define IPEscucha "127.0.0.2"
+#define IPEscucha "IP"
 #define Puerto "Puerto"
 
 void esESIoInstancia (socket_t socketAceptado);

@@ -51,6 +51,8 @@ void salir_agraciadamente(int);
 socket_t crearSocketCliente(char *, char *);
 //-1 en error o fileDescriptor en exito
 socket_t crearSocketServer(char *, char *);
+//-1 en error o fileDescriptor en exito
+socket_t crearSocketClientePorFD(socket_t, char*);
 //0 para falso o 1 para verdad
 int seDesconectoSocket(socket_t);
 void usarPuertoTapado (socket_t);

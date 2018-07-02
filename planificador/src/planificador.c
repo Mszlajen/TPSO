@@ -14,7 +14,7 @@ pthread_mutex_t mReady = PTHREAD_MUTEX_INITIALIZER,
 pthread_cond_t cFinEjecucion = PTHREAD_COND_INITIALIZER,
 				cRecibioStatus = PTHREAD_COND_INITIALIZER;
 
-socket_t socketLlegadaNuevaESI = ERROR, socketConsultarStatus = ERROR;
+socket_t socketEsperarConsultaStatus = ERROR, socketActivarConsultaStatus = ERROR;
 
 consultaCoord *ultimaConsulta = NULL;
 
@@ -53,6 +53,7 @@ int main(int argc, char** argv) {
 			continue;
 		pthread_cancel(esiAEjecutar -> hiloDeFin);
 
+		printf("Se selecciono al ESI %i para ejecutar.\n", esiAEjecutar -> id);
 		pthread_mutex_lock(&mEnEjecucion);
 		ejecucionDeESI(esiAEjecutar);
 		pthread_cond_signal(&cFinEjecucion);
@@ -112,9 +113,9 @@ void ejecucionDeESI(ESI* esi)
 	void* resultado = NULL;
 
 	enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
-
-	recibirMensaje(esi -> socket, sizeof(header) + sizeof(enum resultadoEjecucion), resultado);
-
+	printf("Se envio la orden de ejecución.\n");
+	recibirMensaje(esi -> socket, sizeof(header) + sizeof(enum resultadoEjecucion), &resultado);
+	printf("Se recibio el resultado de la ejecución.\n");
 	if(((header*) resultado) -> protocolo != 12)
 	{ /* ERROR */ }
 
@@ -216,6 +217,7 @@ void escucharPorESI ()
 			listarParaEjecucion(nuevaESI);
 			pthread_mutex_unlock(&mReady);
 			sem_post(&contESIEnReady);
+			printf("Se conecto un nuevo ESI.\n");
 		}
 		else
 		{
@@ -243,12 +245,12 @@ void escucharPorFinESI(ESI* esi)
 
 void comunicacionCoord(socket_t socketCoord)
 {
-	int maxFd = max(socketCoord, socketConsultarStatus);
+	int maxFd = max(socketCoord, socketEsperarConsultaStatus);
 	fd_set master, read;
 
 	FD_ZERO(&master);
 	FD_SET(socketCoord, &master);
-	FD_SET(socketConsultarStatus, &master);
+	FD_SET(socketEsperarConsultaStatus, &master);
 	while(1)
 	{
 		read = master;
@@ -265,9 +267,12 @@ void comunicacionCoord(socket_t socketCoord)
 		}
 		else
 		{
-			header head;
-			head.protocolo = 13;
-			enviarHeader(socketCoord, head);
+			header *head;
+			recibirMensaje(socketEsperarConsultaStatus, sizeof(header), (void**)&head);
+			free(head);
+
+			head -> protocolo = 13;
+			enviarHeader(socketCoord, *head);
 			enviarBuffer(socketCoord, (void*) &(consStatus -> tamClave), sizeof(tamClave_t));
 			enviarBuffer(socketCoord, (void*) consStatus -> clave, consStatus -> tamClave);
 
@@ -442,9 +447,7 @@ void comandoStatus(char* clave)
 	consStatus -> clave = clave;
 	consStatus -> tamClave = string_length(clave) + 1;
 
-	header head;
-	head.protocolo = 0;
-	enviarHeader(socketConsultarStatus, head);
+	enviarEncabezado(socketActivarConsultaStatus, 0);
 
 	pthread_mutex_lock(&mCondicionStatus);
 	pthread_cond_wait(&cRecibioStatus, &mCondicionStatus);
@@ -515,15 +518,15 @@ void inicializacion (char* dirConfig)
 	inicializarColas();
 
 	//El tercer parametro es el valor inicial del semaforo
-	sem_init(&corriendo, 0, 0);
+	sem_init(&corriendo, 0, 1);
 	sem_init(&contESIEnReady, 0, 0);
 
 	/*
 	 * Crea los socket en cualquier IP y puerto que el SO
 	 * tenga disponible.
 	 */
-	socketLlegadaNuevaESI = crearSocketServer(NULL, "0");
-	socketConsultarStatus = crearSocketServer(NULL, "0");
+	socketActivarConsultaStatus = crearSocketServer(obtenerIPInterna(), "0");
+	socketEsperarConsultaStatus = crearSocketClientePorFD(socketEsperarConsultaStatus, obtenerIPInterna());
 
 }
 
@@ -633,7 +636,7 @@ socket_t crearServerESI ()
 	char * puerto = obtenerPuerto();
 	char * IPConexion = obtenerIP();
 	socket_t socketServerESI = crearSocketServer(IPConexion, puerto);
-	if(socketServerESI)
+	if(socketServerESI == ERROR)
 		salirConError("Planificador no pudo crear el socket para conectarse con ESI\n");
 	return socketServerESI;
 }
@@ -689,8 +692,8 @@ pthread_t crearHiloCoordinador()
 	socketCoord = conectarConCoordinador();
 
 	if(socketCoord == ERROR)
-		salirConError("No se pudo conectar con el coordinador.");
-	if(!enviarEncabezado(socketCoord, 1)) //Enviar el handshake
+		salirConError("No se pudo conectar con el coordinador.\n");
+	if(enviarEncabezado(socketCoord, 1)) //Enviar el handshake
 		salirConError("Fallo al enviar el handshake planificador -> Coordinador\n");
 
 	pthread_attr_init(&attr);

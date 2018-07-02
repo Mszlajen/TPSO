@@ -29,24 +29,45 @@ socket_t crearSocketCliente(char * IP, char * puerto)
 
 socket_t crearSocketServer(char * IP, char * puerto)
 {
-		struct addrinfo hints, *res;
-		int sock;
+	struct addrinfo hints, *res;
+	int sock;
 
-		memset(&hints, 0, sizeof(struct addrinfo));
-		hints.ai_family = AF_UNSPEC;
-		hints.ai_socktype = SOCK_STREAM;
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
 
-		getaddrinfo(IP, puerto, &hints, &res);
+	getaddrinfo(IP, puerto, &hints, &res);
 
-		sock = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol);
+	sock = socket(res -> ai_family, res -> ai_socktype, res -> ai_protocol);
 
-		usarPuertoTapado(sock);
+	int si = 1;
+	if (setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&si,sizeof(si)) == ERROR)
+	{
+		perror("setsockopt");
+		salir_agraciadamente(1);
+	}
 
-		int resultado = bind(sock, res-> ai_addr, res->ai_addrlen);
+	int resultado = bind(sock, res-> ai_addr, res->ai_addrlen);
 
-		if(resultado == ERROR)
-			return resultado;
-		return sock;
+	if(resultado == ERROR)
+	{
+		close(sock);
+		perror("");
+		return resultado;
+	}
+	return sock;
+}
+
+
+socket_t crearSocketClientePorFD(socket_t fd, char *ip)
+{
+	struct sockaddr_in addr;
+	socklen_t addr_size = sizeof(struct sockaddr_in);
+	getsockname(fd, (struct sockaddr *)&addr, &addr_size);
+	char *puerto = string_from_format("%i", ntohs(addr.sin_port));
+	socket_t sock = crearSocketCliente(ip, puerto);
+	free(puerto);
+	return sock;
 }
 
 int seDesconectoSocket(socket_t sock)
@@ -58,17 +79,6 @@ int seDesconectoSocket(socket_t sock)
 		return 1;
 	else
 		return 0;
-
-}
-
-void usarPuertoTapado (socket_t sock)
-{
-	int si = 1;
-	if (setsockopt(sock,SOL_SOCKET,SO_REUSEADDR,&si,sizeof si) == ERROR)
-	{
-		perror("setsockopt");
-		salir_agraciadamente(1);
-	}
 }
 
 int enviarHeader (socket_t sock, header head)
@@ -81,7 +91,7 @@ int enviarBuffer (socket_t sock, void* buffer, int tamBuffer)
 {
 	int bytesEnviados = send(sock, buffer, tamBuffer, 0);
 	if(bytesEnviados == ERROR)
-		return -1;
+		return ERROR;
 		/*
 		 * Lo que sigue es un control porque send
 		 * puede llegar a no enviar todo lo pedido

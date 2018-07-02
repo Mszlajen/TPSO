@@ -177,6 +177,8 @@ void crearColasBloqueados()
 {
 	if(!colasBloqueados)
 		colasBloqueados = dictionary_create();
+	if(!tablaBloqueos)
+		tablaBloqueos = dictionary_create();
 }
 
 void cerrarColasBloqueados()

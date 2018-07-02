@@ -52,11 +52,12 @@ void inicializacion(int argc, char** argv, t_config **configuracion, FILE **prog
 {
 	if(argc != 3)
 		salirConError("Cantidad de parametros invalida\n");
-
-	if(!(*programa = abrirArchivoLectura(argv[1])))
+	*programa = abrirArchivoLectura(argv[2]);
+	if(!*programa)
 		salirConError("No se pudo abrir las instrucciones del ESI.\n");
 
-	if(!(*configuracion = config_create(argv[2])))
+	*configuracion = config_create(argv[1]);
+	if(!*configuracion)
 		salirConError("Fallo al abrir el archivo de configuracion.\n");
 }
 

@@ -17,7 +17,8 @@ t_dictionary * tablaDeClaves = NULL;
 
 socket_t  socketPlanificador;
 socket_t  socketCoordinador;
-socket_t  socketConsultaClave;
+socket_t  socketEsperarConsultaClave;
+socket_t  socketActivarConsultaClave;
 
 pthread_mutex_t mInstanciaActual, mEsiActual, mRespuestaInstancia, mConsultarPorClave , mListaInst, mAuxiliarIdInstancia;
 pthread_cond_t sbInstanciaActual, sbEsiActual, sbRespuestaInstancia, sbConsultarPorClave , sbRespuestaPlanificador;
@@ -46,13 +47,24 @@ int main(int argc, char **argv) {
 
 	inicializacion(argv[1]);
 
-	socketCoordinador = crearSocketServer (config_get_string_value(configuracion,IPEscucha),config_get_string_value(configuracion, Puerto));
+	char* IP = config_get_string_value(configuracion,IPEscucha);
+	char* puerto = config_get_string_value(configuracion, Puerto);
+	socketCoordinador = crearSocketServer (IP, puerto);
+	if(socketCoordinador == ERROR)
+	{
+		salirConError("No se pudo crear el socket para escuchar conexiones.\n");
+	}
 
 	 do {
 		socketPlanificador = esperarYaceptar(socketCoordinador);
+		if(socketPlanificador == ERROR)
+		{
+			error_show("Hubo un fallo al recibir conectar el socket.\n");
+			continue;
+		}
 		esPlanificador = validarPlanificador(socketPlanificador );
 	} while (esPlanificador);
-
+	printf("Se conecto el planificador.\n");
 	pthread_create(&hiloRecibeConexiones, NULL, (void*) recibirConexiones, NULL);
 
 	pthread_join(hiloRecibeConexiones, NULL);
@@ -65,28 +77,26 @@ int main(int argc, char **argv) {
 void hiloPlanificador (socket_t socket){
 
 
-	int maxFd = max(socketPlanificador, socketConsultaClave);
+	int maxFd = max(socketPlanificador, socketEsperarConsultaClave);
 	fd_set master, read;
 
 	FD_ZERO(&master);
 	FD_SET(socketPlanificador, &master);
-	FD_SET(socketConsultaClave, &master);
+	FD_SET(socketEsperarConsultaClave, &master);
 	while(1)
 	{
 		read = master;
 		select(maxFd, &read, NULL, NULL, NULL);
 
-		if(seDesconectoSocket(socketPlanificador) ){
-			salirConError(" Se Desconecto Planificador. ");
-		}
-
 		if(FD_ISSET(socketPlanificador, &read))
 		{
-
+			if(seDesconectoSocket(socketPlanificador) )
+			{
+				salirConError("Se Desconecto Planificador. \n");
+			}
 			tratarStatusPlanificador();
 
-		}else if(FD_ISSET(socketConsultaClave, &read)){
-
+		}else if(FD_ISSET(socketEsperarConsultaClave, &read)){
 			consultarPorClave();
 		}
 	}
@@ -417,7 +427,7 @@ void tratarSetInstancia(Instancia * instancia){
 void pedirConsultaClave(){
 	int * buffer = malloc(sizeof(int));
 	*buffer = 1;
-	enviarBuffer (socketConsultaClave , buffer , sizeof(int) );
+	enviarBuffer (socketActivarConsultaClave , buffer , sizeof(int) );
 	free(buffer);
 }
 
@@ -427,7 +437,7 @@ void consultarPorClave(){
 	int *respuesta;
 	enum tipoDeInstruccion tipo;
 
-	tamClave_t tamClave = string_length(esiActual->clave) + sizeof("\0");
+	tamClave_t tamClave = string_length(esiActual->clave) + sizeof(char);
 
 	switch(esiActual->instr){
 	case store:
@@ -685,10 +695,10 @@ void recibirConexiones() {
 
 	socket_t socketAceptado;
 	while (1)
-		{
-			socketAceptado = esperarYaceptar(socketCoordinador);
-			esESIoInstancia(socketAceptado);
-		}
+	{
+		socketAceptado = esperarYaceptar(socketCoordinador);
+		esESIoInstancia(socketAceptado);
+	}
 }
 
 void esESIoInstancia (socket_t socketAceptado)
@@ -716,9 +726,9 @@ void registrarEsi(socket_t socket){
 	nuevaEsi->clave = NULL;
 	nuevaEsi->valor = NULL;
 	list_add(listaEsi,nuevaEsi);
-
-	pthread_t hiloEsi;
-	pthread_create(&hiloEsi, NULL, (void*) hiloEsi, nuevaEsi);
+	printf("Se conecto una ESI");
+	pthread_t pHiloEsi;
+	pthread_create(&pHiloEsi, NULL, (void*) hiloEsi, nuevaEsi);
 }
 
 void registrarInstancia(socket_t socket)
@@ -730,13 +740,13 @@ void registrarInstancia(socket_t socket)
 	int enviado;
 	pthread_t hiloInstancia;
 
+	printf("Se recibio un pedido de conexion de una instancia.\n");
+	recibirMensaje(socket,sizeof(instancia_id),(void**) &idInstancia );
 
-	recibirMensaje(socket,sizeof(int),(void*) &idInstancia );
+	if(!*idInstancia){
 
-	if(*idInstancia == 0){
-
-		recibirMensaje(socket,sizeof(int),(void *) &tamNombre );
-		recibirMensaje(socket,*tamNombre,(void *) &instanciaRecibida->nombre );
+		recibirMensaje(socket,sizeof(tamNombreInstancia_t),(void **) &tamNombre );
+		recibirMensaje(socket,*tamNombre,(void **) &instanciaRecibida->nombre );
 
 		instanciaRecibida->idinstancia = contadorIdInstancias;
 		instanciaRecibida->socket = socket;
@@ -748,27 +758,28 @@ void registrarInstancia(socket_t socket)
 		cantInstancias = list_add(listaInstancias,instanciaRecibida);
 		pthread_mutex_unlock(&mListaInst);
 
-		header header;
-		header.protocolo = 5;
+		header head;
+		head.protocolo = 5;
 		cantEntradas_t cantEntradas = config_get_int_value(configuracion, "CantEntradas");
 		tamEntradas_t tamEntradas = config_get_int_value(configuracion, "TamEntradas");
 
 		instanciaRecibida->entradasLibres = cantEntradas;
 
-		int * buffer = malloc(sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) );
+		void * buffer = malloc(sizeof(header) + sizeof(instancia_id) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) );
 
-		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer , &head, sizeof(header) );
 		memcpy(buffer+sizeof(header) , &instanciaRecibida->idinstancia , sizeof(int) );
-		memcpy(buffer+sizeof(header)+sizeof(int) , &cantEntradas , sizeof(cantEntradas_t) );
-		memcpy(buffer+sizeof(header)+sizeof(int)+sizeof(cantEntradas_t) , &tamEntradas , sizeof(tamEntradas_t) );
+		memcpy(buffer+sizeof(header)+sizeof(instancia_id) , &cantEntradas , sizeof(cantEntradas_t) );
+		memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(cantEntradas_t) , &tamEntradas , sizeof(tamEntradas_t) );
 
 		enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) );
 
 
 		while(enviado != 0){
-			error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
+			error_show ("No se envio correctamente los datos a la instancia, enviando nuevamente");
 			enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) );
 		}
+		printf("Se envio la información a la instancia.\n");
 
 		free(buffer);
 
@@ -782,8 +793,8 @@ void registrarInstancia(socket_t socket)
 
 		instanciaRecibida->socket = socket;
 
-		header header;
-		header.protocolo = 4;
+		header head;
+		head.protocolo = 4;
 
 		cantEntradas_t cantEntradas = config_get_int_value(configuracion, "CantEntradas");
 		tamEntradas_t tamEntradas = config_get_int_value(configuracion, "TamEntradas");
@@ -795,9 +806,9 @@ void registrarInstancia(socket_t socket)
 		cantClaves_t cantClaves = list_size(listaDeClaves);
 		char * claveAux;
 
-		int * buffer = malloc(sizeof(header) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) + sizeof(cantClaves_t));
+		void * buffer = malloc(sizeof(header) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) + sizeof(cantClaves_t));
 
-		memcpy(buffer , &header.protocolo , sizeof(header) );
+		memcpy(buffer , &head , sizeof(header) );
 		memcpy(buffer+sizeof(header) , &cantEntradas , sizeof(cantEntradas_t) );
 		memcpy(buffer+sizeof(header)+sizeof(cantEntradas_t) , &tamEntradas , sizeof(tamEntradas_t) );
 		memcpy(buffer+sizeof(header)+sizeof(cantEntradas_t)+sizeof(tamEntradas_t) , &cantClaves , sizeof(cantClaves_t) );
@@ -805,7 +816,7 @@ void registrarInstancia(socket_t socket)
 		enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) + sizeof(cantClaves_t));
 
 		while(enviado != 0){
-			error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
+			error_show ("No se envio correctamente los datos a la instancia, enviando nuevamente");
 			enviado = enviarBuffer (instanciaRecibida->socket , buffer ,sizeof(header) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) + sizeof(cantClaves_t));
 		}
 
@@ -935,21 +946,21 @@ Instancia * algoritmoEquitativeLoad(void){
 int esperarYaceptar(socket_t socketCoordinador)
 {
 	unsigned int tam;
-	struct sockaddr_in dir;
+	struct sockaddr dir;
 	listen(socketCoordinador , 5);
-	int socket = accept(socketCoordinador, (void*)&dir, &tam);
+	int socket = accept(socketCoordinador, &dir, &tam);
 	return socket;
-	}
+}
 
 int validarPlanificador (socket_t socket) {
 	header* handshake = NULL;
 	int estadoDellegada;
-	pthread_t hiloPlanificador;
+	pthread_t pHiloPlanificador;
 
 	estadoDellegada = recibirMensaje(socket,sizeof(header),(void*) &handshake);
 	if (estadoDellegada != 0)
 	{
-		error_show ("no se pudo recibir header de planificador.");
+		error_show ("No se pudo recibir header de planificador.\n");
 		return 1;
 	}
 
@@ -960,7 +971,7 @@ int validarPlanificador (socket_t socket) {
 	}
 	else
 	{
-		pthread_create(&hiloPlanificador, NULL, (void*) hiloPlanificador, &socket);
+		pthread_create(&pHiloPlanificador, NULL, (void*) hiloPlanificador, (void*) &socket);
 		return 0;
 	}
 }
@@ -992,7 +1003,8 @@ void liberarInstancia(Instancia * instancia) {
 void liberarRecursos()
 {
 	close(socketCoordinador);
-	close(socketConsultaClave);
+	close(socketEsperarConsultaClave);
+	close(socketActivarConsultaClave);
 
 	log_destroy(logOperaciones);
 
@@ -1045,7 +1057,8 @@ int crearConfiguracion(char* archivoConfig){
 		salirConError("Fallo al leer el archivo de configuracion del planificador.\n ");
 	Algoritmo = config_get_string_value(configuracion, "Algoritmo");
 
-	socketConsultaClave = crearSocketServer(NULL, "0");
+	socketActivarConsultaClave = crearSocketServer(config_get_string_value(configuracion, "IPInterna"), "0");
+	socketEsperarConsultaClave = crearSocketClientePorFD(socketEsperarConsultaClave, config_get_string_value(configuracion, "IPInterna"));
 
 	listaEsi = list_create();
 	listaInstancias = list_create();
