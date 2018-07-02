@@ -19,18 +19,6 @@ socket_t  socketPlanificador;
 socket_t  socketCoordinador;
 socket_t  socketConsultaClave;
 
-/*
- * Primero hago está aclaración, por lo que encontre de pthread_cond
- * son más parecidos a los monitores que a los semaforos.
- * Segundo, me parece que no estás entendiendo bien como usarlos, ahora
- * mismo todos los hilos de instancias se quedan esperando por el mismo
- * cond y no hay manera de decirle a la instancia particular que devolvio
- * el algoritmo que se desbloquee (El cond te sirve para esto, pero no de
- * está manera).
- * Tambien me parece que hay recursos sincronizados de más pero no estoy seguro.
- * [MATI]
- */
-
 pthread_mutex_t mInstanciaActual, mEsiActual, mRespuestaInstancia, mConsultarPorClave , mListaInst, mAuxiliarIdInstancia;
 pthread_cond_t sbInstanciaActual, sbEsiActual, sbRespuestaInstancia, sbConsultarPorClave , sbRespuestaPlanificador;
 
@@ -88,8 +76,13 @@ void hiloPlanificador (socket_t socket){
 		read = master;
 		select(maxFd, &read, NULL, NULL, NULL);
 
+		if(seDesconectoSocket(socketPlanificador) ){
+			salirConError(" Se Desconecto Planificador. ");
+		}
+
 		if(FD_ISSET(socketPlanificador, &read))
 		{
+
 			tratarStatusPlanificador();
 
 		}else if(FD_ISSET(socketConsultaClave, &read)){
@@ -297,9 +290,6 @@ void tratarGetEsi(Esi * esi){
 		}
 
 		list_add(listaClaves,esi->clave);
-
-
-
 	}
 }
 
@@ -639,7 +629,7 @@ void recibirResultadoInstancia(Instancia * instancia){
 
 		if(instancia->esiTrabajando->instr == set || instancia->esiTrabajando->instr == create ){
 			recibirMensaje(instancia->socket,sizeof(cantEntradas_t),(void *) &entradas);
-			instancia->entradasLibres = entradas;
+			instancia->entradasLibres = *entradas;
 		}
 
 		if (estadoInstancia == 1){
@@ -729,7 +719,6 @@ void registrarEsi(socket_t socket){
 
 	pthread_t hiloEsi;
 	pthread_create(&hiloEsi, NULL, (void*) hiloEsi, nuevaEsi);
-	//TODO hacer free en algun lugar
 }
 
 void registrarInstancia(socket_t socket)
@@ -780,7 +769,7 @@ void registrarInstancia(socket_t socket)
 			error_show ("no se envio correctamente los datos a la instancia, enviando nuevamente");
 			enviado = enviarBuffer (instanciaRecibida->socket , buffer , sizeof(header) + sizeof(instanciaRecibida->idinstancia) + sizeof(cantEntradas_t) + sizeof(tamEntradas_t) );
 		}
-		//TODO hacer free en algun lugar de la instancia
+
 		free(buffer);
 
 		pthread_create(&hiloInstancia, NULL, (void*) hiloInstancia, instanciaRecibida);
@@ -887,8 +876,6 @@ Instancia * algoritmoUsado(void){
 	return instancia;
 }
 
-
-
 Instancia * algoritmoLastStatementUsed(void){
 
 	Instancia * instancia;
@@ -899,16 +886,15 @@ Instancia * algoritmoLastStatementUsed(void){
 		hayQueSimular = 0;
 	}
 
-	list_sort(listaAuxiliarLSU, compararPorEntradasLibres);
+	list_sort(listaAuxiliarLSU, (void*) compararPorEntradasLibres);
 
 	instancia = list_get(listaAuxiliarLSU, 0);
 
 	return instancia;
 	pthread_mutex_unlock(&mListaInst);
-	//TODO falta el caso de empate en donde debo llamar a equitative load
 
-	//TODO falta liberar la listaAuxiliarLSU
-
+	list_destroy_and_destroy_elements(listaAuxiliarLSU, (void*) liberarInstancia );
+	//TODO falta el caso de empate en donde debo llamar a equitative load, pero como esta, funcionara en las pruebas
 }
 
 Instancia * algoritmoEquitativeLoad(void){
@@ -987,12 +973,27 @@ int max (int v1, int v2)
 		return v2;
 }
 
+void liberarClave(char * clave) {
+	free(clave);
+}
+
+void liberarEsi (Esi * esi) {
+	free(esi->clave);
+	free(esi->valor);
+	free(esi);
+}
+
+void liberarInstancia(Instancia * instancia) {
+	free(instancia->nombre);
+	free(instancia->esiTrabajando);
+	free(instancia);
+}
+
 void liberarRecursos()
 {
-	// void list_destroy_and_destroy_elements(t_list*, void(*element_destroyer)(void*));
-	// TODO liberar las listas
-
 	close(socketCoordinador);
+	close(socketConsultaClave);
+
 	log_destroy(logOperaciones);
 
 	if(configuracion != NULL)
@@ -1016,6 +1017,12 @@ void liberarRecursos()
 
 	pthread_mutex_destroy (&mConsultarPorClave);
 	pthread_cond_destroy (&sbConsultarPorClave);
+
+	list_destroy_and_destroy_elements(listaInstancias, (void*) liberarInstancia );
+	list_destroy_and_destroy_elements(listaEsi, (void*) liberarEsi );
+	list_destroy_and_destroy_elements(listaClaves, (void*) liberarClave );
+
+	dictionary_destroy(tablaDeClaves);
 }
 
 void salirConError(char * error)

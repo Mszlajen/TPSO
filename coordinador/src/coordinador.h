@@ -80,6 +80,10 @@ int max (int v1, int v2);
 int comprobarEstadoDeInstancia (Instancia * instancia);
 void tratarStatusPlanificador ();
 void tratarStatusInstancia (Instancia * instancia);
+bool compararPorEntradasLibres(Instancia instancia1,Instancia instancia2);
+void liberarClave(char * clave);
+void liberarEsi (Esi * esi);
+void liberarInstancia(Instancia * instancia);
 
 
 
