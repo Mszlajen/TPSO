@@ -4,29 +4,26 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../src/adminESI.c \
-../src/colas.c \
-../src/configuracion.c \
-../src/planificador.c 
+../commons/collections/dictionary.c \
+../commons/collections/list.c \
+../commons/collections/queue.c 
 
 OBJS += \
-./src/adminESI.o \
-./src/colas.o \
-./src/configuracion.o \
-./src/planificador.o 
+./commons/collections/dictionary.o \
+./commons/collections/list.o \
+./commons/collections/queue.o 
 
 C_DEPS += \
-./src/adminESI.d \
-./src/colas.d \
-./src/configuracion.d \
-./src/planificador.d 
+./commons/collections/dictionary.d \
+./commons/collections/list.d \
+./commons/collections/queue.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
-src/%.o: ../src/%.c
+commons/collections/%.o: ../commons/collections/%.c
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C Compiler'
-	gcc -I"../../biblioCompartida" -O0 -g3 -Wall -c -fmessage-length=0 -pthread -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
+	gcc -O0 -g3 -Wall -c -fmessage-length=0 -fPIC -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

@@ -52,7 +52,6 @@ void agregarRecurso(ESI* esi, char* clave)
 
 void quitarRecurso(ESI* esi, char* clave)
 {
-	int posicion = 0;
 	bool esClave(void* recurso)
 	{
 		return string_equals_ignore_case((char*)recurso, clave);

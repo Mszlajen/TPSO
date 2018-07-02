@@ -639,7 +639,7 @@ void recibirResultadoInstancia(Instancia * instancia){
 
 		if(instancia->esiTrabajando->instr == set || instancia->esiTrabajando->instr == create ){
 			recibirMensaje(instancia->socket,sizeof(cantEntradas_t),(void *) &entradas);
-			instancia->entradasLibres = entradas;
+			instancia->entradasLibres = *entradas;
 		}
 
 		if (estadoInstancia == 1){
