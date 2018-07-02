@@ -42,6 +42,6 @@ clean:
 	-@echo ' '
 
 .PHONY: all clean dependents
-../../biblioCompartida/Debug/libbiblioCompartida.so:
+../../biblioCompartida/make/libbiblioCompartida.so:
 
 -include ../makefile.targets
