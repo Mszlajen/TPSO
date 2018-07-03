@@ -24,10 +24,15 @@ int main(int argc, char** argv) {
 	while(!terminoEjecucion)
 	{
 		header* encabezado;
-		recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado);
+		printf("Esperando instrucciones del coordinador.\n");
+		if(recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado) == 1)
+		{
+			salirConError("Se desconecto el coordinador.\n");
+		}
 		switch(encabezado -> protocolo)
 		{
 		case 11:
+			printf("Procesando una instrucción.\n");
 			procesamientoInstrucciones(socketCoord);
 			break;
 		case 13:
@@ -49,7 +54,7 @@ int main(int argc, char** argv) {
 void inicializar(char* dirConfig, socket_t *socketCoord)
 {
 	if(crearConfiguracion(dirConfig))
-		salirConError("No se pudo abrir la configuracion.");
+		salirConError("No se pudo abrir la configuracion.\n");
 	infoClaves = dictionary_create();
 	conectarConCoordinador(socketCoord);
 	recibirRespuestaHandshake(*socketCoord);

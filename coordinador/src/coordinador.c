@@ -738,10 +738,14 @@ void registrarInstancia(socket_t socket)
 	Instancia * instanciaRecibida = malloc(sizeof(Instancia));
 	instanciaRecibida->esiTrabajando = NULL;
 	int enviado;
-	pthread_t hiloInstancia;
+	pthread_t pHiloInstancia;
 
 	printf("Se recibio un pedido de conexion de una instancia.\n");
-	recibirMensaje(socket,sizeof(instancia_id),(void**) &idInstancia );
+	if(recibirMensaje(socket,sizeof(instancia_id),(void**) &idInstancia ) == -1)
+	{
+		printf("Fallo al recibir el ID.\n");
+		return;
+	}
 
 	if(!*idInstancia){
 
@@ -783,7 +787,7 @@ void registrarInstancia(socket_t socket)
 
 		free(buffer);
 
-		pthread_create(&hiloInstancia, NULL, (void*) hiloInstancia, instanciaRecibida);
+		pthread_create(&pHiloInstancia, NULL, (void*) hiloInstancia, instanciaRecibida);
 
 	}else{
 		pthread_mutex_lock(&mAuxiliarIdInstancia);
@@ -840,7 +844,7 @@ void registrarInstancia(socket_t socket)
 			}
 			free(buffer);
 
-			pthread_create(&hiloInstancia, NULL, (void*) hiloInstancia, instanciaRecibida);
+			pthread_create(&pHiloInstancia, NULL, (void*) hiloInstancia, instanciaRecibida);
 		}
 
 	}

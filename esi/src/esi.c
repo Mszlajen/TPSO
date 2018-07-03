@@ -20,26 +20,28 @@ int main(int argc, char **argv) {
 	booleano hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
 	enum resultadoEjecucion *resultado;
 	while (hayInstruccion){
+		printf("Esperando aviso de ejecución.\n");
 		recibirMensaje(socketPlan, sizeof(header), (void**) &head);
 		if(head -> protocolo != 7)
 		{/* ERROR */}
 		free(head);
-
+		printf("Enviando instrucción al coordinador.\n");
 		enviarInstruccionCoord(socketCoord, operacionESI, *id);
 		destruir_operacion(operacionESI);
-
+		printf("Esperando resultado de ejecución.\n");
 		recibirMensaje(socketCoord, sizeof(header), (void**) &head);
 		if(head -> protocolo != 12)
 		{ /*ERROR*/ }
 		recibirMensaje(socketCoord, sizeof(enum resultadoEjecucion), (void**) &resultado);
 
 		hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
-
+		printf("Enviando resultado de ejecución al planificador.\n");
 		enviarResultadoPlanificador(socketPlan, *resultado, hayInstruccion);
 
 		if(!hayInstruccion)
 			break;
 	}
+	printf("Termino la ejecución.\n");
 	free(id);
 	fclose(programa);
 	config_destroy(configuracion);
