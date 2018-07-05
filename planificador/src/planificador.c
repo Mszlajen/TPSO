@@ -2,19 +2,18 @@
 #include "configuracion.h"
 #include "colas.h"
 
-sem_t corriendo, contESIEnReady;
+sem_t corriendo, contESIEnReady, sSocketCoord;
 
 pthread_mutex_t mReady = PTHREAD_MUTEX_INITIALIZER,
 				mBloqueados = PTHREAD_MUTEX_INITIALIZER,
 				mFinalizados = PTHREAD_MUTEX_INITIALIZER,
 				mEjecutando = PTHREAD_MUTEX_INITIALIZER,
 				mEnEjecucion = PTHREAD_MUTEX_INITIALIZER,
+				mConsStatus = PTHREAD_MUTEX_INITIALIZER,
 				mCondicionStatus = PTHREAD_MUTEX_INITIALIZER;
 
 pthread_cond_t cFinEjecucion = PTHREAD_COND_INITIALIZER,
 				cRecibioStatus = PTHREAD_COND_INITIALIZER;
-
-socket_t socketEsperarConsultaStatus = ERROR, socketActivarConsultaStatus = ERROR;
 
 consultaCoord *ultimaConsulta = NULL;
 
@@ -27,11 +26,13 @@ int main(int argc, char** argv) {
 
 	bloquearClavesConfiguracion();
 
-	crearHiloCoordinador();
+	socket_t socketNuevasESI = crearServerESI();
+	listen(socketNuevasESI, 5);
+	crearHiloCoordinador(socketNuevasESI);
 
 	crearHiloTerminal();
 
-	crearHiloNuevasESI();
+	crearHiloNuevasESI(socketNuevasESI);
 
 	ESI * esiAEjecutar;
 	while(!terminoEjecucion)
@@ -114,6 +115,9 @@ void ejecucionDeESI(ESI* esi)
 
 	enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
 	printf("Se envio la orden de ejecución.\n");
+
+	sem_post(&sSocketCoord);
+
 	recibirMensaje(esi -> socket, sizeof(header) + sizeof(enum resultadoEjecucion), &resultado);
 	printf("Se recibio el resultado de la ejecución.\n");
 	if(((header*) resultado) -> protocolo != 12)
@@ -127,7 +131,7 @@ void ejecucionDeESI(ESI* esi)
 	if(res == fallo)
 	{
 		//Esto se repite despues, podria modulizarlo.
-		printf("El ESI %i tuvo un fallo en su ejecución y fue terminado.", esi -> id);
+		printf("El ESI %i tuvo un fallo en su ejecución y fue terminado.\n", esi -> id);
 		free(ultimaConsulta -> clave);
 		free(ultimaConsulta);
 		ultimaConsulta = NULL;
@@ -151,7 +155,7 @@ void ejecucionDeESI(ESI* esi)
 				}
 				pthread_mutex_unlock(&mBloqueados);
 				pthread_mutex_unlock(&mReady);
-				printf("Se libero la clave %s del ESI %i", ultimaConsulta -> clave, esi -> id);
+				printf("Se libero la clave %s del ESI %i.\n", ultimaConsulta -> clave, esi -> id);
 			}
 			break;
 		case bloqueante:
@@ -160,12 +164,12 @@ void ejecucionDeESI(ESI* esi)
 			if(ultimaConsulta -> resultado)
 			{
 				colocarEnColaESI(esi, ultimaConsulta -> clave);
-				printf("El ESI %i se bloqueo por la clave %s", esi -> id, ultimaConsulta -> clave);
+				printf("El ESI %i se bloqueo por la clave %s\n", esi -> id, ultimaConsulta -> clave);
 			}
 			else
 			{
 				reservarClave(esi, string_duplicate(ultimaConsulta -> clave));
-				printf("El ESI %i tomo poseción de la clave %s", esi -> id, ultimaConsulta -> clave);
+				printf("El ESI %i tomo poseción de la clave %s\n", esi -> id, ultimaConsulta -> clave);
 			}
 			pthread_mutex_unlock(&mBloqueados);
 			break;
@@ -193,12 +197,11 @@ void ejecucionDeESI(ESI* esi)
 	crearFinEjecucion(esi);
 }
 
-void escucharPorESI ()
+void escucharPorESI (socket_t socketServerESI)
 {
-	socket_t socketServerESI = ERROR, socketNuevaESI;
+	socket_t socketNuevaESI;
 	ESI* nuevaESI;
 
-	socketServerESI = crearServerESI();
 	while(!terminoEjecucion)
 	{
 		socketNuevaESI = ERROR;
@@ -243,45 +246,41 @@ void escucharPorFinESI(ESI* esi)
 	}
 }
 
-void comunicacionCoord(socket_t socketCoord)
+void comunicacionCoord(socket_pair_t *socketCoord)
 {
-	int maxFd = max(socketCoord, socketEsperarConsultaStatus);
-	fd_set master, read;
-
-	FD_ZERO(&master);
-	FD_SET(socketCoord, &master);
-	FD_SET(socketEsperarConsultaStatus, &master);
+	header *head;
 	while(1)
 	{
-		read = master;
-		select(maxFd, &read, NULL, NULL, NULL);
 
-		if(FD_ISSET(socketCoord, &read))
+		sem_wait(&sSocketCoord);
+
+		pthread_mutex_lock(&mConsStatus);
+		if(!consStatus)
 		{
-			if(seDesconectoSocket(socketCoord))
-				salirConError("Se desconecto el coordinador.");
+			pthread_mutex_unlock(&mConsStatus);
+			if(recibirMensaje(socketCoord -> escucha, sizeof(header), (void**) &head) == 1)
+				salirConError("Se desconecto el coordinador.\n");
 			//Consulta estado clave
-			ultimaConsulta = recibirConsultaCoord(socketCoord);
-			enviarRespuestaConsultaCoord(socketCoord,
-										claveTomadaPorESI(ultimaConsulta -> clave, ultimaConsulta -> id_esi));
+			printf("Se recibio una consulta del coordinador.\n");
+			ultimaConsulta = recibirConsultaCoord(socketCoord -> escucha);
+			ultimaConsulta -> resultado = claveTomadaPorESI(ultimaConsulta -> clave, ultimaConsulta -> id_esi);
+			enviarRespuestaConsultaCoord(socketCoord -> escucha, ultimaConsulta -> resultado);
 		}
 		else
 		{
-			header *head;
-			recibirMensaje(socketEsperarConsultaStatus, sizeof(header), (void**)&head);
-			free(head);
-
+			pthread_mutex_unlock(&mConsStatus);
 			head -> protocolo = 13;
-			enviarHeader(socketCoord, *head);
-			enviarBuffer(socketCoord, (void*) &(consStatus -> tamClave), sizeof(tamClave_t));
-			enviarBuffer(socketCoord, (void*) consStatus -> clave, consStatus -> tamClave);
+			enviarHeader(socketCoord -> envio, *head);
+			enviarBuffer(socketCoord -> envio, (void*) &(consStatus -> tamClave), sizeof(tamClave_t));
+			enviarBuffer(socketCoord -> envio, (void*) consStatus -> clave, consStatus -> tamClave);
 
-			recibirRespuestaStatus(socketCoord, consStatus);
+			recibirRespuestaStatus(socketCoord -> envio, consStatus);
 
 			pthread_mutex_lock(&mCondicionStatus);
 			pthread_cond_signal(&cRecibioStatus);
 			pthread_mutex_unlock(&mCondicionStatus);
 		}
+		free(head);
 	}
 }
 
@@ -430,11 +429,11 @@ void comandoKill(char *IdESI)
 	}
 	else if(estaEnFinalizados(IDparaMatar))
 	{
-		printf("El ESI %i ya está finalizado.\n", IdESI);
+		printf("El ESI %s ya está finalizado.\n", IdESI);
 	}
 	else
 	{
-		printf("El ESI %i no existe en el sistema.\n");
+		printf("El ESI %s no existe en el sistema.\n", IdESI);
 	}
 	pthread_mutex_unlock(&mEjecutando);
 }
@@ -443,11 +442,13 @@ void comandoStatus(char* clave)
 {
 	printf("Preguntando al coordinador por el estado de la clave %s", clave);
 
+	pthread_mutex_lock(&mConsStatus);
 	consStatus = malloc(sizeof(consultaStatus));
 	consStatus -> clave = clave;
 	consStatus -> tamClave = string_length(clave) + 1;
+	pthread_mutex_unlock(&mConsStatus);
 
-	enviarEncabezado(socketActivarConsultaStatus, 0);
+	sem_post(&sSocketCoord);
 
 	pthread_mutex_lock(&mCondicionStatus);
 	pthread_cond_wait(&cRecibioStatus, &mCondicionStatus);
@@ -521,13 +522,6 @@ void inicializacion (char* dirConfig)
 	sem_init(&corriendo, 0, 1);
 	sem_init(&contESIEnReady, 0, 0);
 
-	/*
-	 * Crea los socket en cualquier IP y puerto que el SO
-	 * tenga disponible.
-	 */
-	socketActivarConsultaStatus = crearSocketServer(obtenerIPInterna(), "0");
-	socketEsperarConsultaStatus = crearSocketClientePorFD(socketEsperarConsultaStatus, obtenerIPInterna());
-
 }
 
 void bloquearClavesConfiguracion()
@@ -551,27 +545,17 @@ int enviarEncabezado(socket_t sock, int prot)
 	return enviarHeader(sock, handshake);
 }
 
-int enviarIdESI(socket_t sock, ESI_id id)
+booleano enviarIdESI(socket_t sock, ESI_id id)
 {
-	header respuesta;
-	respuesta.protocolo = 6;
-	int tamEncabezado = sizeof(header), tamId = sizeof(ESI_id);
-	void* buffer = malloc(tamEncabezado + tamId);
-	memcpy(buffer, &respuesta, tamEncabezado);
-	memcpy(buffer + tamEncabezado, &id, tamId);
-	int resultado = enviarBuffer(sock, buffer, sizeof(buffer));
-	free(buffer);
+	booleano resultado = 1;
+	resultado &= enviarEncabezado(sock, 6);
+	resultado &= enviarBuffer(sock, (void*) &id, sizeof(id));
 	return resultado;
 }
 
 int enviarRespuestaConsultaCoord(socket_t coord, booleano respuesta)
 {
-	header encabezado;
-	encabezado.protocolo = 10;
-	void* buffer = malloc(sizeof(header) + sizeof(respuesta));
-	memcpy(buffer, &encabezado, sizeof(header));
-	memcpy(buffer + sizeof(header), &respuesta, sizeof(respuesta));
-	return enviarBuffer(coord, buffer, sizeof(buffer));
+	return enviarEncabezado(coord, 10) & enviarBuffer(coord, &respuesta, sizeof(booleano));
 }
 
 consultaCoord* recibirConsultaCoord(socket_t socketCoord)
@@ -579,8 +563,8 @@ consultaCoord* recibirConsultaCoord(socket_t socketCoord)
 	consultaCoord *consulta = malloc(sizeof(consultaCoord));
 
 	ESI_id *id_esi;
-	recibirMensaje(socketCoord, sizeof(enum tipoDeInstruccion), (void**) &id_esi);
-	consulta -> tipo = *id_esi;
+	recibirMensaje(socketCoord, sizeof(ESI_id), (void**) &id_esi);
+	consulta -> id_esi = *id_esi;
 	free(id_esi);
 
 	enum tipoDeInstruccion *tipo;
@@ -588,8 +572,8 @@ consultaCoord* recibirConsultaCoord(socket_t socketCoord)
 	consulta -> tipo = *tipo;
 	free(tipo);
 
-	uint8_t *tamClave;
-	recibirMensaje(socketCoord, sizeof(uint8_t), (void**) &tamClave);
+	tamClave_t *tamClave;
+	recibirMensaje(socketCoord, sizeof(tamClave_t), (void**) &tamClave);
 	consulta -> tamClave = *tamClave;
 	free(tamClave);
 
@@ -658,14 +642,14 @@ pthread_t crearHiloTerminal()
 	return hilo;
 }
 
-pthread_t crearHiloNuevasESI()
+pthread_t crearHiloNuevasESI(socket_t socketNuevosESI)
 {
 	pthread_t hilo;
 	pthread_attr_t attr;
 
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	pthread_create(&hilo, &attr, (void*) escucharPorESI, NULL);
+	pthread_create(&hilo, &attr, (void*) escucharPorESI, (void*) socketNuevosESI);
 	pthread_attr_destroy(&attr);
 	return hilo;
 }
@@ -683,26 +667,33 @@ pthread_t crearFinEjecucion(ESI* esi)
 	return hilo;
 }
 
-pthread_t crearHiloCoordinador()
+pthread_t crearHiloCoordinador(socket_t socketEscucha)
 {
-	socket_t socketCoord = ERROR;
+	socket_t socketCoord = ERROR, socketStatus = ERROR;
 	pthread_t hilo;
 	pthread_attr_t attr;
 
 	socketCoord = conectarConCoordinador();
 
+	tamClave_t tamIP = string_length(obtenerIP()) + sizeof(char), tamPuerto = string_length(obtenerPuerto()) + sizeof(char);
+
 	if(socketCoord == ERROR)
 		salirConError("No se pudo conectar con el coordinador.\n");
-	if(enviarEncabezado(socketCoord, 1)) //Enviar el handshake
+	if(enviarEncabezado(socketCoord, 1) || enviarBuffer(socketCoord, &tamIP, sizeof(tamClave_t)) || enviarBuffer(socketCoord, obtenerIP(), tamIP) ||
+		enviarBuffer(socketCoord, &tamPuerto, sizeof(tamClave_t)) || enviarBuffer(socketCoord, obtenerPuerto(), tamPuerto)) //Enviar el handshake
 		salirConError("Fallo al enviar el handshake planificador -> Coordinador\n");
 
+	socketStatus = aceptarConexion(socketEscucha);
+	printf("Se conecto el socket para status.\n");
+	socket_pair_t *par = malloc(sizeof(socket_pair_t));
+	par -> escucha = socketCoord;
+	par -> envio = socketStatus;
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-	pthread_create(&hilo, NULL, (void*) comunicacionCoord, (void*) socketCoord);
+	pthread_create(&hilo, &attr, (void*) comunicacionCoord, (void*) par);
 	pthread_attr_destroy(&attr);
 
 	return hilo;
-
 }
 
 enum comandos convertirComando(char* linea)

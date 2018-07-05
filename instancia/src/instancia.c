@@ -220,7 +220,7 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 			if(tamValor)
 				registrarNuevaClave(clave, valor, tamValor);
 			else
-				error_show("No se pudo recuperar la clave %s", clave);
+				error_show("No se pudo recuperar la clave %s\n", clave);
 			free(tamClave);
 			free(clave);
 			free(valor);
@@ -230,7 +230,7 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 	case 5:
 		recibirMensaje(socketCoord, sizeof(instancia_id), (void**) &buffID);
 		if(!almacenarID(*buffID))
-			error_show("No se pudo almacenar la ID");
+			error_show("No se pudo almacenar la ID\n");
 		free(buffID);
 
 		recibirMensaje(socketCoord, sizeof(cantEntradas_t), (void **) &buffCantEntr);

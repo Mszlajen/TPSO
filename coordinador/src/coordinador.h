@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <biblio.h>
 #include <string.h>
 #include <commons/config.h>
@@ -63,6 +64,7 @@ void tratarStoreInstancia(Instancia * instancia);
 void hiloInstancia (Instancia * instancia);
 void hiloEsi (Esi * esi);
 void hiloPlanificador (socket_t socket);
+void hiloStatus (socket_t sock);
 void recibirConexiones();
 Instancia * algoritmoUsado(void);
 Instancia * algoritmoEquitativeLoad(void);

@@ -17,12 +17,13 @@ t_dictionary * tablaDeClaves = NULL;
 
 socket_t  socketPlanificador;
 socket_t  socketCoordinador;
-socket_t  socketEsperarConsultaClave;
-socket_t  socketActivarConsultaClave;
+socket_t  socketStatus;
 
 pthread_mutex_t mInstanciaActual, mEsiActual, mRespuestaInstancia, mConsultarPorClave , mListaInst, mAuxiliarIdInstancia;
 pthread_cond_t sbInstanciaActual, sbEsiActual, sbRespuestaInstancia, sbConsultarPorClave , sbRespuestaPlanificador;
 
+sem_t sSocketPlanificador;
+booleano consultarClave;
 
 char * Algoritmo;
 int auxiliarIdInstancia;
@@ -30,7 +31,7 @@ int auxiliarIdEsi;
 int contadorEquitativeLoad = 0;
 int contadorIdInstancias = 1;
 int cantInstancias = 0;
-int respuestaPlanificador;
+booleano respuestaPlanificador;
 int hayCompactacion = 0;
 int instanciasCompactadas= 0;
 int hayQueSimular = 0;
@@ -76,29 +77,26 @@ int main(int argc, char **argv) {
 
 void hiloPlanificador (socket_t socket){
 
-
-	int maxFd = max(socketPlanificador, socketEsperarConsultaClave);
-	fd_set master, read;
-
-	FD_ZERO(&master);
-	FD_SET(socketPlanificador, &master);
-	FD_SET(socketEsperarConsultaClave, &master);
 	while(1)
 	{
-		read = master;
-		select(maxFd, &read, NULL, NULL, NULL);
+		sem_wait(&sSocketPlanificador);
+		consultarPorClave();
+	}
+}
 
-		if(FD_ISSET(socketPlanificador, &read))
-		{
-			if(seDesconectoSocket(socketPlanificador) )
-			{
-				salirConError("Se Desconecto Planificador. \n");
-			}
-			tratarStatusPlanificador();
-
-		}else if(FD_ISSET(socketEsperarConsultaClave, &read)){
-			consultarPorClave();
-		}
+void hiloStatus (socket_t sock)
+{
+	printf("Se conecto el socket de status.\n");
+	fd_set read;
+	int max = sock + 1;
+	FD_ZERO(&read);
+	while(1)
+	{
+		FD_SET(sock, &read);
+		select(max, &read, NULL, NULL, NULL);
+		if(seDesconectoSocket(sock))
+			salirConError("Se desconecto el planificador.\n");
+		tratarStatusPlanificador();
 	}
 }
 
@@ -191,31 +189,32 @@ void hiloInstancia (Instancia * instancia) {
 void hiloEsi (Esi * esi) {
 	tamClave_t * tamClave = NULL;
 	tamValor_t * tamValor = NULL;
-	header * header;
+	header * head;
 	enum instruccion * instr = NULL;
 
 	while(1){
 
-	if( recibirMensaje(esi->socket,sizeof(header),(void *) &header) != 1 ){
-		recibirMensaje(esi->socket,sizeof(int),(void *) &esi->idEsi);
-
-		if (header->protocolo == 8){
-				recibirMensaje(esi->socket,sizeof(enum instruccion),(void *) &instr );
+	if( !recibirMensaje(esi->socket,sizeof(header),(void **) &head) ){
+		ESI_id *id;
+		recibirMensaje(esi->socket,sizeof(ESI_id),(void **) &id);
+		esi -> idEsi = *id;
+		free(id);
+		printf("Se recibio un mensaje del ESI %i.\n", esi -> idEsi);
+		if (head->protocolo == 8){
+				recibirMensaje(esi->socket,sizeof(enum instruccion),(void **) &instr );
 				esi->instr = *instr;
 
+				recibirMensaje(esi->socket,sizeof(tamClave_t),(void **) &tamClave );
+				recibirMensaje(esi->socket,*tamClave,(void **) &esi->clave);
 				switch(esi->instr){
 						case get:
-							recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
-							recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
 
 							tratarGetEsi(esi);
 							enviarResultadoEsi(esi);
 							break;
 						case set:
-							recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
-							recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
-							recibirMensaje(esi->socket,sizeof(tamValor_t),(void *) &tamValor );
-							recibirMensaje(esi->socket,*tamValor,(void *) &esi->valor);
+							recibirMensaje(esi->socket,sizeof(tamValor_t),(void **) &tamValor );
+							recibirMensaje(esi->socket,*tamValor,(void **) &esi->valor);
 
 							pthread_mutex_lock(&mRespuestaInstancia);
 							tratarSetEsi(esi);
@@ -235,8 +234,6 @@ void hiloEsi (Esi * esi) {
 							enviarResultadoEsi(esi);
 							break;
 						case store:
-							recibirMensaje(esi->socket,sizeof(tamClave_t),(void *) &tamClave );
-							recibirMensaje(esi->socket,*tamClave,(void *) &esi->clave);
 
 							pthread_mutex_lock(&mRespuestaInstancia);
 							tratarStoreEsi(esi);
@@ -249,7 +246,7 @@ void hiloEsi (Esi * esi) {
 						case compactacion:
 							break;
 						}
-				free(header);
+				free(head);
 				free(instr);
 			}
 		}else{
@@ -258,6 +255,7 @@ void hiloEsi (Esi * esi) {
 			auxiliarIdEsi = esi->idEsi;
 			list_remove_by_condition(listaEsi, (void*)buscarEsiPorId);
 			free(esi);
+			break;
 		}
 	}
 }
@@ -364,7 +362,7 @@ void tratarSetEsi(Esi * esi) {
 	pthread_cond_wait(&sbRespuestaPlanificador,&mConsultarPorClave);
 	pthread_mutex_unlock(&mConsultarPorClave);
 
-	if(respuestaPlanificador){
+	if(!respuestaPlanificador){
 		//este es el caso en que la instancia no tiene la clave, el coordinador le retorna un fallo
 		esi->res = fallo;
 	}else{
@@ -372,7 +370,7 @@ void tratarSetEsi(Esi * esi) {
 
 		if(instancia == NULL){
 			instancia = algoritmoUsado();
-			dictionary_put(tablaDeClaves, esi->clave, &instancia);
+			dictionary_put(tablaDeClaves, esi->clave, instancia);
 
 			esi->instr = create;
 
@@ -425,18 +423,16 @@ void tratarSetInstancia(Instancia * instancia){
 }
 
 void pedirConsultaClave(){
-	int * buffer = malloc(sizeof(int));
-	*buffer = 1;
-	enviarBuffer (socketActivarConsultaClave , buffer , sizeof(int) );
-	free(buffer);
+	consultarClave = 1;
+	sem_post(&sSocketPlanificador);
 }
 
 void consultarPorClave(){
-	header header;
-	header.protocolo = 9;
-	int *respuesta;
+	header *head = malloc(sizeof(header));
+	head ->protocolo = 9;
+	booleano *respuesta;
 	enum tipoDeInstruccion tipo;
-
+	printf("Se está consultando por al planificador por la clave %s\n", esiActual -> clave);
 	tamClave_t tamClave = string_length(esiActual->clave) + sizeof(char);
 
 	switch(esiActual->instr){
@@ -455,40 +451,32 @@ void consultarPorClave(){
 		break;
 	}
 
-	void * buffer = malloc(sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion) + sizeof(tamClave_t) + tamClave);
+	enviarBuffer(socketPlanificador, (void*) head, sizeof(header));
+	enviarBuffer(socketPlanificador, &(esiActual -> idEsi), sizeof(ESI_id));
+	enviarBuffer(socketPlanificador, &tipo, sizeof(enum tipoDeInstruccion));
+	enviarBuffer(socketPlanificador, &tamClave, sizeof(tamClave_t));
+	enviarBuffer(socketPlanificador, esiActual->clave, tamClave);
 
-	memcpy(buffer , &header.protocolo , sizeof(header) );
-	memcpy(buffer+sizeof(header) , &esiActual->idEsi, sizeof(ESI_id) );
-	memcpy(buffer+sizeof(header) + sizeof(ESI_id) , &tipo, sizeof(enum tipoDeInstruccion) );
-	memcpy(buffer+sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion)  , &tamClave, sizeof(tamClave_t) );
-	memcpy(buffer+sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion) + sizeof(tamClave_t) , &esiActual->clave, tamClave );
-
-	int estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion) + sizeof(tamClave_t) + tamClave);
-
-	while(estado !=0){
-		error_show("no se pudo preguntar por el estado de la clave al planificador, volviendo a intentar");
-		estado = enviarBuffer (socketPlanificador , buffer , sizeof(header) + sizeof(ESI_id) + sizeof(enum tipoDeInstruccion) + sizeof(tamClave_t) + tamClave);
-		}
-	free(buffer);
-
-	respuesta = malloc(sizeof(booleano));
-	recibirMensaje(socketPlanificador,sizeof(header),(void *) &header);
-	recibirMensaje(socketPlanificador,sizeof(int),(void *) &respuesta);
+	recibirMensaje(socketPlanificador,sizeof(header),(void **) &head);
+	recibirMensaje(socketPlanificador,sizeof(booleano),(void **) &respuesta);
 
 	respuestaPlanificador = *respuesta;
 
+	printf("Se recibio la respuesta del planificador (Respuesta = %i).\n", respuestaPlanificador);
+	pthread_mutex_lock(&mConsultarPorClave);
 	pthread_cond_signal(&sbRespuestaPlanificador);
+	pthread_mutex_unlock(&mConsultarPorClave);
 
 	free(respuesta);
 }
 
 void tratarStatusPlanificador () {
 	Instancia * instancia;
-	header * header;
+	header * head;
 	int estado;
 
-	recibirMensaje(socketPlanificador,sizeof(header),(void *) &header);
-	if(header->protocolo == 13){
+	recibirMensaje(socketPlanificador,sizeof(header),(void *) &head);
+	if(head->protocolo == 13){
 		recibirMensaje(socketPlanificador,sizeof(tamClave_t),(void *) &RespStatus.tamClave );
 		recibirMensaje(socketPlanificador,*RespStatus.tamClave,(void *) &RespStatus.clave);
 
@@ -512,7 +500,7 @@ void tratarStatusPlanificador () {
 
 		if(*RespStatus.existe == 1){
 			// logre conseguir el valor de la clave y lo mando
-			header->protocolo = 14;
+			head->protocolo = 14;
 			tamNombreInstancia_t tamNombre = sizeof(*instancia->nombre);
 
 			void * buffer = malloc(sizeof(header)
@@ -523,7 +511,7 @@ void tratarStatusPlanificador () {
 					+ *RespStatus.tamValor)
 					+ sizeof(enum estadoClave);
 
-			memcpy(buffer , &header , sizeof(header) );
+			memcpy(buffer , &head , sizeof(header) );
 			memcpy(buffer+sizeof(header) , &instancia->idinstancia , sizeof(instancia_id) );
 			memcpy(buffer+sizeof(header)+sizeof(instancia_id) , &tamNombre, sizeof(tamNombreInstancia_t) );
 			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t) , &instancia->nombre, tamNombre );
@@ -542,12 +530,12 @@ void tratarStatusPlanificador () {
 
 		}else{
 			// no logre conseguir el valor de la clave, no lo envio
-			header->protocolo = 14;
+			head->protocolo = 14;
 			tamNombreInstancia_t tamNombre = sizeof(*instancia->nombre);
 
 			void * buffer = malloc(sizeof(header)+sizeof(instancia_id)+tamNombre+sizeof(tamNombreInstancia_t)+sizeof(tamValor_t)+sizeof(enum estadoClave));
 
-			memcpy(buffer , &header , sizeof(header) );
+			memcpy(buffer , &head , sizeof(header) );
 			memcpy(buffer+sizeof(header) , &instancia->idinstancia , sizeof(instancia_id) );
 			memcpy(buffer+sizeof(header)+sizeof(instancia_id) , &tamNombre, sizeof(tamNombreInstancia_t) );
 			memcpy(buffer+sizeof(header)+sizeof(instancia_id)+sizeof(tamNombreInstancia_t) , &instancia->nombre, tamNombre );
@@ -705,7 +693,7 @@ void esESIoInstancia (socket_t socketAceptado)
 {
 
 	header* Header;
-	recibirMensaje(socketAceptado,sizeof(header),(void *) &Header);
+	recibirMensaje(socketAceptado,sizeof(header),(void **) &Header);
 
 	switch(Header->protocolo){
 	case 2:
@@ -717,6 +705,7 @@ void esESIoInstancia (socket_t socketAceptado)
 	default:
 		break;
 	}
+	free(Header);
 }
 
 void registrarEsi(socket_t socket){
@@ -726,7 +715,7 @@ void registrarEsi(socket_t socket){
 	nuevaEsi->clave = NULL;
 	nuevaEsi->valor = NULL;
 	list_add(listaEsi,nuevaEsi);
-	printf("Se conecto una ESI");
+	printf("Se conecto una ESI.\n");
 	pthread_t pHiloEsi;
 	pthread_create(&pHiloEsi, NULL, (void*) hiloEsi, nuevaEsi);
 }
@@ -956,12 +945,12 @@ int esperarYaceptar(socket_t socketCoordinador)
 	return socket;
 }
 
-int validarPlanificador (socket_t socket) {
+int validarPlanificador (socket_t sock) {
 	header* handshake = NULL;
 	int estadoDellegada;
-	pthread_t pHiloPlanificador;
+	pthread_t pHiloPlanificador, pHiloStatus;
 
-	estadoDellegada = recibirMensaje(socket,sizeof(header),(void*) &handshake);
+	estadoDellegada = recibirMensaje(sock,sizeof(header),(void*) &handshake);
 	if (estadoDellegada != 0)
 	{
 		error_show ("No se pudo recibir header de planificador.\n");
@@ -970,12 +959,24 @@ int validarPlanificador (socket_t socket) {
 
 	if (handshake->protocolo != 1)
 	{
-		close(socket);
+		close(sock);
 		return 1;
 	}
 	else
 	{
+		tamClave_t *tamIP, *tamPuerto;
+		char *ip;
+		char *puerto;
+		recibirMensaje(sock, sizeof(tamClave_t), (void**)&tamIP);
+		recibirMensaje(sock, *tamIP, (void**)&ip);
+		recibirMensaje(sock, sizeof(tamClave_t), (void**)&tamPuerto);
+		recibirMensaje(sock, *tamPuerto, (void**)&puerto);
+		free(tamIP);
+		free(tamPuerto);
 		pthread_create(&pHiloPlanificador, NULL, (void*) hiloPlanificador, (void*) &socket);
+		pthread_create(&pHiloStatus, NULL, (void*) hiloStatus, (void*) crearSocketCliente(ip, puerto));
+		free(ip);
+		free(puerto);
 		return 0;
 	}
 }
@@ -1007,8 +1008,6 @@ void liberarInstancia(Instancia * instancia) {
 void liberarRecursos()
 {
 	close(socketCoordinador);
-	close(socketEsperarConsultaClave);
-	close(socketActivarConsultaClave);
 
 	log_destroy(logOperaciones);
 
@@ -1061,9 +1060,6 @@ int crearConfiguracion(char* archivoConfig){
 		salirConError("Fallo al leer el archivo de configuracion del planificador.\n ");
 	Algoritmo = config_get_string_value(configuracion, "Algoritmo");
 
-	socketActivarConsultaClave = crearSocketServer(config_get_string_value(configuracion, "IPInterna"), "0");
-	socketEsperarConsultaClave = crearSocketClientePorFD(socketEsperarConsultaClave, config_get_string_value(configuracion, "IPInterna"));
-
 	listaEsi = list_create();
 	listaInstancias = list_create();
 	listaClaves = list_create();
@@ -1086,6 +1082,8 @@ int crearConfiguracion(char* archivoConfig){
 
 	pthread_mutex_init (&mConsultarPorClave,NULL);
 	pthread_cond_init (&sbConsultarPorClave,NULL);
+
+	sem_init(&sSocketPlanificador, 0, 0);
 
 	logOperaciones = log_create("archivoLog.txt","logOperaciones",1,LOG_LEVEL_INFO);
 

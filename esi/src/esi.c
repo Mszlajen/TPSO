@@ -5,6 +5,7 @@ int main(int argc, char **argv) {
 	FILE * programa = NULL;
 	socket_t socketCoord = ERROR, socketPlan = ERROR;
 	ESI_id *id;
+	header *head;
 
 	inicializacion(argc, argv, &configuracion, &programa);
 
@@ -13,15 +14,19 @@ int main(int argc, char **argv) {
 
 	socketPlan = conectarConPlanificador(configuracion);
 	enviarHandshake(socketPlan);
+	recibirMensaje(socketPlan, sizeof(header), (void**) &head);
 	recibirMensaje(socketPlan, sizeof(ESI_id), (void**) &id);
 
-	header *head;
 	t_esi_operacion operacionESI;
 	booleano hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
 	enum resultadoEjecucion *resultado;
 	while (hayInstruccion){
 		printf("Esperando aviso de ejecución.\n");
-		recibirMensaje(socketPlan, sizeof(header), (void**) &head);
+		if(recibirMensaje(socketPlan, sizeof(header), (void**) &head))
+		{
+			error_show("Se desconecto el planificador.\n");
+			break;
+		}
 		if(head -> protocolo != 7)
 		{/* ERROR */}
 		free(head);
@@ -29,7 +34,11 @@ int main(int argc, char **argv) {
 		enviarInstruccionCoord(socketCoord, operacionESI, *id);
 		destruir_operacion(operacionESI);
 		printf("Esperando resultado de ejecución.\n");
-		recibirMensaje(socketCoord, sizeof(header), (void**) &head);
+		if(recibirMensaje(socketCoord, sizeof(header), (void**) &head))
+		{
+			error_show("Se desconecto el coordinador.\n");
+			break;
+		}
 		if(head -> protocolo != 12)
 		{ /*ERROR*/ }
 		recibirMensaje(socketCoord, sizeof(enum resultadoEjecucion), (void**) &resultado);
@@ -126,7 +135,18 @@ void enviarInstruccionCoord(socket_t socketCoord, t_esi_operacion operacion, ESI
 {
 	header header;
 	header.protocolo = 8;
-	enum instruccion instr = (enum instruccion) operacion.keyword;
+	enum instruccion instr;
+	switch(operacion.keyword)
+	{
+	case GET:
+		instr = get;
+		break;
+	case SET:
+		instr = set;
+		break;
+	case STORE:
+		instr = store;
+	}
 	tamClave_t tamClave;
 	tamValor_t tamValor;
 

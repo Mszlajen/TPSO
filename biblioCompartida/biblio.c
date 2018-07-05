@@ -19,11 +19,13 @@ socket_t crearSocketCliente(char * IP, char * puerto)
 	int sock = socket(server_info->ai_family, server_info->ai_socktype, server_info->ai_protocol);
 
 	int resultado = connect(sock, server_info->ai_addr, server_info->ai_addrlen);
-
 	freeaddrinfo(server_info);
 
 	if(resultado == ERROR)
+	{
+		perror("");
 		return resultado;
+	}
 	return sock;
 }
 
@@ -55,18 +57,6 @@ socket_t crearSocketServer(char * IP, char * puerto)
 		perror("");
 		return resultado;
 	}
-	return sock;
-}
-
-
-socket_t crearSocketClientePorFD(socket_t fd, char *ip)
-{
-	struct sockaddr_in addr;
-	socklen_t addr_size = sizeof(struct sockaddr_in);
-	getsockname(fd, (struct sockaddr *)&addr, &addr_size);
-	char *puerto = string_from_format("%i", ntohs(addr.sin_port));
-	socket_t sock = crearSocketCliente(ip, puerto);
-	free(puerto);
 	return sock;
 }
 
