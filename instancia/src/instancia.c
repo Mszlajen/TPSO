@@ -164,26 +164,30 @@ void conectarConCoordinador(socket_t *socketCoord)
 
 	if((archivoID = fopen(dirArchivoID, "r")))
 	{
-		fread((void*)&ID, sizeof(instancia_id), 1, archivoID);
+		fread(&ID, sizeof(instancia_id), 1, archivoID);
 		fclose(archivoID);
 	}
 	else
-	{
-		tamNombreInstancia_t tamNombre = sizeof(char) * string_length(obtenerNombreInstancia()) +
-						sizeof(char);
-		int tamBuffer = sizeof(head) +
-						sizeof(instancia_id) +
-						sizeof(tamNombreInstancia_t) +
-						tamNombre;
+		ID = 0;
 
-		buffer = malloc(tamBuffer);
-		head.protocolo = 2;
-		memcpy(buffer, &head, sizeof(head));
-		memcpy(buffer + sizeof(instancia_id), &ID, sizeof(instancia_id));
-		memcpy(buffer + sizeof(head) + sizeof(instancia_id), &tamNombre, sizeof(tamNombreInstancia_t));
-		memcpy(buffer + sizeof(head) + sizeof(instancia_id) + sizeof(tamNombre), obtenerNombreInstancia(), tamNombre);
-		enviarBuffer(*socketCoord, buffer, tamBuffer);
-	}
+	tamNombreInstancia_t tamNombre = sizeof(char) * string_length(obtenerNombreInstancia()) +
+					sizeof(char);
+	int tamBuffer = sizeof(head) +
+					sizeof(instancia_id) +
+					sizeof(tamNombreInstancia_t) +
+					tamNombre;
+
+	buffer = malloc(tamBuffer);
+	head.protocolo = 2;
+	memcpy(buffer, &head, sizeof(head));
+	memcpy(buffer + sizeof(instancia_id), &ID, sizeof(instancia_id));
+	memcpy(buffer + sizeof(head) + sizeof(instancia_id), &tamNombre, sizeof(tamNombreInstancia_t));
+	memcpy(buffer + sizeof(head) + sizeof(instancia_id) + sizeof(tamNombre), obtenerNombreInstancia(), tamNombre);
+	enviarBuffer(*socketCoord, buffer, tamBuffer);
+
+	if(archivoID)
+		fclose(archivoID);
+
 	free(buffer);
 	free(dirArchivoID);
 }
@@ -196,6 +200,7 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 	cantEntradas_t *buffCantEntr;
 	tamEntradas_t *buffTamEntr;
 	instancia_id *buffID;
+	recibirMensaje(socketCoord, sizeof(instancia_id), (void**) &buffID);
 	switch(head -> protocolo)
 	{
 	case 4:
@@ -225,13 +230,15 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 			free(clave);
 			free(valor);
 		}
+		*cantClaves = obtenerEntradasDisponibles();
+		enviarBuffer(socketCoord, (void*) head, sizeof(header));
+		enviarBuffer(socketCoord, (void*) cantClaves, sizeof(cantClaves_t));
 		free(cantClaves);
+
 		break;
 	case 5:
-		recibirMensaje(socketCoord, sizeof(instancia_id), (void**) &buffID);
 		if(!almacenarID(*buffID))
 			error_show("No se pudo almacenar la ID\n");
-		free(buffID);
 
 		recibirMensaje(socketCoord, sizeof(cantEntradas_t), (void **) &buffCantEntr);
 		cantidadEntradas = *buffCantEntr;
@@ -242,6 +249,8 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 		free(buffTamEntr);
 		break;
 	}
+	free(buffID);
+	free(head);
 }
 
 instruccion_t* recibirInstruccionCoordinador(socket_t socketCoord)

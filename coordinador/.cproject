@@ -57,21 +57,6 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
-					<fileInfo id="cdt.managedbuild.config.gnu.exe.debug.1968438936.1792078604" name="coordinador.c" rcbsApplicability="disable" resourcePath="src/coordinador.c" toolsToInvoke="cdt.managedbuild.tool.gnu.c.compiler.exe.debug.258976802.1558727825">
-						<tool command="gcc" commandLinePattern="${COMMAND} ${FLAGS} ${OUTPUT_FLAG} ${OUTPUT_PREFIX}${OUTPUT} ${INPUTS}" id="cdt.managedbuild.tool.gnu.c.compiler.exe.debug.258976802.1558727825" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.exe.debug.258976802">
-							<option id="gnu.c.compiler.option.include.paths.68706907" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
-								<listOptionValue builtIn="false" value="&quot;${workspace_loc:/biblioCompartida}&quot;"/>
-							</option>
-							<option id="gnu.c.compiler.option.include.files.1822707832" name="Include files (-include)" superClass="gnu.c.compiler.option.include.files" useByScannerDiscovery="false"/>
-							<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.646889773" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
-						</tool>
-						<tool announcement="Invoking: Resource Custom Build Step" command="" customBuildStep="true" id="org.eclipse.cdt.managedbuilder.ui.rcbs.1630554684" name="Resource Custom Build Step">
-							<inputType id="org.eclipse.cdt.managedbuilder.ui.rcbs.inputtype.1986996594" name="Resource Custom Build Step Input Type">
-								<additionalInput kind="additionalinputdependency" paths=""/>
-							</inputType>
-							<outputType id="org.eclipse.cdt.managedbuilder.ui.rcbs.outputtype.1934486140" name="Resource Custom Build Step Output Type" outputNames=""/>
-						</tool>
-					</fileInfo>
 					<sourceEntries>
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>

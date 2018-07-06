@@ -14,80 +14,68 @@
 #include <commons/log.c>
 
 typedef struct {
-	socket_t socket;
-	enum instruccion instr;
-	enum resultadoEjecucion res;
-	char* clave;
-	char* valor;
-	ESI_id idEsi;
-} Esi;
-
-
-typedef struct {
-	socket_t socket;
-	instancia_id idinstancia;
+	instancia_id id;
 	char* nombre;
-	Esi * esiTrabajando;
+	booleano conectada;
+	t_list *claves;
 	cantEntradas_t entradasLibres;
-} Instancia;
+	sem_t sIniciarEjecucion;
+	sem_t sFinCompactacion;
+	socket_t socket;
+	pthread_t hilo;
+} instancia_t;
 
 typedef struct {
+	tamClave_t tamClave;
+	char *clave;
+	tamValor_t tamValor;
+	char *valor;
+	ESI_id id;
+	enum instruccion instr;
+	booleano validez;
+	enum resultadoEjecucion result;
+} operacion_t;
 
-	tamClave_t * tamClave;
-	char* clave;
-	booleano * existe;
-	tamValor_t * tamValor;
-	char* valor;
+typedef struct {
+	tamClave_t tamClave;
+	char *clave;
+	tamValor_t tamValor;
+	char *valor;
 	enum estadoClave estado;
-} RespuestaStatus;
-
-
+	booleano atender;
+	sem_t atendida;
+} consultaStatus_t;
 
 #define IPEscucha "IP"
 #define Puerto "Puerto"
 
-void esESIoInstancia (socket_t socketAceptado);
-int esperarYaceptar(socket_t socketCoordinador);
-int validarPlanificador (socket_t socket);
-void liberarRecursos();
-void salirConError(char * error);
-void inicializacion();
-void registrarEsi(socket_t socket);
-void registrarInstancia(socket_t socket);
-bool idInstancia(Instancia * instancia);
-void tratarGetInstancia(Instancia * instancia);
-void tratarGetEsi(Esi * esi);
-void tratarSetEsi(Esi * esi);
-void tratarStoreEsi(Esi * esi);
-void tratarSetInstancia(Instancia * instancia);
-void tratarStoreInstancia(Instancia * instancia);
-void hiloInstancia (Instancia * instancia);
-void hiloEsi (Esi * esi);
-void hiloPlanificador (socket_t socket);
-void hiloStatus (socket_t sock);
-void recibirConexiones();
-Instancia * algoritmoUsado(void);
-Instancia * algoritmoEquitativeLoad(void);
-Instancia * algoritmoLastStatementUsed(void);
-int crearConfiguracion(char * archivoConfig);
-int buscarClaves(char * clave);
-int buscarInstanciaPorId(Instancia * instancia);
-int buscarEsiPorId(Esi * esi);
-void setearEsiActual(Esi esi);
-void recibirResultadoInstancia(Instancia * instancia);
-void enviarResultadoEsi(Esi * esi);
-void consultarPorClave();
-void pedirConsultaClave();
-int max (int v1, int v2);
-int comprobarEstadoDeInstancia (Instancia * instancia);
-void tratarStatusPlanificador ();
-void tratarStatusInstancia (Instancia * instancia);
-bool compararPorEntradasLibres(Instancia instancia1,Instancia instancia2);
-void liberarClave(char * clave);
-void liberarEsi (Esi * esi);
-void liberarInstancia(Instancia * instancia);
+void inicializacion (char * dirConfiguracion);
+socket_t conectarConPlanificador(socket_t socketEscucha);
+void recibirNuevasConexiones(socket_t socketEscuchar);
+void registrarInstancia(socket_t conexion);
+void registrarESI(socket_t conexion);
 
+void hiloESI (socket_t *socketESI);
+void hiloInstancia(instancia_t *instancia);
+void hiloPlanificador(socket_t *socketPlanificador);
+void hiloStatus(socket_t *socketStatus);
+void hiloCompactacion(instancia_t *llamadora);
 
+void ejecutarGET();
+void ejecutarSET();
+void ejecutarSTORE();
 
+instancia_t *correrAlgoritmo(int *puntero);
+instancia_t *algoritmoEquitativeLoad(int *puntero);
+instancia_t *algoritmoLeastSpaceUsed(int *puntero);
+instancia_t *simularDistribucion();
 
+int enviarEncabezado(socket_t conexion, uint8_t valor);
+//Devuelve 0 si envio bien, diferente en caso contrario
+int enviarResultado(socket_t conexion, enum resultadoEjecucion result);
+void enviarInfoEntradas(socket_t instancia);
+char* instrToArray(enum instruccion instr);
+void removerClave(instancia_t *instancia, char *clave);
+void limpiarOperacion();
+void salirConError(char*);
 #endif /* SRC_COORDINADOR_H_ */

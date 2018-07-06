@@ -40,11 +40,12 @@ enum resultadoEjecucion {exito, bloqueo, fallo, fin, necesitaCompactar};
 /*
  * Descripción de los estados:
  * existente - Tiene instancia asignada y un valor.
- * innexistente - No tiene instancia asignada.
+ * innexistente - No existe en el coordinador.
+ * sinIniciar - Existe pero no tiene instancia asignada.
  * caida - Tiene instancia asignada pero está desconectada.
  * sinValor - Tiene instancia asignada pero está no tiene su valor.
  */
-enum estadoClave {existente, innexistente, caida, sinValor};
+enum estadoClave {existente, innexistente, sinIniciar, caida, sinValor};
 
 void salir_agraciadamente(int);
 //-1 en error o fileDescriptor en exito

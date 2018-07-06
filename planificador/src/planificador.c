@@ -169,7 +169,7 @@ void ejecucionDeESI(ESI* esi)
 			else
 			{
 				reservarClave(esi, string_duplicate(ultimaConsulta -> clave));
-				printf("El ESI %i tomo poseción de la clave %s\n", esi -> id, ultimaConsulta -> clave);
+				printf("El ESI %i tomo posesión de la clave %s\n", esi -> id, ultimaConsulta -> clave);
 			}
 			pthread_mutex_unlock(&mBloqueados);
 			break;
@@ -263,7 +263,10 @@ void comunicacionCoord(socket_pair_t *socketCoord)
 			//Consulta estado clave
 			printf("Se recibio una consulta del coordinador.\n");
 			ultimaConsulta = recibirConsultaCoord(socketCoord -> escucha);
-			ultimaConsulta -> resultado = claveTomadaPorESI(ultimaConsulta -> clave, ultimaConsulta -> id_esi);
+			if(ultimaConsulta -> tipo == bloqueante)
+				ultimaConsulta -> resultado = claveTomada(ultimaConsulta -> clave);
+			else
+				ultimaConsulta -> resultado = claveTomadaPorESI(ultimaConsulta -> clave, ultimaConsulta -> id_esi);
 			enviarRespuestaConsultaCoord(socketCoord -> escucha, ultimaConsulta -> resultado);
 		}
 		else
@@ -340,7 +343,7 @@ void comandoBloquear(char* clave, char* IdESI)
 	}
 	else
 	{
-		printf("El ESI %i no existe en el sistema.\n");
+		printf("El ESI %i no existe en el sistema.\n", IDparaBloquear);
 	}
 	pthread_mutex_unlock(&mReady);
 	pthread_mutex_unlock(&mBloqueados);
@@ -473,7 +476,11 @@ void comandoStatus(char* clave)
 		free(consStatus -> valor);
 		break;
 	case innexistente:
-		printf("La clave %s no tiene instacia asignada, actualmente iria a la %i (%s).\n", clave,
+		printf("La clave %s no existe en el coordinador, actualmente iria a la instancia %i (%s).\n", clave,
+				consStatus -> id, consStatus -> nombre);
+		break;
+	case sinIniciar:
+		printf("La clave %s no tiene instacia asignada, actualmente iria a la instancia %i (%s).\n", clave,
 				consStatus -> id, consStatus -> nombre);
 		break;
 	case caida:

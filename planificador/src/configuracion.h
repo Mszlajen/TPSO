@@ -14,7 +14,6 @@
 #define IPCoord "IPCoord"
 #define PuertoCoord "PuertoCoord"
 #define ClavesBloq "ClavesBloqueadas"
-#define IPinterna "IPInterna"
 
 enum t_algoritmo {sjf, srt, hrrn};
 
@@ -28,6 +27,5 @@ float obtenerAlfa();
 int obtenerEstimacionInicial();
 enum t_algoritmo obtenerAlgoritmo();
 char* obtenerBloqueosConfiguracion();
-char* obtenerIPInterna();
 
 #endif /* CONFIGURACION_H_ */

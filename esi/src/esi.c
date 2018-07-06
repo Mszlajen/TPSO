@@ -20,7 +20,13 @@ int main(int argc, char **argv) {
 	t_esi_operacion operacionESI;
 	booleano hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
 	enum resultadoEjecucion *resultado;
-	while (hayInstruccion){
+	while (hayInstruccion)
+	{
+		if(!operacionESI.valido)
+		{
+			printf("Abortando por error de tamaño de clave.\n");
+			break;
+		}
 		printf("Esperando aviso de ejecución.\n");
 		if(recibirMensaje(socketPlan, sizeof(header), (void**) &head))
 		{
@@ -46,9 +52,6 @@ int main(int argc, char **argv) {
 		hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
 		printf("Enviando resultado de ejecución al planificador.\n");
 		enviarResultadoPlanificador(socketPlan, *resultado, hayInstruccion);
-
-		if(!hayInstruccion)
-			break;
 	}
 	printf("Termino la ejecución.\n");
 	free(id);
