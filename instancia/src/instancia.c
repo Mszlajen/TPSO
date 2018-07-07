@@ -60,6 +60,7 @@ void inicializar(char* dirConfig, socket_t *socketCoord)
 	recibirRespuestaHandshake(*socketCoord);
 	//Supuestamente al usar calloc, el valor inicial va a ser NULL de una.
 	tablaDeControl = calloc(cantidadEntradas, sizeof(infoEntrada_t));
+	tablaDeEntradas = malloc(cantidadEntradas * tamanioEntradas);
 	pthread_mutex_init(&mEnEjecucion, NULL);
 }
 
@@ -121,18 +122,23 @@ void procesamientoInstrucciones(socket_t socketCoord)
 			incrementarUltimoUsoClaves();
 		res = instruccionSet(instruc);
 		entradasLibres = obtenerEntradasDisponibles();
+		free(instruc -> clave);
+		free(instruc -> valor);
 		break;
 	case store:
 		if(esLRU)
 			incrementarUltimoUsoClaves();
 		res = instruccionStore(instruc);
 		cambioEspacio = 0;
+		free(instruc -> clave);
 		break;
 	case create:
 		if(esLRU)
 			incrementarUltimoUsoClaves();
 		res = registrarNuevaClave(instruc -> clave, instruc -> valor, instruc -> tamValor);
 		entradasLibres = obtenerEntradasDisponibles();
+		free(instruc -> clave);
+		free(instruc -> valor);
 		break;
 	case compactacion:
 		instruccionCompactacion();
@@ -145,8 +151,6 @@ void procesamientoInstrucciones(socket_t socketCoord)
 		break;
 	}
 	enviarResultadoEjecucion(socketCoord, res, cambioEspacio, entradasLibres);
-	free(instruc -> clave);
-	free(instruc -> valor);
 	free(instruc);
 }
 
@@ -184,9 +188,6 @@ void conectarConCoordinador(socket_t *socketCoord)
 	memcpy(buffer + sizeof(head) + sizeof(instancia_id), &tamNombre, sizeof(tamNombreInstancia_t));
 	memcpy(buffer + sizeof(head) + sizeof(instancia_id) + sizeof(tamNombre), obtenerNombreInstancia(), tamNombre);
 	enviarBuffer(*socketCoord, buffer, tamBuffer);
-
-	if(archivoID)
-		fclose(archivoID);
 
 	free(buffer);
 	free(dirArchivoID);

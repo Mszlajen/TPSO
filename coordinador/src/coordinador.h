@@ -64,6 +64,7 @@ void hiloCompactacion(instancia_t *llamadora);
 void ejecutarGET();
 void ejecutarSET();
 void ejecutarSTORE();
+void ejecutarCreate();
 
 instancia_t *correrAlgoritmo(int *puntero);
 instancia_t *algoritmoEquitativeLoad(int *puntero);

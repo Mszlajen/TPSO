@@ -14,10 +14,6 @@ int punteroSeleccion = 0;
 instancia_id contadorInstancias = 0;
 booleano compactar = 0;
 
-//Estás dos existen por simplicidad, bien podrian ser locales
-cantEntradas_t cantEntradas;
-tamEntradas_t tamEntradas;
-
 int main(int argc, char **argv)
 {
 	if (argc != 2)
@@ -58,14 +54,12 @@ void inicializacion(char *dirConfiguracion) {
 	logger = log_create("log de operaciones", "coordinador", 1, LOG_LEVEL_INFO);
 	sem_init(&sSocketPlanificador, 0, 0);
 	sem_init(&sTerminoConsulta, 0, 0);
+	sem_init(&sTerminoEjecucion, 0, 0);
 
 	consultaStatus.atender = 0;
 	sem_init(&consultaStatus.atendida, 0, 0);
 	consultaStatus.clave = NULL;
 	consultaStatus.valor = NULL;
-
-	cantEntradas = config_get_int_value(configuracion, "CantEntradas");
-	tamEntradas = config_get_int_value(configuracion, "TamEntradas");
 
 	limpiarOperacion();
 }
@@ -182,6 +176,7 @@ void registrarInstancia(socket_t conexion)
 		if(nuevaInstancia -> conectada)
 		{
 			pthread_cancel(nuevaInstancia -> hilo);
+			sem_post(&nuevaInstancia -> sIniciarEjecucion);
 			close(nuevaInstancia -> socket);
 		}
 
@@ -208,8 +203,8 @@ void registrarInstancia(socket_t conexion)
 	{
 		nuevaInstancia = malloc(sizeof(instancia_t));
 		nuevaInstancia->claves = list_create();
-		sem_init(&nuevaInstancia->sIniciarEjecucion, 0, 0);
-		sem_init(&nuevaInstancia->sFinCompactacion, 0, 0);
+		sem_init(&(nuevaInstancia->sIniciarEjecucion), 0, 0);
+		sem_init(&(nuevaInstancia->sFinCompactacion), 0, 0);
 		contadorInstancias++;
 		nuevaInstancia->id = contadorInstancias;
 		nuevaInstancia->nombre = nombre;
@@ -221,12 +216,12 @@ void registrarInstancia(socket_t conexion)
 	enviarBuffer(conexion, (void*) &nuevaInstancia -> id, sizeof(instancia_id));
 	enviarInfoEntradas(conexion);
 
+	list_add(instancias, nuevaInstancia);
+
 	pthread_t hilo;
 	pthread_create(&hilo, NULL, (void*) hiloInstancia, (void*) nuevaInstancia);
 	nuevaInstancia -> hilo = hilo;
 	free(id);
-
-	list_add(instancias, instancias);
 }
 
 void registrarESI(socket_t conexion)
@@ -315,7 +310,7 @@ void hiloInstancia(instancia_t *instancia)
 				sizeof(tamClave_t));
 		enviarBuffer(instancia->socket, (void*) operacion.clave,
 				operacion.tamClave);
-		if (operacion.instr == set) {
+		if (operacion.instr == set || operacion.instr == create) {
 			enviarBuffer(instancia->socket, (void*) &operacion.tamValor,
 					sizeof(tamValor_t));
 			enviarBuffer(instancia->socket, (void*) operacion.valor,
@@ -326,6 +321,14 @@ void hiloInstancia(instancia_t *instancia)
 		free(head);
 		recibirMensaje(instancia->socket, sizeof(enum resultadoEjecucion),
 				(void**) &result);
+
+		if (operacion.instr == set || operacion.instr == create)
+		{
+			cantEntradas_t *entradasDisponibles;
+			recibirMensaje(instancia->socket, sizeof(cantEntradas_t), (void**) &entradasDisponibles);
+			instancia->entradasLibres = *entradasDisponibles;
+			free(entradasDisponibles);
+		}
 
 		if (*result == necesitaCompactar)
 		{
@@ -561,13 +564,11 @@ void ejecutarSET()
 				operacion.id);
 		return;
 	}
+
 	instancia_t *instancia = dictionary_get(claves, operacion.clave);
 	if(!instancia)
 	{
-		dictionary_remove(claves, operacion.clave);
-		instancia = correrAlgoritmo(&punteroSeleccion);
-		dictionary_put(claves, operacion.clave, instancia);
-		operacion.instr = create;
+		return ejecutarCreate();
 	}
 
 	sem_post(&instancia -> sIniciarEjecucion);
@@ -581,6 +582,22 @@ void ejecutarSET()
 		operacion.result = fallo;
 		return;
 	}
+}
+
+void ejecutarCreate()
+{
+	instancia_t *instancia;
+	operacion.instr = create;
+	do
+	{
+		dictionary_remove(claves, operacion.clave);
+		instancia = correrAlgoritmo(&punteroSeleccion);
+		dictionary_put(claves, operacion.clave, instancia);
+
+		sem_post(&instancia -> sIniciarEjecucion);
+
+		sem_wait(&sTerminoEjecucion);
+	}while(!instancia -> conectada);
 }
 
 void ejecutarSTORE()

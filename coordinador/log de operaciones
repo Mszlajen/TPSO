@@ -1,0 +1,82 @@
+[INFO] 20:08:38:251 coordinador/(6361:6397): ESI 1: GET futbol:messi
+[INFO] 20:09:36:877 coordinador/(6361:6397): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 20:09:36:877 coordinador/(6361:6397): ESI 1: tomo posesión de la clave
+[INFO] 20:09:36:878 coordinador/(6361:6397): ESI 1: SET futbol:messi futbol:messi
+[INFO] 20:13:23:966 coordinador/(6546:6572): ESI 1: GET futbol:messi
+[INFO] 20:13:23:990 coordinador/(6546:6572): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 20:13:23:990 coordinador/(6546:6572): ESI 1: tomo posesión de la clave
+[INFO] 20:13:23:990 coordinador/(6546:6572): ESI 1: SET futbol:messi futbol:messi
+[INFO] 20:16:59:0 coordinador/(6691:6712): ESI 1: GET futbol:messi
+[INFO] 20:17:00:58 coordinador/(6691:6712): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 20:17:00:58 coordinador/(6691:6712): ESI 1: tomo posesión de la clave
+[INFO] 20:17:00:59 coordinador/(6691:6712): ESI 1: SET futbol:messi futbol:messi
+[INFO] 20:19:13:148 coordinador/(6825:6843): ESI 1: GET futbol:messi
+[INFO] 20:19:13:163 coordinador/(6825:6843): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 20:19:13:163 coordinador/(6825:6843): ESI 1: tomo posesión de la clave
+[INFO] 20:19:13:203 coordinador/(6825:6843): ESI 1: SET futbol:messi futbol:messi
+[INFO] 20:23:15:243 coordinador/(6952:6978): ESI 1: GET futbol:messi
+[INFO] 20:23:15:244 coordinador/(6952:6978): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 20:23:15:247 coordinador/(6952:6978): ESI 1: tomo posesión de la clave
+[INFO] 20:23:15:288 coordinador/(6952:6978): ESI 1: SET futbol:messi futbol:messi
+[INFO] 13:09:08:78 coordinador/(3891:4223): ESI 1: GET futbol:messi
+[INFO] 13:09:08:94 coordinador/(3891:4223): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 13:09:08:94 coordinador/(3891:4223): ESI 1: tomo posesión de la clave
+[INFO] 13:09:08:138 coordinador/(3891:4223): ESI 1: SET futbol:messi futbol:messi
+[INFO] 13:17:52:602 coordinador/(4501:4517): ESI 1: GET futbol:messi
+[INFO] 13:17:52:649 coordinador/(4501:4517): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 13:17:52:649 coordinador/(4501:4517): ESI 1: tomo posesión de la clave
+[INFO] 13:17:52:649 coordinador/(4501:4517): ESI 1: SET futbol:messi futbol:messi
+[INFO] 13:29:31:148 coordinador/(4721:4741): ESI 1: GET futbol:messi
+[INFO] 13:29:31:149 coordinador/(4721:4741): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 13:29:31:150 coordinador/(4721:4741): ESI 1: tomo posesión de la clave
+[INFO] 13:29:31:151 coordinador/(4721:4741): ESI 1: SET futbol:messi futbol:messi
+[INFO] 13:30:36:557 coordinador/(4794:4822): ESI 1: GET futbol:messi
+[INFO] 13:30:36:558 coordinador/(4794:4822): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 13:30:36:558 coordinador/(4794:4822): ESI 1: tomo posesión de la clave
+[INFO] 13:30:36:602 coordinador/(4794:4822): ESI 1: SET futbol:messi futbol:messi
+[INFO] 13:36:16:607 coordinador/(5048:5066): ESI 1: GET futbol:messi
+[INFO] 13:36:16:697 coordinador/(5048:5066): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 13:36:16:698 coordinador/(5048:5066): ESI 1: tomo posesión de la clave
+[INFO] 13:36:16:699 coordinador/(5048:5066): ESI 1: SET futbol:messi futbol:messi
+[INFO] 13:38:24:924 coordinador/(5227:5245): ESI 1: GET futbol:messi
+[INFO] 13:38:24:977 coordinador/(5227:5245): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 13:38:24:977 coordinador/(5227:5245): ESI 1: tomo posesión de la clave
+[INFO] 13:38:24:978 coordinador/(5227:5245): ESI 1: SET futbol:messi futbol:messi
+[INFO] 14:09:38:755 coordinador/(5828:5846): ESI 1: GET futbol:messi
+[INFO] 14:09:38:814 coordinador/(5828:5846): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 14:09:38:814 coordinador/(5828:5846): ESI 1: tomo posesión de la clave
+[INFO] 14:09:38:823 coordinador/(5828:5846): ESI 1: SET futbol:messi futbol:messi
+[INFO] 14:12:43:926 coordinador/(5942:5962): ESI 1: GET futbol:messi
+[INFO] 14:12:43:927 coordinador/(5942:5962): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 14:12:43:927 coordinador/(5942:5962): ESI 1: tomo posesión de la clave
+[INFO] 14:12:43:967 coordinador/(5942:5962): ESI 1: SET futbol:messi futbol:messi
+[INFO] 15:01:40:183 coordinador/(7613:7640): ESI 1: GET futbol:messi
+[INFO] 15:01:40:220 coordinador/(7613:7640): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 15:01:40:220 coordinador/(7613:7640): ESI 1: tomo posesión de la clave
+[INFO] 15:01:40:222 coordinador/(7613:7640): ESI 1: SET futbol:messi TraemeLaCopa
+[INFO] 15:09:40:491 coordinador/(7882:7904): ESI 1: GET futbol:messi
+[INFO] 15:09:40:505 coordinador/(7882:7904): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 15:09:40:505 coordinador/(7882:7904): ESI 1: tomo posesión de la clave
+[INFO] 15:09:40:505 coordinador/(7882:7904): ESI 1: SET futbol:messi TraemeLaCopa
+[INFO] 19:28:38:618 coordinador/(3611:3694): ESI 1: GET futbol:messi
+[INFO] 19:28:38:641 coordinador/(3611:3694): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 19:28:38:641 coordinador/(3611:3694): ESI 1: tomo posesión de la clave
+[INFO] 19:28:38:682 coordinador/(3611:3694): ESI 1: SET futbol:messi TraemeLaCopa
+[INFO] 19:44:40:914 coordinador/(4211:4229): ESI 1: GET futbol:messi
+[INFO] 19:44:40:929 coordinador/(4211:4229): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 19:44:40:929 coordinador/(4211:4229): ESI 1: tomo posesión de la clave
+[INFO] 19:44:40:930 coordinador/(4211:4229): ESI 1: SET futbol:messi TraemeLaCopa
+[INFO] 19:44:41:8 coordinador/(4211:4224): Se desconecto la instancia Inst1, ID = 1
+[INFO] 19:44:41:9 coordinador/(4211:4229): ESI 1: Fallo por clave inaccesible
+[INFO] 19:51:54:207 coordinador/(4503:4521): ESI 1: GET futbol:messi
+[INFO] 19:51:54:207 coordinador/(4503:4521): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 19:51:54:207 coordinador/(4503:4521): ESI 1: tomo posesión de la clave
+[INFO] 19:51:54:244 coordinador/(4503:4521): ESI 1: SET futbol:messi TraemeLaCopa
+[INFO] 19:53:01:994 coordinador/(4538:4559): ESI 1: GET futbol:messi
+[INFO] 19:53:01:995 coordinador/(4538:4559): Se creo la clave futbol:messi en la tabla de claves
+[INFO] 19:53:01:995 coordinador/(4538:4559): ESI 1: tomo posesión de la clave
+[INFO] 19:53:02:35 coordinador/(4538:4559): ESI 1: SET futbol:messi TraemeLaCopa
+[INFO] 19:53:02:76 coordinador/(4538:4555): Se desconecto la instancia Inst1, ID = 1
+[INFO] 19:53:45:288 coordinador/(4538:4559): ESI 1: STORE futbol:messi
+[INFO] 19:53:45:328 coordinador/(4538:4557): Se desconecto la instancia Inst1, ID = 2
+[INFO] 19:53:45:329 coordinador/(4538:4559): ESI 1: Fallo por clave inaccesible
