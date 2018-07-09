@@ -28,6 +28,7 @@ int main(int argc, char** argv) {
 		if(recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado) == 1)
 		{
 			salirConError("Se desconecto el coordinador.\n");
+			continue;
 		}
 		switch(encabezado -> protocolo)
 		{

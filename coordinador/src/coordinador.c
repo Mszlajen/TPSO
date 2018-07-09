@@ -582,6 +582,8 @@ void ejecutarSET()
 		operacion.result = fallo;
 		return;
 	}
+
+	log_info(logger, "ESI %i: Modifico el valor de la clave", operacion.id);
 }
 
 void ejecutarCreate()
@@ -598,6 +600,7 @@ void ejecutarCreate()
 
 		sem_wait(&sTerminoEjecucion);
 	}while(!instancia -> conectada);
+	log_info("ESI %i: Creo la clave", operacion.id);
 }
 
 void ejecutarSTORE()
@@ -620,6 +623,7 @@ void ejecutarSTORE()
 		log_info(logger, "ESI %i: Fallo por clave inaccesible", operacion.id);
 		operacion.result = fallo;
 	}
+	log_info(logger, "ESI %i: Bajo la clave a disco", operacion.id);
 }
 
 //Asumo que existe al menos una instancia a donde mandarlo.

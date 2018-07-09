@@ -183,8 +183,10 @@ void enviarInstruccionCoord(socket_t socketCoord, t_esi_operacion operacion, ESI
 
 void enviarResultadoPlanificador(socket_t socketPlan, enum resultadoEjecucion resultado, booleano termino)
 {
+	header head;
+	head.protocolo = 12;
 	if(termino)
 		resultado = fin;
-
+	enviarHeader(socketPlan, head);
 	enviarBuffer(socketPlan, (void*) &resultado, sizeof(resultado));
 }

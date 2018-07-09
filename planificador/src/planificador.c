@@ -110,25 +110,25 @@ void terminal()
 
 void ejecucionDeESI(ESI* esi)
 {
-	enum resultadoEjecucion res;
-	void* resultado = NULL;
+	header *head;
+	enum resultadoEjecucion *resultado;
 
 	enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
 	printf("Se envio la orden de ejecución.\n");
 
 	sem_post(&sSocketCoord);
 
-	recibirMensaje(esi -> socket, sizeof(header) + sizeof(enum resultadoEjecucion), &resultado);
-	printf("Se recibio el resultado de la ejecución.\n");
+	recibirMensaje(esi -> socket, sizeof(header), (void**) &head);
 	if(((header*) resultado) -> protocolo != 12)
 	{ /* ERROR */ }
+	free(head);
 
-	res = *((enum resultadoEjecucion*) resultado + sizeof(header));
+	recibirMensaje(esi->socket, sizeof(enum resultadoEjecucion), (void**) &resultado);
+	printf("Se recibio el resultado de la ejecución.\n");
 
-	free(resultado);
 
 	//Controlo que el ESI haya terminado correctamente la instrucción.
-	if(res == fallo)
+	if(*resultado == fallo)
 	{
 		//Esto se repite despues, podria modulizarlo.
 		printf("El ESI %i tuvo un fallo en su ejecución y fue terminado.\n", esi -> id);
@@ -178,7 +178,7 @@ void ejecucionDeESI(ESI* esi)
 	}
 
 	//Compruebo si el ESI termino su ejecución.
-	if(res == fin)
+	if(*resultado == fin)
 	{
 		free(ultimaConsulta -> clave);
 		free(ultimaConsulta);
@@ -190,6 +190,7 @@ void ejecucionDeESI(ESI* esi)
 
 	free(ultimaConsulta -> clave);
 	free(ultimaConsulta);
+	free(resultado);
 	ultimaConsulta = NULL;
 
 	//El ESI sigue siendo valido para el planificador por lo tanto se puede llegar a desconectar.
