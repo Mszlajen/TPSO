@@ -23,8 +23,7 @@ typedef struct {
 	tamValor_t tamanio;
 	cantEntradas_t entradaInicial;
 	int tiempoUltimoUso;
-	int fd;
-	void* mappeado;
+	FILE* archivo;
 } infoClave_t;
 
 typedef struct {

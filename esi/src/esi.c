@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
 	{
 		if(!operacionESI.valido)
 		{
-			printf("Abortando por error de tamaño de clave.\n");
+			error_show("Abortando por error de tamaño de clave.\n");
 			break;
 		}
 		printf("Esperando aviso de ejecución.\n");
@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
 
 		hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
 		printf("Enviando resultado de ejecución al planificador.\n");
-		enviarResultadoPlanificador(socketPlan, *resultado, hayInstruccion);
+		enviarResultadoPlanificador(socketPlan, *resultado, !hayInstruccion);
 	}
 	printf("Termino la ejecución.\n");
 	free(id);
@@ -185,8 +185,8 @@ void enviarResultadoPlanificador(socket_t socketPlan, enum resultadoEjecucion re
 {
 	header head;
 	head.protocolo = 12;
-	if(termino)
+	if(termino && resultado != fallo)
 		resultado = fin;
 	enviarHeader(socketPlan, head);
-	enviarBuffer(socketPlan, (void*) &resultado, sizeof(resultado));
+	enviarBuffer(socketPlan, (void*) &resultado, sizeof(enum resultadoEjecucion));
 }

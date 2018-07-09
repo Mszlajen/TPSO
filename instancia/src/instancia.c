@@ -382,7 +382,7 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 					 * Acá podria borrar el archivo, pero como igual lo voy a rehacer
 					 * seria procesamiento adicional.
 					*/
-					close(nuevaClave -> fd);
+					fclose(nuevaClave -> archivo);
 					free(nuevaClave);
 					return necesitaCompactar;
 				}
@@ -394,22 +394,16 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 				algoritmoDeReemplazo();
 				entradasDisponibles++;
 			}
-		}while(1);
-		/*
-		 * Reemplaza claves hasta tener espacio suficiente para guardar la clave.
-		 */
+		}while(1); // Reemplaza claves hasta tener espacio suficiente para guardar la clave.
 	}
 	//Abro el archivo o lo creo si no existe
 	char* dirArchivo = obtenerDireccionArchivoMontaje(clave);
-	nuevaClave -> fd = open(dirArchivo, O_RDWR | O_TRUNC | O_CREAT, S_IRUSR | S_IWUSR | S_IROTH | S_IWOTH);
+	nuevaClave -> archivo = fopen(dirArchivo, "w");
 	free(dirArchivo);
 
 	nuevaClave -> entradaInicial = posicion;
 	nuevaClave -> tamanio = tamValor - 1;
 	nuevaClave ->tiempoUltimoUso = 0;
-
-	ftruncate(nuevaClave -> fd, nuevaClave -> tamanio);
-	crearMappeado(nuevaClave);
 
 	//Coloco el valor en la tabla de entradas.
 	memcpy(tablaDeEntradas + posicion * tamanioEntradas, valor, nuevaClave -> tamanio);
@@ -434,9 +428,8 @@ enum resultadoEjecucion actualizarValorMayorTamanio(char* clave, infoClave_t* in
 	 */
 	cantEntradas_t cantEntradasClave = tamValorACantEntradas(informacionClave -> tamanio);
 	free(tablaDeControl[informacionClave->entradaInicial].clave);
-	asociarEntradas(informacionClave -> entradaInicial, cantEntradasClave, NULL);
-	destruirMappeado(informacionClave);
-	close(informacionClave -> fd); //¿Hace falta cerrar el archivo o gasto tiempo innecesariamente?
+	asociarEntradas(informacionClave -> entradaInicial, cantEntradasClave, NULL);;
+	fclose(informacionClave -> archivo); //¿Hace falta cerrar el archivo o gasto tiempo innecesariamente?
 	free(informacionClave);
 
 	return registrarNuevaClave(clave, valor, tamValor);
@@ -457,10 +450,8 @@ enum resultadoEjecucion actualizarValorMenorTamanio(char* clave, infoClave_t* in
 	entradasRestantes = tamValorACantEntradas(informacionClave -> tamanio) - tamValorACantEntradas(tamValor);
 	asociarEntradas(finNuevaClave, entradasRestantes, NULL);
 
-	destruirMappeado(informacionClave);
-	informacionClave -> tamanio = tamValor;
-	ftruncate(informacionClave -> fd, informacionClave -> tamanio);
-	crearMappeado(informacionClave);
+	informacionClave -> tamanio = tamValor - 1;
+	ftruncate(fileno(informacionClave->archivo), informacionClave -> tamanio);
 
 	return exito;
 }
@@ -672,28 +663,16 @@ void destruirClave(char* nombreClave)
 
 void destruirInfoClave(infoClave_t* clave)
 {
-	destruirMappeado(clave);
-	close(clave -> fd);
+	fclose(clave -> archivo);
 	free(clave);
-}
-
-int crearMappeado(infoClave_t* clave)
-{
-	clave -> mappeado = mmap(NULL, clave -> tamanio, PROT_WRITE, MAP_PRIVATE, clave -> fd, 0);
-	return clave -> mappeado == ERROR? ERROR : 0;
-}
-
-int destruirMappeado(infoClave_t* clave)
-{
-	int resultado = munmap(clave -> mappeado, clave -> tamanio);
-	clave -> mappeado = NULL;
-	return resultado;
 }
 
 int guardarEnArchivo(infoClave_t* clave)
 {
-	strcpy(clave -> mappeado, tablaDeEntradas + clave -> entradaInicial * tamanioEntradas);
-	return msync(clave -> mappeado, clave -> tamanio, MS_SYNC);
+	uint8_t escrito =
+			fwrite(tablaDeEntradas + clave -> entradaInicial * tamanioEntradas, sizeof(char), clave -> tamanio, clave -> archivo);
+	rewind(clave->archivo);
+	return clave -> tamanio == escrito;
 }
 
 tamValor_t leerDeArchivo(char* clave, char** valor)

@@ -73,8 +73,7 @@ int seDesconectoSocket(socket_t sock)
 
 int enviarHeader (socket_t sock, header head)
 {
-	int resultado = enviarBuffer(sock, &head, sizeof(header));
-	return resultado;
+	return enviarBuffer(sock, &head, sizeof(header));
 }
 
 int enviarBuffer (socket_t sock, void* buffer, int tamBuffer)

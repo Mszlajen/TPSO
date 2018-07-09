@@ -622,7 +622,15 @@ void ejecutarSTORE()
 		removerClave(instancia, operacion.clave);
 		log_info(logger, "ESI %i: Fallo por clave inaccesible", operacion.id);
 		operacion.result = fallo;
+		return;
 	}
+
+	if(operacion.result == fallo)
+	{
+		log_info(logger, "ESI %i: No se pudo bajar la clave a disco", operacion.id);
+		return;
+	}
+
 	log_info(logger, "ESI %i: Bajo la clave a disco", operacion.id);
 }
 

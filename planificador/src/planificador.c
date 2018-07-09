@@ -119,7 +119,7 @@ void ejecucionDeESI(ESI* esi)
 	sem_post(&sSocketCoord);
 
 	recibirMensaje(esi -> socket, sizeof(header), (void**) &head);
-	if(((header*) resultado) -> protocolo != 12)
+	if(head -> protocolo != 12)
 	{ /* ERROR */ }
 	free(head);
 
