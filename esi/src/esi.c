@@ -170,7 +170,7 @@ void enviarInstruccionCoord(socket_t socketCoord, t_esi_operacion operacion, ESI
 				enviarBuffer(socketCoord, operacion.argumentos.SET.clave, tamClave);
 
 				tamValor = string_length(operacion.argumentos.SET.valor) + 1;
-				enviarBuffer(socketCoord, &tamClave, sizeof(tamValor));
+				enviarBuffer(socketCoord, &tamValor, sizeof(tamValor));
 				enviarBuffer(socketCoord, operacion.argumentos.SET.valor, tamValor);
 				break;
 			case STORE:

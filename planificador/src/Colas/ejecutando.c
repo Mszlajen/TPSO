@@ -16,7 +16,7 @@ void quitarESIEjecutando()
 
 int esESIEnEjecucion(ESI_id idESI)
 {
-	return ejecutando -> id == idESI;
+	return ejecutando && ejecutando -> id == idESI;
 }
 
 ESI* ESIEjecutando ()

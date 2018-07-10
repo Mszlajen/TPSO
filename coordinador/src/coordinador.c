@@ -391,7 +391,8 @@ void hiloESI(socket_t *socketESI) {
 			log_info(logger, "ESI %i: %s %s %s", operacion.id,
 					instrToArray(operacion.instr), operacion.clave,
 					operacion.valor);
-		} else
+		}
+		else
 			log_info(logger, "ESI %i: %s %s", operacion.id,
 					instrToArray(operacion.instr), operacion.clave);
 
@@ -421,6 +422,9 @@ void hiloESI(socket_t *socketESI) {
 			ejecutarSTORE();
 			break;
 		}
+
+		//El retardo es en milisegundos y usleep recibe microsegundos así que convertimos la unidad al pasar el parametro
+		//usleep(config_get_int_value(configuracion, "Retardo") * 100);
 
 		enviarResultado(*socketESI, operacion.result);
 	}

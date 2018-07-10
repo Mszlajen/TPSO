@@ -9,7 +9,7 @@ tamEntradas_t tamanioEntradas;
 cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
 //fin variables que podrian no ser globales
 
-pthread_mutex_t mEnEjecucion;
+pthread_mutex_t mTablaDeEntradas = PTHREAD_MUTEX_INITIALIZER;
 
 int terminoEjecucion = 0;
 
@@ -62,7 +62,6 @@ void inicializar(char* dirConfig, socket_t *socketCoord)
 	//Supuestamente al usar calloc, el valor inicial va a ser NULL de una.
 	tablaDeControl = calloc(cantidadEntradas, sizeof(infoEntrada_t));
 	tablaDeEntradas = malloc(cantidadEntradas * tamanioEntradas);
-	pthread_mutex_init(&mEnEjecucion, NULL);
 }
 
 void dump()
@@ -70,9 +69,9 @@ void dump()
 	while(!terminoEjecucion)
 	{
 		sleep(obtenerIntervaloDeDump());
-		//Sincronizar con hilo principal
+		pthread_mutex_lock(&mTablaDeEntradas);
 		dictionary_iterator(infoClaves, guardarEnArchivo);
-		//Sincronizar con hilo principal
+		pthread_mutex_unlock(&mTablaDeEntradas);
 	}
 }
 
@@ -121,7 +120,10 @@ void procesamientoInstrucciones(socket_t socketCoord)
 	case set:
 		if(esLRU)
 			incrementarUltimoUsoClaves();
+
+		pthread_mutex_lock(&mTablaDeEntradas);
 		res = instruccionSet(instruc);
+		pthread_mutex_unlock(&mTablaDeEntradas);
 		entradasLibres = obtenerEntradasDisponibles();
 		free(instruc -> clave);
 		free(instruc -> valor);
@@ -136,7 +138,9 @@ void procesamientoInstrucciones(socket_t socketCoord)
 	case create:
 		if(esLRU)
 			incrementarUltimoUsoClaves();
+		pthread_mutex_lock(&mTablaDeEntradas);
 		res = registrarNuevaClave(instruc -> clave, instruc -> valor, instruc -> tamValor);
+		pthread_mutex_unlock(&mTablaDeEntradas);
 		entradasLibres = obtenerEntradasDisponibles();
 		free(instruc -> clave);
 		free(instruc -> valor);
@@ -729,7 +733,7 @@ void liberarRecursosGlobales()
 		free(tablaDeControl);
 	if(tablaDeEntradas)
 		free(tablaDeEntradas);
-	pthread_mutex_destroy(&mEnEjecucion);
+	pthread_mutex_destroy(&mTablaDeEntradas);
 }
 
 void salirConError(char* error)
