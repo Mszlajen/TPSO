@@ -110,20 +110,20 @@ void terminal()
 
 void ejecucionDeESI(ESI* esi)
 {
-	header *head;
-	enum resultadoEjecucion *resultado;
-
 	enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
 	printf("Se envio la orden de ejecución.\n");
 
 	sem_post(&sSocketCoord);
+
+	header *head = NULL;
+	enum resultadoEjecucion *resultado = NULL;
 
 	recibirMensaje(esi -> socket, sizeof(header), (void**) &head);
 	if(head -> protocolo != 12)
 	{ /* ERROR */ }
 	free(head);
 
-	recibirMensaje(esi->socket, sizeof(enum resultadoEjecucion), (void**) &resultado);
+	recibirMensaje(esi -> socket, sizeof(enum resultadoEjecucion), (void**) &resultado);
 	printf("Se recibio el resultado de la ejecución.\n");
 
 
@@ -183,7 +183,7 @@ void ejecucionDeESI(ESI* esi)
 		free(ultimaConsulta -> clave);
 		free(ultimaConsulta);
 		ultimaConsulta = NULL;
-		printf("El ESI %i finalizo su ejecución.", esi -> id);
+		printf("El ESI %i finalizo su ejecución.\n", esi -> id);
 		finalizarESIBien(esi);
 		return;
 	}
@@ -202,17 +202,28 @@ void escucharPorESI (socket_t socketServerESI)
 {
 	socket_t socketNuevaESI;
 	ESI* nuevaESI;
+	header* head;
 
+	listen(socketServerESI, 5);
 	while(!terminoEjecucion)
 	{
 		socketNuevaESI = ERROR;
-		listen(socketServerESI, 5);
 		socketNuevaESI = aceptarConexion(socketServerESI);
 		if(socketNuevaESI == ERROR)
 		{
 			error_show("Fallo en la conexion de nuevo ESI\n");
 			continue;
 		}
+
+		recibirMensaje(socketNuevaESI, sizeof(header), (void**) &head);
+		if(head -> protocolo != 3)
+		{
+			free(head);
+			error_show("Intento conectarse algo que no es un ESI.\n");
+			continue;
+		}
+		free(head);
+
 		nuevaESI = crearESI(socketNuevaESI, obtenerEstimacionInicial());
 		if(!enviarIdESI(socketNuevaESI, nuevaESI -> id))
 		{
@@ -273,6 +284,7 @@ void comunicacionCoord(socket_pair_t *socketCoord)
 		else
 		{
 			pthread_mutex_unlock(&mConsStatus);
+			head = malloc(sizeof(header));
 			head -> protocolo = 13;
 			enviarHeader(socketCoord -> envio, *head);
 			enviarBuffer(socketCoord -> envio, (void*) &(consStatus -> tamClave), sizeof(tamClave_t));
@@ -555,15 +567,12 @@ int enviarEncabezado(socket_t sock, int prot)
 
 booleano enviarIdESI(socket_t sock, ESI_id id)
 {
-	booleano resultado = 1;
-	resultado &= enviarEncabezado(sock, 6);
-	resultado &= enviarBuffer(sock, (void*) &id, sizeof(id));
-	return resultado;
+	return enviarEncabezado(sock, 6) || enviarBuffer(sock, (void*) &id, sizeof(id));
 }
 
 int enviarRespuestaConsultaCoord(socket_t coord, booleano respuesta)
 {
-	return enviarEncabezado(coord, 10) & enviarBuffer(coord, &respuesta, sizeof(booleano));
+	return enviarEncabezado(coord, 10) || enviarBuffer(coord, &respuesta, sizeof(booleano));
 }
 
 consultaCoord* recibirConsultaCoord(socket_t socketCoord)
