@@ -2,10 +2,6 @@
 
 t_list * finalizados = NULL;
 
-/*
- * La función tiene el riesgo que si se finaliza el ESI en ejecución
- * el puntero enEjecucion queda con un valor de memoria sin permisos.
- */
 void agregarAFinalizadosESI(ESI* esi)
 {
 	ESI_id * id = malloc(sizeof(ESI_id));

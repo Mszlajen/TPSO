@@ -117,6 +117,7 @@ void ejecucionDeESI(ESI* esi)
 
 	header *head = NULL;
 	enum resultadoEjecucion *resultado = NULL;
+	booleano bloqueo = 0;
 
 	recibirMensaje(esi -> socket, sizeof(header), (void**) &head);
 	if(head -> protocolo != 12)
@@ -126,14 +127,13 @@ void ejecucionDeESI(ESI* esi)
 	recibirMensaje(esi -> socket, sizeof(enum resultadoEjecucion), (void**) &resultado);
 	printf("Se recibio el resultado de la ejecución.\n");
 
-
 	//Controlo que el ESI haya terminado correctamente la instrucción.
 	if(*resultado == fallo)
 	{
-		//Esto se repite despues, podria modulizarlo.
 		printf("El ESI %i tuvo un fallo en su ejecución y fue terminado.\n", esi -> id);
 		free(ultimaConsulta -> clave);
 		free(ultimaConsulta);
+		free(resultado);
 		ultimaConsulta = NULL;
 		finalizarESIMal(esi);
 		return;
@@ -143,27 +143,27 @@ void ejecucionDeESI(ESI* esi)
 	switch(ultimaConsulta -> tipo)
 	{
 		case liberadora:
-			if(ultimaConsulta -> resultado)
+			pthread_mutex_lock(&mBloqueados);
+			pthread_mutex_lock(&mReady);
+			ESI* esiLiberado = liberarClave(ultimaConsulta -> clave);
+			if(esiLiberado)
 			{
-				pthread_mutex_lock(&mBloqueados);
-				pthread_mutex_lock(&mReady);
-				ESI* esiLiberado = liberarClave(ultimaConsulta -> clave);
-				if(esiLiberado)
-				{
-					listarParaEjecucion(esiLiberado);
-					sem_post(&contESIEnReady);
-				}
-				pthread_mutex_unlock(&mBloqueados);
-				pthread_mutex_unlock(&mReady);
-				printf("Se libero la clave %s del ESI %i.\n", ultimaConsulta -> clave, esi -> id);
+				recalcularEstimacion(esiLiberado, obtenerAlfa());
+				listarParaEjecucion(esiLiberado);
+				sem_post(&contESIEnReady);
 			}
+			pthread_mutex_unlock(&mBloqueados);
+			pthread_mutex_unlock(&mReady);
+			printf("Se libero la clave %s del ESI %i.\n", ultimaConsulta -> clave, esi -> id);
 			break;
 		case bloqueante:
 			//En realidad acá están mal usados los semaforos porque no están pegados a la region critica.
 			pthread_mutex_lock(&mBloqueados);
 			if(ultimaConsulta -> resultado)
 			{
+				quitarESIEjecutando();
 				colocarEnColaESI(esi, ultimaConsulta -> clave);
+				bloqueo = 1;
 				printf("El ESI %i se bloqueo por la clave %s\n", esi -> id, ultimaConsulta -> clave);
 			}
 			else
@@ -177,24 +177,24 @@ void ejecucionDeESI(ESI* esi)
 			break;
 	}
 
+	free(ultimaConsulta -> clave);
+	free(ultimaConsulta);
+	ultimaConsulta = NULL;
+
 	//Compruebo si el ESI termino su ejecución.
 	if(*resultado == fin)
 	{
-		free(ultimaConsulta -> clave);
-		free(ultimaConsulta);
-		ultimaConsulta = NULL;
+		free(resultado);
 		printf("El ESI %i finalizo su ejecución.\n", esi -> id);
 		finalizarESIBien(esi);
 		return;
 	}
 
-	free(ultimaConsulta -> clave);
-	free(ultimaConsulta);
 	free(resultado);
-	ultimaConsulta = NULL;
 
-	//El ESI sigue siendo valido para el planificador por lo tanto se puede llegar a desconectar.
-	sem_post(&contESIEnReady);
+	actualizarEstimacion(esi);
+	if(!bloqueo)
+		sem_post(&contESIEnReady);
 	crearFinEjecucion(esi);
 }
 
@@ -385,10 +385,11 @@ void comandoDesbloquear(char* clave)
 	pthread_mutex_unlock(&mBloqueados);
 
 	pthread_mutex_lock(&mReady);
+	recalcularEstimacion(ESIDesbloqueado, obtenerAlfa());
 	listarParaEjecucion(ESIDesbloqueado);
 	pthread_mutex_unlock(&mReady);
 	sem_post(&contESIEnReady);
-	printf("Se agrego a Ready el ESI %i", ESIDesbloqueado -> id);
+	printf("Se agrego a Ready el ESI %i\n", ESIDesbloqueado -> id);
 }
 
 void comandoListar(char* clave)

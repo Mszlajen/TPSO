@@ -22,7 +22,7 @@ void actualizarEstimacion(ESI* esi)
 	esi -> estimacion -= 1;
 }
 
-void recalcularEstimacion(ESI* esi, int alfa)
+void recalcularEstimacion(ESI* esi, float alfa)
 {
 	int ultimaEjecucion = esi-> ultimaEstimacion - esi -> estimacion;
 	esi -> estimacion = esi -> ultimaEstimacion * (1 - alfa) + ultimaEjecucion * alfa;

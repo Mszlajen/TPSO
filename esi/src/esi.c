@@ -38,7 +38,6 @@ int main(int argc, char **argv) {
 		free(head);
 		printf("Enviando instrucción al coordinador.\n");
 		enviarInstruccionCoord(socketCoord, operacionESI, *id);
-		destruir_operacion(operacionESI);
 		printf("Esperando resultado de ejecución.\n");
 		if(recibirMensaje(socketCoord, sizeof(header), (void**) &head))
 		{
@@ -49,7 +48,11 @@ int main(int argc, char **argv) {
 		{ /*ERROR*/ }
 		recibirMensaje(socketCoord, sizeof(enum resultadoEjecucion), (void**) &resultado);
 
-		hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
+		if(*resultado == exito)
+		{
+			destruir_operacion(operacionESI);
+			hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
+		}
 		printf("Enviando resultado de ejecución al planificador.\n");
 		enviarResultadoPlanificador(socketPlan, *resultado, !hayInstruccion);
 	}
