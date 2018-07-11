@@ -35,14 +35,14 @@ char* obtenerPuertoCoordinador()
 	return config_get_string_value(configuracion, PuertoCoord);
 }
 
-float obtenerAlfa()
+double obtenerAlfa()
 {
 	return config_get_int_value(configuracion, Alfa) / 100.0;
 }
 
-int obtenerEstimacionInicial()
+double obtenerEstimacionInicial()
 {
-	return config_get_int_value(configuracion, Estimacion);
+	return config_get_double_value(configuracion, Estimacion);
 }
 
 enum t_algoritmo obtenerAlgoritmo()
