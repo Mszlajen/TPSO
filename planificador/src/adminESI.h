@@ -9,8 +9,8 @@
 typedef struct {
 	ESI_id id;
 	socket_t socket;
-	int estimacion;
-	int ultimaEstimacion;
+	double estimacion;
+	double ultimaEstimacion;
 	unsigned long int arriboListos;
 	pthread_t hiloDeFin;
 	t_list* recursos;
@@ -22,7 +22,7 @@ void destruirESI(ESI*);
 void borrarRecursosESI(ESI*);
 
 void actualizarEstimacion(ESI*);
-void recalcularEstimacion(ESI*, int);
+void recalcularEstimacion(ESI*, double);
 void ejecutarInstruccion(ESI*);
 int calcularVejez(ESI*);
 void agregarRecurso(ESI*, char*);

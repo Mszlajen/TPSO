@@ -2,7 +2,7 @@
 #include "configuracion.h"
 #include "colas.h"
 
-sem_t corriendo, contESIEnReady, sSocketCoord;
+sem_t sPausa, contESIEnReady, sSocketCoord;
 
 pthread_mutex_t mReady = PTHREAD_MUTEX_INITIALIZER,
 				mBloqueados = PTHREAD_MUTEX_INITIALIZER,
@@ -38,7 +38,8 @@ int main(int argc, char** argv) {
 	while(!terminoEjecucion)
 	{
 		sem_wait(&contESIEnReady);
-		sem_wait(&corriendo);
+		sem_wait(&sPausa);
+		sem_post(&sPausa);
 
 		pthread_mutex_lock(&mEjecutando);
 		pthread_mutex_lock(&mReady);
@@ -59,8 +60,6 @@ int main(int argc, char** argv) {
 		ejecucionDeESI(esiAEjecutar);
 		pthread_cond_signal(&cFinEjecucion);
 		pthread_mutex_unlock(&mEnEjecucion);
-
-		sem_post(&corriendo);
 	}
 
 	liberarRecursos();
@@ -77,10 +76,10 @@ void terminal()
 		switch(convertirComando(palabras[0]))
 		{
 		case pausar:
-			sem_wait(&corriendo);
+			sem_wait(&sPausa);
 			break;
 		case continuar:
-			sem_post(&corriendo);
+			sem_post(&sPausa);
 			break;
 		case bloquear:
 			comandoBloquear(palabras[1], palabras[2]);
@@ -111,7 +110,7 @@ void terminal()
 void ejecucionDeESI(ESI* esi)
 {
 	enviarEncabezado(esi -> socket, 7); //Enviar el aviso de ejecucion
-	printf("Se envio la orden de ejecución.\n");
+	//printf("Se envio la orden de ejecución.\n");
 
 	sem_post(&sSocketCoord);
 
@@ -125,12 +124,12 @@ void ejecucionDeESI(ESI* esi)
 	free(head);
 
 	recibirMensaje(esi -> socket, sizeof(enum resultadoEjecucion), (void**) &resultado);
-	printf("Se recibio el resultado de la ejecución.\n");
+	//printf("Se recibio el resultado de la ejecución.\n");
 
 	//Controlo que el ESI haya terminado correctamente la instrucción.
 	if(*resultado == fallo)
 	{
-		printf("El ESI %i tuvo un fallo en su ejecución y fue terminado.\n", esi -> id);
+		//printf("El ESI %i tuvo un fallo en su ejecución y fue terminado.\n", esi -> id);
 		free(ultimaConsulta -> clave);
 		free(ultimaConsulta);
 		free(resultado);
@@ -232,7 +231,7 @@ void escucharPorESI (socket_t socketServerESI)
 			listarParaEjecucion(nuevaESI);
 			pthread_mutex_unlock(&mReady);
 			sem_post(&contESIEnReady);
-			printf("Se conecto un nuevo ESI.\n");
+			//printf("Se conecto un nuevo ESI.\n");
 		}
 		else
 		{
@@ -273,7 +272,7 @@ void comunicacionCoord(socket_pair_t *socketCoord)
 			if(recibirMensaje(socketCoord -> escucha, sizeof(header), (void**) &head) == 1)
 				salirConError("Se desconecto el coordinador.\n");
 			//Consulta estado clave
-			printf("Se recibio una consulta del coordinador.\n");
+			//printf("Se recibio una consulta del coordinador.\n");
 			ultimaConsulta = recibirConsultaCoord(socketCoord -> escucha);
 			if(ultimaConsulta -> tipo == bloqueante)
 				ultimaConsulta -> resultado = claveTomada(ultimaConsulta -> clave);
@@ -540,7 +539,7 @@ void inicializacion (char* dirConfig)
 	inicializarColas();
 
 	//El tercer parametro es el valor inicial del semaforo
-	sem_init(&corriendo, 0, 1);
+	sem_init(&sPausa, 0, 1);
 	sem_init(&contESIEnReady, 0, 0);
 
 }
@@ -775,7 +774,7 @@ void liberarRecursos()
 	pthread_mutex_destroy(&mBloqueados);
 	pthread_mutex_destroy(&mFinalizados);
 	pthread_mutex_destroy(&mEjecutando);
-	sem_destroy(&corriendo);
+	sem_destroy(&sPausa);
 	sem_destroy(&contESIEnReady);
 
 }

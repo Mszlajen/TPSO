@@ -3,9 +3,9 @@
 
 #include <stdio.h>
 #include <sys/socket.h>
-#include <sys/mman.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <commons/string.h>
 #include <commons/collections/list.h>
 #include <commons/collections/dictionary.h>
@@ -24,6 +24,7 @@ typedef struct {
 	cantEntradas_t entradaInicial;
 	int tiempoUltimoUso;
 	FILE* archivo;
+	sem_t mArchivo;
 } infoClave_t;
 
 typedef struct {

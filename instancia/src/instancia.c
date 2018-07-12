@@ -9,7 +9,7 @@ tamEntradas_t tamanioEntradas;
 cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
 //fin variables que podrian no ser globales
 
-pthread_mutex_t mTablaDeEntradas = PTHREAD_MUTEX_INITIALIZER;
+sem_t mTablaDeEntradas;
 
 int terminoEjecucion = 0;
 
@@ -18,13 +18,13 @@ int main(int argc, char** argv) {
 
 	inicializar(argv[1], &socketCoord);
 
-	/*pthread_t hiloDump;
-	pthread_create(&hiloDump, NULL, (void*) dump, NULL);*/
+	//pthread_t hiloDump;
+	//pthread_create(&hiloDump, NULL, (void*) dump, NULL);
 
 	while(!terminoEjecucion)
 	{
 		header* encabezado;
-		printf("Esperando instrucciones del coordinador.\n");
+		//printf("Esperando instrucciones del coordinador.\n");
 		if(recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado) == 1)
 		{
 			salirConError("Se desconecto el coordinador.\n");
@@ -33,7 +33,7 @@ int main(int argc, char** argv) {
 		switch(encabezado -> protocolo)
 		{
 		case 11:
-			printf("Procesando una instrucción.\n");
+			//printf("Procesando una instrucción.\n");
 			procesamientoInstrucciones(socketCoord);
 			break;
 		case 13:
@@ -59,6 +59,7 @@ void inicializar(char* dirConfig, socket_t *socketCoord)
 	infoClaves = dictionary_create();
 	conectarConCoordinador(socketCoord);
 	recibirRespuestaHandshake(*socketCoord);
+	sem_init(&mTablaDeEntradas, 0, 1);
 	//Supuestamente al usar calloc, el valor inicial va a ser NULL de una.
 	tablaDeControl = calloc(cantidadEntradas, sizeof(infoEntrada_t));
 	tablaDeEntradas = malloc(cantidadEntradas * tamanioEntradas);
@@ -68,10 +69,10 @@ void dump()
 {
 	while(!terminoEjecucion)
 	{
-		sleep(obtenerIntervaloDeDump());
-		pthread_mutex_lock(&mTablaDeEntradas);
+		sleep((unsigned int) obtenerIntervaloDeDump());
+		sem_wait(&mTablaDeEntradas);
 		dictionary_iterator(infoClaves, guardarEnArchivo);
-		pthread_mutex_unlock(&mTablaDeEntradas);
+		sem_post(&mTablaDeEntradas);
 	}
 }
 
@@ -121,9 +122,9 @@ void procesamientoInstrucciones(socket_t socketCoord)
 		if(esLRU)
 			incrementarUltimoUsoClaves();
 
-		pthread_mutex_lock(&mTablaDeEntradas);
+		sem_wait(&mTablaDeEntradas);
 		res = instruccionSet(instruc);
-		pthread_mutex_unlock(&mTablaDeEntradas);
+		sem_post(&mTablaDeEntradas);
 		entradasLibres = obtenerEntradasDisponibles();
 		free(instruc -> clave);
 		free(instruc -> valor);
@@ -138,9 +139,9 @@ void procesamientoInstrucciones(socket_t socketCoord)
 	case create:
 		if(esLRU)
 			incrementarUltimoUsoClaves();
-		pthread_mutex_lock(&mTablaDeEntradas);
+		sem_wait(&mTablaDeEntradas);
 		res = registrarNuevaClave(instruc -> clave, instruc -> valor, instruc -> tamValor);
-		pthread_mutex_unlock(&mTablaDeEntradas);
+		sem_post(&mTablaDeEntradas);
 		entradasLibres = obtenerEntradasDisponibles();
 		free(instruc -> clave);
 		free(instruc -> valor);
@@ -407,7 +408,8 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 
 	nuevaClave -> entradaInicial = posicion;
 	nuevaClave -> tamanio = tamValor - 1;
-	nuevaClave ->tiempoUltimoUso = 0;
+	nuevaClave -> tiempoUltimoUso = 0;
+	sem_init(&(nuevaClave -> mArchivo), 0, 1);
 
 	//Coloco el valor en la tabla de entradas.
 	memcpy(tablaDeEntradas + posicion * tamanioEntradas, valor, nuevaClave -> tamanio);
@@ -668,13 +670,16 @@ void destruirClave(char* nombreClave)
 void destruirInfoClave(infoClave_t* clave)
 {
 	fclose(clave -> archivo);
+	sem_destroy(&(clave -> mArchivo));
 	free(clave);
 }
 
 int guardarEnArchivo(infoClave_t* clave)
 {
+	//sem_wait(&(clave -> mArchivo));
 	uint8_t escrito =
 			fwrite(tablaDeEntradas + clave -> entradaInicial * tamanioEntradas, sizeof(char), clave -> tamanio, clave -> archivo);
+	//sem_post(&(clave -> mArchivo));
 	rewind(clave->archivo);
 	return clave -> tamanio == escrito;
 }
@@ -733,7 +738,7 @@ void liberarRecursosGlobales()
 		free(tablaDeControl);
 	if(tablaDeEntradas)
 		free(tablaDeEntradas);
-	pthread_mutex_destroy(&mTablaDeEntradas);
+	sem_destroy(&mTablaDeEntradas);
 }
 
 void salirConError(char* error)

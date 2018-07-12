@@ -67,7 +67,7 @@ void inicializacion(char *dirConfiguracion) {
 socket_t conectarConPlanificador(socket_t socketEscucha) {
 	socket_t *socketAceptada = malloc(sizeof(socket_t));
 	*socketAceptada = aceptarConexion(socketEscucha);
-	printf("Se realizo una conexion, comprobando si es el planificador.\n");
+	//printf("Se realizo una conexion, comprobando si es el planificador.\n");
 
 	header* handshake = NULL;
 	int estadoDellegada;
@@ -76,18 +76,18 @@ socket_t conectarConPlanificador(socket_t socketEscucha) {
 	estadoDellegada = recibirMensaje(*socketAceptada, sizeof(header),
 			(void**) &handshake);
 	if (estadoDellegada) {
-		error_show("No se pudo recibir header de la conexion.\n");
+		//error_show("No se pudo recibir header de la conexion.\n");
 		close(*socketAceptada);
 		free(socketAceptada);
 		return ERROR;
 	}
 	if (handshake->protocolo != 1) {
-		error_show("La conexion no es el planificador, descartando.\n");
+		//error_show("La conexion no es el planificador, descartando.\n");
 		close(*socketAceptada);
 		free(socketAceptada);
 		return ERROR;
 	}
-	printf("La conexion es el planificador, creando conexion para consulta de status.\n");
+	//printf("La conexion es el planificador, creando conexion para consulta de status.\n");
 	tamClave_t *tamIP, *tamPuerto;
 	char *ip;
 	char *puerto;
@@ -111,7 +111,7 @@ socket_t conectarConPlanificador(socket_t socketEscucha) {
 			(void*) socketStatus);
 	free(ip);
 	free(puerto);
-	printf("Se creo la conexion para consulta de status.\n");
+	//printf("Se creo la conexion para consulta de status.\n");
 	return EXITO;
 }
 
@@ -132,11 +132,11 @@ void recibirNuevasConexiones(socket_t socketEscucha) {
 
 		switch (head->protocolo) {
 		case 2:
-			printf("Se recibio el pedido de conexion de una instancia.\n");
+			//printf("Se recibio el pedido de conexion de una instancia.\n");
 			registrarInstancia(socketAceptado);
 			break;
 		case 3:
-			printf("Se recibio el pedido de conexion de una ESI.\n");
+			//printf("Se recibio el pedido de conexion de una ESI.\n");
 			registrarESI(socketAceptado);
 			break;
 		default:
@@ -294,7 +294,8 @@ void hiloInstancia(instancia_t *instancia)
 			continue;
 		}
 
-		if (seDesconectoSocket(instancia->socket)) {
+		if (seDesconectoSocket(instancia->socket))
+		{
 			log_info(logger, "Se desconecto la instancia %s, ID = %i",
 					instancia->nombre, instancia->id);
 			instancia->conectada = 0;
@@ -366,8 +367,9 @@ void hiloESI(socket_t *socketESI) {
 	enum instruccion * instr = NULL;
 
 	while (1) {
-		if (recibirMensaje(*socketESI, sizeof(header), (void**) &head)) {
-			printf("Se desconecto una ESI");
+		if (recibirMensaje(*socketESI, sizeof(header), (void**) &head))
+		{
+			//printf("Se desconecto una ESI");
 			free(head);
 			pthread_exit(0);
 		}
@@ -424,8 +426,7 @@ void hiloESI(socket_t *socketESI) {
 		}
 
 		//El retardo es en milisegundos y usleep recibe microsegundos así que convertimos la unidad al pasar el parametro
-		//usleep(config_get_int_value(configuracion, "Retardo") * 100);
-
+		usleep((unsigned int)config_get_int_value(configuracion, "Retardo") * 1000);
 		enviarResultado(*socketESI, operacion.result);
 	}
 }
@@ -438,8 +439,7 @@ void hiloPlanificador(socket_t *socketPlanificador) {
 	while (1) {
 		sem_wait(&sSocketPlanificador);
 
-		printf("Se está consultando al planificador por la clave %s\n",
-				operacion.clave);
+		//printf("Se está consultando al planificador por la clave %s\n", operacion.clave);
 
 		tamClave = string_length(operacion.clave) + sizeof(char);
 		switch (operacion.instr) {
@@ -472,8 +472,7 @@ void hiloPlanificador(socket_t *socketPlanificador) {
 		free(estado);
 		free(head);
 
-		printf("Se recibio la respuesta del planificador (Respuesta = %i).\n",
-			 	operacion.validez);
+		//printf("Se recibio la respuesta del planificador (Respuesta = %i).\n", operacion.validez);
 		sem_post(&sTerminoConsulta);
 	}
 }
@@ -604,7 +603,7 @@ void ejecutarCreate()
 
 		sem_wait(&sTerminoEjecucion);
 	}while(!instancia -> conectada);
-	log_info("ESI %i: Creo la clave", operacion.id);
+	log_info(logger, "ESI %i: Creo la clave", operacion.id);
 }
 
 void ejecutarSTORE()

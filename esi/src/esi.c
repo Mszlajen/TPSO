@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
 			error_show("Abortando por error de tamaño de clave.\n");
 			break;
 		}
-		printf("Esperando aviso de ejecución.\n");
+		//printf("Esperando aviso de ejecución.\n");
 		if(recibirMensaje(socketPlan, sizeof(header), (void**) &head))
 		{
 			error_show("Se desconecto el planificador.\n");
@@ -36,9 +36,9 @@ int main(int argc, char **argv) {
 		if(head -> protocolo != 7)
 		{/* ERROR */}
 		free(head);
-		printf("Enviando instrucción al coordinador.\n");
+		//printf("Enviando instrucción al coordinador.\n");
 		enviarInstruccionCoord(socketCoord, operacionESI, *id);
-		printf("Esperando resultado de ejecución.\n");
+		//printf("Esperando resultado de ejecución.\n");
 		if(recibirMensaje(socketCoord, sizeof(header), (void**) &head))
 		{
 			error_show("Se desconecto el coordinador.\n");
@@ -53,10 +53,10 @@ int main(int argc, char **argv) {
 			destruir_operacion(operacionESI);
 			hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
 		}
-		printf("Enviando resultado de ejecución al planificador.\n");
+		//printf("Enviando resultado de ejecución al planificador.\n");
 		enviarResultadoPlanificador(socketPlan, *resultado, !hayInstruccion);
 	}
-	printf("Termino la ejecución.\n");
+	printf("ID%i, termino la ejecución.\n", *id);
 	free(id);
 	fclose(programa);
 	config_destroy(configuracion);

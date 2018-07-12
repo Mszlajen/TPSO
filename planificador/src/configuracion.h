@@ -23,8 +23,8 @@ char* obtenerIP();
 char* obtenerPuerto();
 char* obtenerDireccionCoordinador();
 char* obtenerPuertoCoordinador();
-float obtenerAlfa();
-int obtenerEstimacionInicial();
+double obtenerAlfa();
+double obtenerEstimacionInicial();
 enum t_algoritmo obtenerAlgoritmo();
 char* obtenerBloqueosConfiguracion();
 
