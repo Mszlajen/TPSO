@@ -305,7 +305,7 @@ void comandoBloquear(char* clave, char* IdESI)
 	ESI* ESIParaBloquear = NULL;
 
 	//Compruebo que parametro ID haya sido un posible ID
-	if(IDparaBloquear > 0)
+	if(IDparaBloquear < 0)
 	{
 		printf("El parametro ID no es valido.\n");
 		return;
@@ -319,8 +319,12 @@ void comandoBloquear(char* clave, char* IdESI)
 		printf("El ESI a bloquear está ejecutando, esperando fin de ejecución.\n");
 		pthread_mutex_lock(&mEnEjecucion);
 		pthread_cond_wait(&cFinEjecucion, &mEnEjecucion);
+		pthread_mutex_unlock(&mEnEjecucion);
+
 		if(esESIEnEjecucion(IDparaBloquear))
+		{
 			ESIParaBloquear = ESIEjecutando();
+		}
 	}
 	pthread_mutex_lock(&mBloqueados);
 	pthread_mutex_lock(&mReady);
@@ -715,7 +719,7 @@ pthread_t crearHiloCoordinador(socket_t socketEscucha)
 
 enum comandos convertirComando(char* linea)
 {
-	if(string_equals_ignore_case(linea, "pausar"))
+	if(string_equals_ignore_case(linea, "pausar") || string_equals_ignore_case(linea, "p"))
 		return pausar;
 	else if(string_equals_ignore_case(linea, "continuar"))
 		return continuar;
