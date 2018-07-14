@@ -6,6 +6,8 @@ t_config *configuracion = NULL;
 t_log *logger = NULL;
 
 sem_t sSocketPlanificador, sTerminoConsulta, sTerminoEjecucion;
+pthread_mutex_t mClaves = PTHREAD_MUTEX_INITIALIZER,
+				mInstancias = PTHREAD_MUTEX_INITIALIZER;
 
 operacion_t operacion;
 consultaStatus_t consultaStatus;
@@ -216,10 +218,12 @@ void registrarInstancia(socket_t conexion)
 	enviarBuffer(conexion, (void*) &nuevaInstancia -> id, sizeof(instancia_id));
 	enviarInfoEntradas(conexion);
 
+	pthread_mutex_lock(&mInstancias);
 	list_add(instancias, nuevaInstancia);
 
 	pthread_t hilo;
 	pthread_create(&hilo, NULL, (void*) hiloInstancia, (void*) nuevaInstancia);
+	pthread_mutex_unlock(&mInstancias);
 	nuevaInstancia -> hilo = hilo;
 	free(id);
 }
@@ -353,8 +357,10 @@ void hiloCompactacion(instancia_t *llamadora) {
 		sem_wait(&((instancia_t*) instancia)->sFinCompactacion);
 	}
 	compactar = 1;
+	pthread_mutex_lock(&mInstancias);
 	list_iterate(instancias, activarInstancias);
 	list_iterate(instancias, esperarFinCompactacion);
+	pthread_mutex_unlock(&mInstancias);
 	compactar = 0;
 	sem_post(&(llamadora->sIniciarEjecucion));
 }
@@ -494,9 +500,12 @@ void hiloStatus(socket_t *socketStatus)
 		consultaStatus.tamClave = *tamClave;
 		free(tamClave);
 
+		pthread_mutex_lock(&mClaves);
 		if(!dictionary_has_key(claves, consultaStatus.clave))
 		{
+			pthread_mutex_lock(&mInstancias);
 			instancia = simularDistribucion();
+			pthread_mutex_unlock(&mInstancias);
 			consultaStatus.estado = innexistente;
 		}
 		else
@@ -504,7 +513,9 @@ void hiloStatus(socket_t *socketStatus)
 			instancia = dictionary_get(claves, consultaStatus.clave);
 			if(!instancia)
 			{
+				pthread_mutex_lock(&mInstancias);
 				instancia = simularDistribucion();
+				pthread_mutex_unlock(&mInstancias);
 				consultaStatus.estado = sinIniciar;
 			}
 			else if(instancia -> conectada)
@@ -518,6 +529,7 @@ void hiloStatus(socket_t *socketStatus)
 				consultaStatus.estado = caida;
 			}
 		}
+		pthread_mutex_unlock(&mClaves);
 
 		tamNombre = string_length(instancia -> nombre) + sizeof(char);
 
@@ -543,7 +555,9 @@ void ejecutarGET()
 {
 	if(!dictionary_has_key(claves, operacion.clave))
 	{
+		pthread_mutex_lock(&mClaves);
 		dictionary_put(claves, operacion.clave, NULL);
+		pthread_mutex_unlock(&mClaves);
 		log_info(logger, "Se creo la clave %s en la tabla de claves", operacion.clave);
 	}
 
@@ -580,7 +594,9 @@ void ejecutarSET()
 
 	if(!instancia -> conectada)
 	{
+		pthread_mutex_lock(&mClaves);
 		removerClave(instancia, operacion.clave);
+		pthread_mutex_unlock(&mClaves);
 		log_info(logger, "ESI %i: Fallo por clave inaccesible", operacion.id);
 		operacion.result = fallo;
 		return;
@@ -595,9 +611,13 @@ void ejecutarCreate()
 	operacion.instr = create;
 	do
 	{
+		pthread_mutex_lock(&mClaves);
 		dictionary_remove(claves, operacion.clave);
+		pthread_mutex_lock(&mInstancias);
 		instancia = correrAlgoritmo(&punteroSeleccion);
+		pthread_mutex_unlock(&mInstancias);
 		dictionary_put(claves, operacion.clave, instancia);
+		pthread_mutex_unlock(&mClaves);
 
 		sem_post(&instancia -> sIniciarEjecucion);
 
@@ -622,7 +642,9 @@ void ejecutarSTORE()
 
 	if(!instancia -> conectada)
 	{
+		pthread_mutex_lock(&mClaves);
 		removerClave(instancia, operacion.clave);
+		pthread_mutex_unlock(&mClaves);
 		log_info(logger, "ESI %i: Fallo por clave inaccesible", operacion.id);
 		operacion.result = fallo;
 		return;
