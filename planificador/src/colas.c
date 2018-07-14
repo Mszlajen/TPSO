@@ -29,13 +29,11 @@ void finalizarESI(ESI* esi)
 
 void liberarRecursosDeESI(ESI* esi)
 {
-	ESI* esiLiberado;
+	char * clave;
 	while(!list_is_empty(esi -> recursos))
 	{
-		 esiLiberado = liberarClave(list_get(esi -> recursos, 0));
-		 if(esiLiberado)
-			 listarParaEjecucion(esiLiberado);
-		 list_remove(esi->recursos, 0);
+		clave = list_get(esi->recursos, 0);
+		liberarClave(clave);
 	}
 }
 

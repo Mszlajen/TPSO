@@ -55,7 +55,14 @@ int main(int argc, char **argv) {
 		}
 		//printf("Enviando resultado de ejecución al planificador.\n");
 		enviarResultadoPlanificador(socketPlan, *resultado, !hayInstruccion);
-	}while(hayInstruccion && *resultado != fallo);
+
+		if(*resultado == fallo)
+		{
+			destruir_operacion(operacionESI);
+			error_show("Hubo un fallo durante la ejecución.\n");
+			break;
+		}
+	}while(hayInstruccion);
 	printf("ID%i, termino la ejecución.\n", *id);
 	free(id);
 	fclose(programa);

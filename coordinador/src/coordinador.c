@@ -500,7 +500,7 @@ void hiloStatus(socket_t *socketStatus)
 	tamNombreInstancia_t tamNombre;
 	while (1)
 	{
-		if(!recibirMensaje(*socketStatus, sizeof(header), (void**) &head))
+		if(recibirMensaje(*socketStatus, sizeof(header), (void**) &head))
 			salirConError("Se desconecto el planificador.\n");
 		free(head);
 		recibirMensaje(*socketStatus, sizeof(tamClave_t), (void**) &tamClave);

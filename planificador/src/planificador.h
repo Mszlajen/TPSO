@@ -33,11 +33,6 @@ typedef struct {
 	char* valor;
 } consultaStatus;
 
-typedef struct {
-	socket_t escucha;
-	socket_t envio;
-} socket_pair_t;
-
 enum comandos {pausar, continuar, bloquear, desbloquear, listar, kill, status, deadlock, salir};
 
 void inicializacion(char*);
@@ -53,25 +48,25 @@ void recibirRespuestaCoordinador(socket_t, consultaStatus*);
 void recibirRespuestaStatus(socket_t, consultaStatus*);
 socket_t crearServerESI();
 
-pthread_t crearHiloTerminal ();
+pthread_t crearHiloTerminal (socket_t);
 pthread_t crearHiloNuevasESI (socket_t);
 pthread_t crearFinEjecucion (ESI*);
-pthread_t crearHiloCoordinador (socket_t);
+pthread_t crearHiloCoordinador (socket_t, socket_t*);
 
 enum comandos convertirComando(char *);
 void salirConError(char *);
 void liberarRecursos();
 
-void terminal();
+void terminal(socket_t);
 void escucharPorESI (socket_t);
-void comunicacionCoord(socket_pair_t*);
-void escucharPorFinESI();
+void comunicacionCoord(socket_t);
+void escucharPorFinESI(ESI*);
 
 void comandoBloquear(char*, char*);
 void comandoDesbloquear(char*);
 void comandoListar(char*);
 void comandoKill(char*);
-void comandoStatus(char*);
+void comandoStatus(socket_t, char*);
 void comandoDeadlock();
 
 void finalizarESIBien(ESI* esi);
