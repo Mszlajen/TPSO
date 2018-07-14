@@ -27,13 +27,13 @@ endif
 all: planificador
 
 dependents:
-	-cd ../../biblioCompartida/Debug && $(MAKE) all
+	-cd ../../biblioCompartida/make && $(MAKE) all
 
 # Tool invocations
-planificador: $(OBJS) $(USER_OBJS) ../../biblioCompartida/Debug/libbiblioCompartida.so
+planificador: $(OBJS) $(USER_OBJS) ../../biblioCompartida/make/libbiblioCompartida.so
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker'
-	gcc -L"../../biblioCompartida/Debug" -o "planificador" $(OBJS) $(USER_OBJS) $(LIBS)
+	gcc -L"../../biblioCompartida/make" -o "planificador" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -43,6 +43,6 @@ clean:
 	-@echo ' '
 
 .PHONY: all clean dependents
-../../biblioCompartida/Debug/libbiblioCompartida.so:
+../../biblioCompartida/make/libbiblioCompartida.so:
 
 -include ../makefile.targets
