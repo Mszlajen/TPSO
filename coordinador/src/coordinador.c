@@ -240,7 +240,8 @@ void hiloInstancia(instancia_t *instancia)
 {
 	header *head;
 	enum resultadoEjecucion *result;
-	while (1) {
+	while (1)
+	{
 		sem_wait(&instancia -> sIniciarEjecucion);
 
 		if(compactar)
@@ -263,7 +264,7 @@ void hiloInstancia(instancia_t *instancia)
 					(void**) &result);
 			sem_post(&(instancia->sFinCompactacion));
 			continue;
-		}
+		} //Fin Compactacion
 
 		if(consultaStatus.atender)
 		{
@@ -296,7 +297,7 @@ void hiloInstancia(instancia_t *instancia)
 			consultaStatus.atender = 0;
 			sem_post(&consultaStatus.atendida);
 			continue;
-		}
+		} //Fin Status
 
 		if (seDesconectoSocket(instancia->socket))
 		{
@@ -351,18 +352,25 @@ void hiloInstancia(instancia_t *instancia)
 
 void hiloCompactacion(instancia_t *llamadora) {
 	void activarInstancias(void *instancia) {
-		sem_post(&((instancia_t*) instancia)->sIniciarEjecucion);
+		sem_post(&((instancia_t*) instancia) -> sIniciarEjecucion);
 	}
 	void esperarFinCompactacion(void *instancia) {
-		sem_wait(&((instancia_t*) instancia)->sFinCompactacion);
+		sem_wait(&((instancia_t*) instancia) -> sFinCompactacion);
 	}
-	compactar = 1;
+	pthread_mutex_lock(&mClaves);
 	pthread_mutex_lock(&mInstancias);
+	compactar = 1;
+	log_info(logger, "Iniciando compactación.");
 	list_iterate(instancias, activarInstancias);
 	list_iterate(instancias, esperarFinCompactacion);
-	pthread_mutex_unlock(&mInstancias);
+	log_info(logger, "Terminada compactacion.");
 	compactar = 0;
-	sem_post(&(llamadora->sIniciarEjecucion));
+	pthread_mutex_unlock(&mInstancias);
+	pthread_mutex_unlock(&mClaves);
+	if(llamadora -> conectada)
+		sem_post(&(llamadora->sIniciarEjecucion));
+	else
+		sem_post(&sTerminoEjecucion);
 }
 
 void hiloESI(socket_t *socketESI) {
@@ -577,8 +585,7 @@ void ejecutarSET()
 {
 	if (!operacion.validez) {
 		operacion.result = fallo;
-		log_info(logger, "ESI %i: Fallo por clave no bloqueada",
-				operacion.id);
+		log_info(logger, "ESI %i: Fallo por clave no bloqueada", operacion.id);
 		return;
 	}
 
@@ -586,6 +593,16 @@ void ejecutarSET()
 	if(!instancia)
 	{
 		return ejecutarCreate();
+	}
+
+	if(!instancia -> conectada)
+	{
+		pthread_mutex_lock(&mClaves);
+		removerClave(instancia, operacion.clave);
+		pthread_mutex_unlock(&mClaves);
+		log_info(logger, "ESI %i: Fallo por clave inaccesible", operacion.id);
+		operacion.result = fallo;
+		return;
 	}
 
 	sem_post(&instancia -> sIniciarEjecucion);
@@ -599,6 +616,15 @@ void ejecutarSET()
 		pthread_mutex_unlock(&mClaves);
 		log_info(logger, "ESI %i: Fallo por clave inaccesible", operacion.id);
 		operacion.result = fallo;
+		return;
+	}
+
+	if(operacion.result == fallo)
+	{
+		pthread_mutex_lock(&mClaves);
+		removerClave(instancia, operacion.clave);
+		pthread_mutex_unlock(&mClaves);
+		log_info(logger, "ESI %i: Fallo por clave no identificada", operacion.id);
 		return;
 	}
 

@@ -461,7 +461,7 @@ void comandoKill(char *IdESI)
 
 void comandoStatus(char* clave)
 {
-	printf("Preguntando al coordinador por el estado de la clave %s", clave);
+	printf("Preguntando al coordinador por el estado de la clave %s\n", clave);
 
 	pthread_mutex_lock(&mConsStatus);
 	consStatus = malloc(sizeof(consultaStatus));
@@ -551,9 +551,13 @@ void inicializacion (char* dirConfig)
 
 void bloquearClavesConfiguracion()
 {
-	char** claves = string_split(obtenerBloqueosConfiguracion(), ",");
-	string_iterate_lines(claves, reservarClaveSinESI);
-	string_iterate_lines(claves, free);
+	char clavesABloquear = obtenerBloqueosConfiguracion();
+	if(clavesABloquear)
+	{
+		char** claves = string_split(clavesABloquear, ",");
+		string_iterate_lines(claves, reservarClaveSinESI);
+		string_iterate_lines(claves, free);
+	}
 }
 
 socket_t conectarConCoordinador()

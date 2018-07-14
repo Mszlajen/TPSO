@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 	t_esi_operacion operacionESI;
 	booleano hayInstruccion = leerSiguienteInstruccion(programa, &operacionESI);
 	enum resultadoEjecucion *resultado;
-	while (hayInstruccion)
+	do
 	{
 		if(!operacionESI.valido)
 		{
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 		}
 		//printf("Enviando resultado de ejecución al planificador.\n");
 		enviarResultadoPlanificador(socketPlan, *resultado, !hayInstruccion);
-	}
+	}while(hayInstruccion && *resultado != fallo);
 	printf("ID%i, termino la ejecución.\n", *id);
 	free(id);
 	fclose(programa);

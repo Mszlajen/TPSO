@@ -9,17 +9,18 @@ tamEntradas_t tamanioEntradas;
 cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
 //fin variables que podrian no ser globales
 
-sem_t mTablaDeEntradas;
+pthread_mutex_t mTablaDeEntradas = PTHREAD_MUTEX_INITIALIZER;
 
 int terminoEjecucion = 0;
+unsigned long int instruccionActual = 0;
 
 int main(int argc, char** argv) {
 	socket_t socketCoord = ERROR;
 
 	inicializar(argv[1], &socketCoord);
 
-	//pthread_t hiloDump;
-	//pthread_create(&hiloDump, NULL, (void*) dump, NULL);
+	pthread_t hiloDump;
+	pthread_create(&hiloDump, NULL, (void*) dump, NULL);
 
 	while(!terminoEjecucion)
 	{
@@ -46,7 +47,7 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	//pthread_join(hiloDump, NULL);
+	pthread_join(hiloDump, NULL);
 
 	liberarRecursosGlobales();
 	exit(0);
@@ -59,7 +60,6 @@ void inicializar(char* dirConfig, socket_t *socketCoord)
 	infoClaves = dictionary_create();
 	conectarConCoordinador(socketCoord);
 	recibirRespuestaHandshake(*socketCoord);
-	sem_init(&mTablaDeEntradas, 0, 1);
 	//Supuestamente al usar calloc, el valor inicial va a ser NULL de una.
 	tablaDeControl = calloc(cantidadEntradas, sizeof(infoEntrada_t));
 	tablaDeEntradas = malloc(cantidadEntradas * tamanioEntradas);
@@ -70,9 +70,9 @@ void dump()
 	while(!terminoEjecucion)
 	{
 		sleep((unsigned int) obtenerIntervaloDeDump());
-		sem_wait(&mTablaDeEntradas);
+		pthread_mutex_lock(&mTablaDeEntradas);
 		dictionary_iterator(infoClaves, guardarEnArchivo);
-		sem_post(&mTablaDeEntradas);
+		pthread_mutex_unlock(&mTablaDeEntradas);
 	}
 }
 
@@ -114,37 +114,33 @@ void procesamientoInstrucciones(socket_t socketCoord)
 {
 	instruccion_t* instruc = recibirInstruccionCoordinador(socketCoord);
 	enum resultadoEjecucion res;
-	booleano esLRU = obtenerAlgoritmoReemplazo() == LRU, cambioEspacio = 1;
+	booleano cambioEspacio = 1;
 	cantEntradas_t entradasLibres;
 	switch(instruc -> tipo)
 	{
 	case set:
-		if(esLRU)
-			incrementarUltimoUsoClaves();
-
-		sem_wait(&mTablaDeEntradas);
+		pthread_mutex_lock(&mTablaDeEntradas);
 		res = instruccionSet(instruc);
-		sem_post(&mTablaDeEntradas);
+		pthread_mutex_unlock(&mTablaDeEntradas);
 		entradasLibres = obtenerEntradasDisponibles();
 		free(instruc -> clave);
 		free(instruc -> valor);
+		instruccionActual++;
 		break;
 	case store:
-		if(esLRU)
-			incrementarUltimoUsoClaves();
 		res = instruccionStore(instruc);
 		cambioEspacio = 0;
 		free(instruc -> clave);
+		instruccionActual++;
 		break;
 	case create:
-		if(esLRU)
-			incrementarUltimoUsoClaves();
-		sem_wait(&mTablaDeEntradas);
+		pthread_mutex_lock(&mTablaDeEntradas);
 		res = registrarNuevaClave(instruc -> clave, instruc -> valor, instruc -> tamValor);
-		sem_post(&mTablaDeEntradas);
+		pthread_mutex_unlock(&mTablaDeEntradas);
 		entradasLibres = obtenerEntradasDisponibles();
 		free(instruc -> clave);
 		free(instruc -> valor);
+		instruccionActual++;
 		break;
 	case compactacion:
 		instruccionCompactacion();
@@ -300,6 +296,7 @@ enum resultadoEjecucion instruccionCompactacion()
 {
 	cantEntradas_t punteroVacio = 0, punteroEntrada = 0, distancia;
 	infoClave_t *claveAMover;
+	printf("Se está realizando la compactación.\n");
 	while(1)
 	{
 		//Busco el proximo espacio vacio
@@ -327,11 +324,12 @@ enum resultadoEjecucion instruccionCompactacion()
 		//Actualizo los valores de la tabla de control
 		distancia = punteroEntrada - punteroVacio;
 		asociarEntradas(punteroVacio, distancia, tablaDeControl[punteroEntrada].clave);
-		punteroVacio = claveAMover -> entradaInicial + tamValorACantEntradas(claveAMover->tamanio);
+		punteroVacio = punteroVacio + tamValorACantEntradas(claveAMover->tamanio);
 		asociarEntradas(punteroVacio, distancia, NULL);
 
 		//Actualizo la información de la clave
 		claveAMover -> entradaInicial = punteroVacio;
+
 	}
 	return exito;
 }
@@ -341,8 +339,8 @@ enum resultadoEjecucion instruccionStore(instruccion_t* instruccion)
 	if(dictionary_has_key(infoClaves, instruccion -> clave))
 	{
 		infoClave_t *clave = dictionary_get(infoClaves, instruccion -> clave);
-		clave -> tiempoUltimoUso = 0;
-		if(guardarEnArchivo(clave))
+		clave -> tiempoUltimoUso = instruccionActual;
+		if(guardarEnArchivo(instruccion -> clave, clave))
 			return exito;
 	}
 	return fallo;
@@ -355,14 +353,11 @@ enum resultadoEjecucion actualizarValorDeClave(char* clave, char* valor, tamValo
 	cantEntradas_t entradasUsadas = tamValorACantEntradas(informacionClave -> tamanio);
 	if(entradasNecesarias > entradasUsadas)
 	{
-		/*
-		 * Este es un caso que no está definido y, por lo tanto,
-		 * no van a probar pero lo dejo porque ya está todo hecho.
-		 */
-		return actualizarValorMayorTamanio(clave, informacionClave, valor, tamValor);
+		return fallo;
 	}
 	else
 	{
+		informacionClave -> tiempoUltimoUso = instruccionActual;
 		return actualizarValorMenorTamanio(clave, informacionClave, valor, tamValor);
 	}
 }
@@ -370,24 +365,19 @@ enum resultadoEjecucion actualizarValorDeClave(char* clave, char* valor, tamValo
 enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t tamValor)
 {
 	infoClave_t* nuevaClave = malloc(sizeof(infoClave_t));
+	nuevaClave -> tamanio = tamValor - 1;
 
-
-	cantEntradas_t posicion = encontrarEspacioLibreConsecutivo(tamValor);
+	cantEntradas_t posicion = encontrarEspacioLibreConsecutivo(nuevaClave -> tamanio);
 	if(posicion == cantidadEntradas)
 	{
 		cantEntradas_t entradasDisponibles = obtenerEntradasDisponibles();
 		do
 		{
-			if(entradasDisponibles >= tamValorACantEntradas(tamValor))
+			if(entradasDisponibles >= tamValorACantEntradas(nuevaClave -> tamanio))
 			{
-				posicion = encontrarEspacioLibreConsecutivo(tamValor);
+				posicion = encontrarEspacioLibreConsecutivo(nuevaClave -> tamanio);
 				if(posicion == cantidadEntradas)
 				{
-					/*
-					 * Acá podria borrar el archivo, pero como igual lo voy a rehacer
-					 * seria procesamiento adicional.
-					*/
-					fclose(nuevaClave -> archivo);
 					free(nuevaClave);
 					return necesitaCompactar;
 				}
@@ -407,9 +397,8 @@ enum resultadoEjecucion registrarNuevaClave(char* clave, char* valor, tamValor_t
 	free(dirArchivo);
 
 	nuevaClave -> entradaInicial = posicion;
-	nuevaClave -> tamanio = tamValor - 1;
-	nuevaClave -> tiempoUltimoUso = 0;
-	sem_init(&(nuevaClave -> mArchivo), 0, 1);
+	nuevaClave -> tiempoUltimoUso = instruccionActual;
+	pthread_mutex_init(&(nuevaClave -> mArchivo), NULL);
 
 	//Coloco el valor en la tabla de entradas.
 	memcpy(tablaDeEntradas + posicion * tamanioEntradas, valor, nuevaClave -> tamanio);
@@ -474,7 +463,7 @@ cantEntradas_t encontrarEspacioLibreConsecutivo(tamValor_t tamValor)
 		else
 			libresConsecutivos++;
 	}
-	return i==cantidadEntradas? cantidadEntradas : i - libresConsecutivos;
+	return libresConsecutivos < entradasNecesarias? cantidadEntradas : i - libresConsecutivos;
 }
 
 cantEntradas_t obtenerEntradasDisponibles()
@@ -511,9 +500,11 @@ void algoritmoDeReemplazo()
 		claveAReemplazar = reemplazoBSU();
 		break;
 	}
-	free(tablaDeControl[claveAReemplazar->entradaInicial].clave);
-	tablaDeControl[claveAReemplazar->entradaInicial].clave = NULL;
-	destruirClave(tablaDeControl[claveAReemplazar->entradaInicial].clave);
+	printf("Se reemplazo la clave %s\n", tablaDeControl[claveAReemplazar->entradaInicial].clave);
+	int posicionReemplazada = claveAReemplazar->entradaInicial;
+	destruirClave(tablaDeControl[posicionReemplazada].clave);
+	free(tablaDeControl[posicionReemplazada].clave);
+	tablaDeControl[posicionReemplazada].clave = NULL;
 }
 
 /*
@@ -522,45 +513,39 @@ void algoritmoDeReemplazo()
 
 infoClave_t* reemplazoCircular()
 {
+	infoClave_t *candidato;
 	do
 	{
-		if(tablaDeControl[punteroReemplazo].clave &&
-			((infoClave_t*) dictionary_get(infoClaves, tablaDeControl[punteroReemplazo].clave)) -> tamanio < tamanioEntradas)
+		if(!tablaDeControl[punteroReemplazo].clave)
 		{
 			incrementarPunteroReemplazo();
 			continue;
 		}
-		incrementarPunteroReemplazo();
-		break;
+		candidato = dictionary_get(infoClaves, tablaDeControl[punteroReemplazo].clave);
+		if(candidato -> tamanio <= tamanioEntradas)
+			break;
+		else
+			incrementarPunteroReemplazo();
 	}while(1);
-	return (infoClave_t*) dictionary_get(infoClaves, tablaDeControl[punteroReemplazo].clave);
+	incrementarPunteroReemplazo();
+	return candidato;
 }
 
 //BSU y LRU repiten (mucho) codigo, ver que se puede hacer.
 infoClave_t* reemplazoLRU()
 {
-	t_list* candidatos = list_create();
 	infoClave_t* claveAReemplazar = NULL;
-	int tiempoMayor = 0;
-	void obtenerClaveAReemplazar(infoClave_t* infoClave)
+	unsigned long int mayorAntiguedad = ULONG_MAX;
+	void obtenerClaveAReemplazar(char* clave, infoClave_t* infoClave)
 	{
-		if(infoClave -> tamanio < tamanioEntradas && infoClave -> tiempoUltimoUso >= tiempoMayor)
+		if(infoClave -> tamanio <= tamanioEntradas && infoClave -> tiempoUltimoUso <= mayorAntiguedad)
 		{
-			if(infoClave -> tiempoUltimoUso > tiempoMayor)
-			{
-				list_clean(candidatos);
-				tiempoMayor = infoClave -> tiempoUltimoUso;
-			}
-			list_add(candidatos, infoClave);
+			claveAReemplazar = infoClave;
+			mayorAntiguedad = infoClave -> tiempoUltimoUso;
 		}
 	}
 
 	dictionary_iterator(infoClaves, obtenerClaveAReemplazar);
-	if(list_size(candidatos) == 1)
-		claveAReemplazar = list_get(candidatos, 0);
-	else
-		claveAReemplazar = desempatePorCircular(candidatos);
-	list_destroy(candidatos);
 	return claveAReemplazar;
 }
 
@@ -569,14 +554,14 @@ infoClave_t* reemplazoBSU()
 	t_list* candidatos = list_create();
 	infoClave_t* claveAReemplazar = NULL;
 	tamValor_t tamMayor = 0;
-	void obtenerClaveAReemplazar(infoClave_t* infoClave)
+	void obtenerClaveAReemplazar(char* clave, infoClave_t* infoClave)
 	{
-		if(infoClave -> tamanio < tamanioEntradas && infoClave -> tiempoUltimoUso >= tamMayor)
+		if(infoClave -> tamanio <= tamanioEntradas && infoClave -> tamanio >= tamMayor)
 		{
-			if(infoClave -> tiempoUltimoUso > tamMayor)
+			if(infoClave -> tamanio > tamMayor)
 			{
 				list_clean(candidatos);
-				tamMayor = infoClave -> tiempoUltimoUso;
+				tamMayor = infoClave -> tamanio;
 			}
 			list_add(candidatos, infoClave);
 		}
@@ -615,6 +600,9 @@ infoClave_t* desempatePorCircular(t_list* candidatos)
 	list_iterate(candidatos, esMasCercano);
 	if(!claveAReemplazar)
 		list_iterate(candidatos, menorPosicion);
+
+	punteroReemplazo = claveAReemplazar -> entradaInicial;
+	incrementarPunteroReemplazo();
 	return claveAReemplazar;
 }
 
@@ -654,7 +642,7 @@ booleano almacenarID(instancia_id ID)
 
 cantEntradas_t tamValorACantEntradas(tamValor_t v)
 {
-	return (cantEntradas_t) v / tamanioEntradas + v % tamanioEntradas? 1 : 0;
+	return (cantEntradas_t) v / tamanioEntradas + (v % tamanioEntradas? 1 : 0);
 }
 
 void destruirClave(char* nombreClave)
@@ -670,17 +658,17 @@ void destruirClave(char* nombreClave)
 void destruirInfoClave(infoClave_t* clave)
 {
 	fclose(clave -> archivo);
-	sem_destroy(&(clave -> mArchivo));
+	pthread_mutex_destroy(&(clave -> mArchivo));
 	free(clave);
 }
 
-int guardarEnArchivo(infoClave_t* clave)
+int guardarEnArchivo(char* nombreClave, infoClave_t* clave)
 {
-	//sem_wait(&(clave -> mArchivo));
+	pthread_mutex_lock(&(clave -> mArchivo));
 	uint8_t escrito =
 			fwrite(tablaDeEntradas + clave -> entradaInicial * tamanioEntradas, sizeof(char), clave -> tamanio, clave -> archivo);
-	//sem_post(&(clave -> mArchivo));
 	rewind(clave->archivo);
+	pthread_mutex_unlock(&(clave -> mArchivo));
 	return clave -> tamanio == escrito;
 }
 
@@ -724,21 +712,21 @@ int max (int primerValor, int segundoValor)
 
 void liberarRecursosGlobales()
 {
-	void interacionLiberarNombres(void* infoClave)
+	void interacionLiberarNombres(char* clave, void* infoClave)
 	{
 		free(tablaDeControl[((infoClave_t*) infoClave) -> entradaInicial].clave);
 	}
 
 	if(infoClaves)
 	{
-		dictionary_iterator(infoClaves,interacionLiberarNombres);
+		dictionary_iterator(infoClaves, interacionLiberarNombres);
 		dictionary_destroy_and_destroy_elements(infoClaves, destruirInfoClave);
 	}
 	if(tablaDeControl)
 		free(tablaDeControl);
 	if(tablaDeEntradas)
 		free(tablaDeEntradas);
-	sem_destroy(&mTablaDeEntradas);
+	pthread_mutex_destroy(&mTablaDeEntradas);
 }
 
 void salirConError(char* error)

@@ -2,10 +2,10 @@
 #define INSTANCIA_H_
 
 #include <stdio.h>
+#include <limits.h>
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <pthread.h>
-#include <semaphore.h>
 #include <commons/string.h>
 #include <commons/collections/list.h>
 #include <commons/collections/dictionary.h>
@@ -22,9 +22,9 @@ typedef struct {
 typedef struct {
 	tamValor_t tamanio;
 	cantEntradas_t entradaInicial;
-	int tiempoUltimoUso;
+	unsigned long int tiempoUltimoUso;
 	FILE* archivo;
-	sem_t mArchivo;
+	pthread_mutex_t mArchivo;
 } infoClave_t;
 
 typedef struct {
@@ -71,7 +71,7 @@ cantEntradas_t tamValorACantEntradas(tamValor_t);
 //Devuelve 0 en exito, ERROR si fallo
 int crearMappeado(infoClave_t*);
 int destruirMappeado(infoClave_t*);
-int guardarEnArchivo(infoClave_t*);
+int guardarEnArchivo(char*, infoClave_t*);
 tamValor_t leerDeArchivo(char*, char**);
 void destruirClave(char*);
 void destruirInfoClave(infoClave_t*);

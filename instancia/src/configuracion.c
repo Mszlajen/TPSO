@@ -45,7 +45,7 @@ enum algoritmoReemplazo obtenerAlgoritmoReemplazo()
 	char* nombreAlgoritmo = config_get_string_value(configuracion, algoReempl);
 	if(string_equals_ignore_case(nombreAlgoritmo, "BSU"))
 		return BSU;
-	else if(string_equals_ignore_case(nombreAlgoritmo, "LSU"))
+	else if(string_equals_ignore_case(nombreAlgoritmo, "LRU"))
 		return LRU;
 	else
 		return Circular;
