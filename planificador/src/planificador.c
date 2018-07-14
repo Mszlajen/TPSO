@@ -305,7 +305,7 @@ void comandoBloquear(char* clave, char* IdESI)
 	ESI* ESIParaBloquear = NULL;
 
 	//Compruebo que parametro ID haya sido un posible ID
-	if(IDparaBloquear < 0)
+	if(IDparaBloquear <= 0)
 	{
 		printf("El parametro ID no es valido.\n");
 		return;
@@ -425,7 +425,7 @@ void comandoKill(char *IdESI)
 	ESI* ESIParaMatar = NULL;
 
 	//Compruebo que parametro ID haya sido un posible ID
-	if(IDparaMatar > 0)
+	if(IDparaMatar <= 0)
 	{
 		printf("El parametro ID no es valido.\n");
 		return;
@@ -439,6 +439,7 @@ void comandoKill(char *IdESI)
 		printf("El ESI a matar está ejecutando, esperando fin de ejecución.\n");
 		pthread_mutex_lock(&mEnEjecucion);
 		pthread_cond_wait(&cFinEjecucion, &mEnEjecucion);
+		pthread_mutex_unlock(&mEnEjecucion);
 		if(esESIEnEjecucion(IDparaMatar))
 			ESIParaMatar = ESIEjecutando();
 	}
