@@ -7,6 +7,7 @@ t_dictionary* infoClaves = NULL;
 infoEntrada_t* tablaDeControl = NULL;
 tamEntradas_t tamanioEntradas;
 cantEntradas_t cantidadEntradas, punteroReemplazo = 0;
+instancia_id *id;
 //fin variables que podrian no ser globales
 
 pthread_mutex_t mTablaDeEntradas = PTHREAD_MUTEX_INITIALIZER;
@@ -162,7 +163,8 @@ void conectarConCoordinador(socket_t *socketCoord)
 	FILE* archivoID = NULL;
 	char* dirArchivoID = obtenerDireccionArchivoID();
 	void* buffer = NULL;
-	instancia_id ID = nuevoID;
+
+	id = malloc(sizeof(instancia_id));
 
 	*socketCoord = crearSocketCliente(obtenerIPCordinador(), obtenerPuertoCoordinador());
 	if(*socketCoord == ERROR)
@@ -170,11 +172,11 @@ void conectarConCoordinador(socket_t *socketCoord)
 
 	if((archivoID = fopen(dirArchivoID, "r")))
 	{
-		fread(&ID, sizeof(instancia_id), 1, archivoID);
+		fread(id, sizeof(instancia_id), 1, archivoID);
 		fclose(archivoID);
 	}
 	else
-		ID = 0;
+		*id = 0;
 
 	tamNombreInstancia_t tamNombre = sizeof(char) * string_length(obtenerNombreInstancia()) +
 					sizeof(char);
@@ -186,13 +188,14 @@ void conectarConCoordinador(socket_t *socketCoord)
 	buffer = malloc(tamBuffer);
 	head.protocolo = 2;
 	memcpy(buffer, &head, sizeof(head));
-	memcpy(buffer + sizeof(instancia_id), &ID, sizeof(instancia_id));
+	memcpy(buffer + sizeof(instancia_id), id, sizeof(instancia_id));
 	memcpy(buffer + sizeof(head) + sizeof(instancia_id), &tamNombre, sizeof(tamNombreInstancia_t));
 	memcpy(buffer + sizeof(head) + sizeof(instancia_id) + sizeof(tamNombre), obtenerNombreInstancia(), tamNombre);
 	enviarBuffer(*socketCoord, buffer, tamBuffer);
 
 	free(buffer);
 	free(dirArchivoID);
+	free(id);
 }
 
 void recibirRespuestaHandshake(socket_t socketCoord)
@@ -202,8 +205,7 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 
 	cantEntradas_t *buffCantEntr;
 	tamEntradas_t *buffTamEntr;
-	instancia_id *buffID;
-	recibirMensaje(socketCoord, sizeof(instancia_id), (void**) &buffID);
+	recibirMensaje(socketCoord, sizeof(instancia_id), (void**) id);
 	switch(head -> protocolo)
 	{
 	case 4:
@@ -240,7 +242,7 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 
 		break;
 	case 5:
-		if(!almacenarID(*buffID))
+		if(!almacenarID(*id))
 			error_show("No se pudo almacenar la ID\n");
 
 		recibirMensaje(socketCoord, sizeof(cantEntradas_t), (void **) &buffCantEntr);
@@ -252,7 +254,6 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 		free(buffTamEntr);
 		break;
 	}
-	free(buffID);
 	free(head);
 }
 
@@ -632,9 +633,8 @@ booleano almacenarID(instancia_id ID)
 	booleano resultado = 0;
 	if((archivo = fopen(dirArchivo, "w")))
 	{
-		fwrite((void*)&ID, sizeof(instancia_id), 1, archivo);
+		resultado = fwrite(&ID, sizeof(instancia_id), 1, archivo) == sizeof(instancia_id);
 		fclose(archivo);
-		resultado = 1;
 	}
 	free(dirArchivo);
 	return resultado;

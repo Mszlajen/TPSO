@@ -13,6 +13,7 @@ typedef struct {
 	double ultimaEstimacion;
 	unsigned long int arriboListos;
 	pthread_t hiloDeFin;
+	void* bufferAux;
 	t_list* recursos;
 }ESI;
 

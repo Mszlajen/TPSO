@@ -10,6 +10,7 @@
 #include <commons/collections/list.h>
 #include <commons/error.h>
 #include <commons/string.h>
+#include <commons/log.h>
 #include <biblio.h>
 
 #include "adminESI.h"

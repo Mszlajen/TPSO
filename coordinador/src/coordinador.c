@@ -493,7 +493,6 @@ void hiloPlanificador(socket_t *socketPlanificador) {
 
 void hiloStatus(socket_t *socketStatus)
 {
-	printf("Se conecto el socket de status.\n");
 	header *head;
 	tamClave_t *tamClave;
 	instancia_t *instancia;

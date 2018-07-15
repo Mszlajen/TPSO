@@ -232,7 +232,7 @@ t_list* detectarDeadlock()
 
 	//Coloco en la lista a los candidatos filtrando las claves bloqueadas por el sistema.
 	//Solo puede estar una vez cada ESI.
-	void filtrarClavesBloqueadasPorSistema(void *esi)
+	void filtrarClavesBloqueadasPorSistema(char* clave, void *esi)
 	{
 		if(esi && !esiEnLista(candidatos, (ESI*) esi))
 			list_add(candidatos, esi);

@@ -82,4 +82,6 @@ socket_t aceptarConexion(socket_t);
  */
 void cerrarSocket(socket_t);
 
+char* resultToString(enum resultadoEjecucion);
+
 #endif /* BIBLIO_H_ */

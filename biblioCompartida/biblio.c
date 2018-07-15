@@ -132,3 +132,28 @@ void cerrarSocket(socket_t sock)
 	if(sock == ERROR)
 		close(sock);
 }
+
+char* resultToString(enum resultadoEjecucion result)
+{
+	char *ret;
+	switch(result)
+	{
+	case exito:
+		ret = malloc(6);
+		strcpy(ret, "exito");
+		break;
+	case bloqueo:
+		ret = malloc(8);
+		strcpy(ret, "bloqueo");
+		break;
+	case fallo:
+		ret = malloc(6);
+		strcpy(ret, "fallo");
+		break;
+	case fin:
+		ret = malloc(4);
+		strcpy(ret, "fin");
+		break;
+	}
+	return ret;
+}
