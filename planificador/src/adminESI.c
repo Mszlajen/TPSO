@@ -14,6 +14,7 @@ ESI* crearESI (socket_t sock, int estimacionInicial)
 	unaESI -> arriboListos = instruccionesEjecutadas;
 	unaESI -> recursos = list_create();
 	unaESI -> socket = sock;
+	unaESI -> bufferAux = NULL;
 	return unaESI;
 }
 
