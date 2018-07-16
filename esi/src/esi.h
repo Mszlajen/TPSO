@@ -19,6 +19,7 @@ socket_t conectarConPlanificador(t_config*);
 
 FILE* abrirArchivoLectura(char*);
 void enviarHandshake (socket_t);
+void informarError(enum resultadoEjecucion, ESI_id);
 void liberarRecursos();
 void salirConError(char*);
 // Devuelve 0 si no hay más instrucciones para leer, y usa el segundo parametro como salida en caso contrario

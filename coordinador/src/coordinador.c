@@ -8,10 +8,7 @@ t_log *logger = NULL;
 sem_t sSocketPlanificador, sTerminoConsulta, sTerminoEjecucion;
 
 pthread_mutex_t mClaves = PTHREAD_MUTEX_INITIALIZER,
-				mInstancias = PTHREAD_MUTEX_INITIALIZER,
-				mCondInstanciasDisponibles = PTHREAD_MUTEX_INITIALIZER;
-
-pthread_cond_t condInstanciasDisponibles = PTHREAD_COND_INITIALIZER;
+				mInstancias = PTHREAD_MUTEX_INITIALIZER;
 
 operacion_t operacion;
 consultaStatus_t consultaStatus;
@@ -138,12 +135,13 @@ void recibirNuevasConexiones(socket_t socketEscucha) {
 
 		switch (head->protocolo) {
 		case 2:
-			//printf("Se recibio el pedido de conexion de una instancia.\n");
 			registrarInstancia(socketAceptado);
 			break;
 		case 3:
-			//printf("Se recibio el pedido de conexion de una ESI.\n");
-			registrarESI(socketAceptado);
+			if(list_is_empty(instancias))
+				error_show("Aun no se conectaron instancias, rechazando conexion de ESI");
+			else
+				registrarESI(socketAceptado);
 			break;
 		default:
 			close(socketAceptado);
@@ -229,11 +227,8 @@ void registrarInstancia(socket_t conexion)
 	pthread_create(&hilo, NULL, (void*) hiloInstancia, (void*) nuevaInstancia);
 	pthread_mutex_unlock(&mInstancias);
 	nuevaInstancia -> hilo = hilo;
+	printf("Se conecto la instancia %s (Id = %i).\n", nuevaInstancia -> nombre, nuevaInstancia -> id);
 	free(id);
-
-	pthread_mutex_lock(&mCondInstanciasDisponibles);
-	pthread_cond_signal(&condInstanciasDisponibles);
-	pthread_mutex_unlock(&mCondInstanciasDisponibles);
 }
 
 void registrarESI(socket_t conexion)
@@ -242,6 +237,7 @@ void registrarESI(socket_t conexion)
 	*socketESI = conexion;
 	pthread_t hilo;
 	pthread_create(&hilo, NULL, (void*) hiloESI, (void*) socketESI);
+	printf("Se conecto un ESI.\n");
 }
 
 void hiloInstancia(instancia_t *instancia)
@@ -391,7 +387,7 @@ void hiloESI(socket_t *socketESI) {
 	while (1) {
 		if (recibirMensaje(*socketESI, sizeof(header), (void**) &head))
 		{
-			//printf("Se desconecto una ESI");
+			printf("Se desconecto un ESI.\n");
 			free(head);
 			pthread_exit(0);
 		}
@@ -422,7 +418,7 @@ void hiloESI(socket_t *socketESI) {
 
 		if (operacion.instr != get
 				&& !dictionary_has_key(claves, operacion.clave)) {
-			enviarResultado(*socketESI, fallo);
+			enviarResultado(*socketESI, fNoIdentificada);
 			log_info(logger, "ESI %i: Fallo por clave no identificada",
 					operacion.id);
 			limpiarOperacion();
@@ -458,7 +454,8 @@ void hiloPlanificador(socket_t *socketPlanificador) {
 	booleano *estado;
 	tamClave_t tamClave;
 	enum tipoDeInstruccion tipo;
-	while (1) {
+	while (1)
+	{
 		sem_wait(&sSocketPlanificador);
 
 		//printf("Se está consultando al planificador por la clave %s\n", operacion.clave);
@@ -591,7 +588,7 @@ void ejecutarGET()
 void ejecutarSET()
 {
 	if (!operacion.validez) {
-		operacion.result = fallo;
+		operacion.result = fNoBloqueada;
 		log_info(logger, "ESI %i: Fallo por clave no bloqueada", operacion.id);
 		return;
 	}
@@ -608,7 +605,7 @@ void ejecutarSET()
 		removerClave(instancia, operacion.clave);
 		pthread_mutex_unlock(&mClaves);
 		log_info(logger, "ESI %i: Fallo por clave inaccesible", operacion.id);
-		operacion.result = fallo;
+		operacion.result = fNoAccesible;
 		return;
 	}
 
@@ -622,16 +619,21 @@ void ejecutarSET()
 		removerClave(instancia, operacion.clave);
 		pthread_mutex_unlock(&mClaves);
 		log_info(logger, "ESI %i: Fallo por clave inaccesible", operacion.id);
-		operacion.result = fallo;
+		operacion.result = fNoAccesible;
 		return;
 	}
 
-	if(operacion.result == fallo)
+	if(operacion.result == fNoIdentificada)
 	{
 		pthread_mutex_lock(&mClaves);
 		removerClave(instancia, operacion.clave);
 		pthread_mutex_unlock(&mClaves);
 		log_info(logger, "ESI %i: Fallo por clave no identificada", operacion.id);
+		return;
+	}
+	else if(operacion.result == fIncrementaValor)
+	{
+		log_info(logger, "ESI %i: Fallo por incrementar cantidad de entradas necesarias", operacion.id);
 		return;
 	}
 
@@ -644,14 +646,6 @@ void ejecutarCreate()
 	operacion.instr = create;
 	do
 	{
-		if(list_is_empty(instancias))
-		{
-			log_info(logger, "No hay instancias disponibles, esperando...");
-			pthread_mutex_lock(&mCondInstanciasDisponibles);
-			pthread_cond_wait(&condInstanciasDisponibles, &mCondInstanciasDisponibles);
-			pthread_mutex_unlock(&mCondInstanciasDisponibles);
-		}
-
 		pthread_mutex_lock(&mClaves);
 		dictionary_remove(claves, operacion.clave);
 		pthread_mutex_lock(&mInstancias);
@@ -670,7 +664,7 @@ void ejecutarCreate()
 void ejecutarSTORE()
 {
 	if (!operacion.validez) {
-		operacion.result = fallo;
+		operacion.result = fNoBloqueada;
 		log_info(logger, "ESI %i: Fallo por clave no bloqueada",
 				operacion.id);
 		return;
@@ -687,11 +681,19 @@ void ejecutarSTORE()
 		removerClave(instancia, operacion.clave);
 		pthread_mutex_unlock(&mClaves);
 		log_info(logger, "ESI %i: Fallo por clave inaccesible", operacion.id);
-		operacion.result = fallo;
+		operacion.result = fNoAccesible;
 		return;
 	}
 
-	if(operacion.result == fallo)
+	if(operacion.result == fNoIdentificada)
+	{
+		pthread_mutex_lock(&mClaves);
+		removerClave(instancia, operacion.clave);
+		pthread_mutex_unlock(&mClaves);
+		log_info(logger, "ESI %i: Fallo por clave no identificada", operacion.id);
+		return;
+	}
+	else if(operacion.result == fNoAlmaceno)
 	{
 		log_info(logger, "ESI %i: No se pudo bajar la clave a disco", operacion.id);
 		return;

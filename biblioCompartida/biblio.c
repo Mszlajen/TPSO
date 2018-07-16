@@ -146,9 +146,25 @@ char* resultToString(enum resultadoEjecucion result)
 		ret = malloc(8);
 		strcpy(ret, "bloqueo");
 		break;
-	case fallo:
+	case fallos:
 		ret = malloc(6);
-		strcpy(ret, "fallo");
+		strcpy(ret, "fallos");
+		break;
+	case fNoAccesible:
+		ret = malloc(13);
+		strcpy(ret, "fNoAccesible");
+		break;
+	case fNoBloqueada:
+		ret = malloc(13);
+		strcpy(ret, "fNoBloqueada");
+		break;
+	case fNoIdentificada:
+		ret = malloc(16);
+		strcpy(ret, "fNoIdentificada");
+		break;
+	case fIncrementaValor:
+		ret = malloc(17);
+		strcpy(ret, "fIncrementaValor");
 		break;
 	case fin:
 		ret = malloc(4);

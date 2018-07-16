@@ -141,7 +141,7 @@ void ejecucionDeESI(ESI* esi)
 	free(stringResultado);
 
 	//Controlo que el ESI haya terminado correctamente la instrucción.
-	if(*resultado == fallo)
+	if(*resultado > fallos)
 	{
 		log_error(logger, "ESI %i fallo durante su ejecución", esi -> id);
 		free(ultimaConsulta -> clave);

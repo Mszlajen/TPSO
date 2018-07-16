@@ -56,10 +56,10 @@ int main(int argc, char **argv) {
 		//printf("Enviando resultado de ejecución al planificador.\n");
 		enviarResultadoPlanificador(socketPlan, *resultado, !hayInstruccion);
 
-		if(*resultado == fallo)
+		if(*resultado > fallos)
 		{
 			destruir_operacion(operacionESI);
-			error_show("Hubo un fallo durante la ejecución.\n");
+			informarError(*resultado, *id);
 			break;
 		}
 	}while(hayInstruccion);
@@ -195,8 +195,29 @@ void enviarResultadoPlanificador(socket_t socketPlan, enum resultadoEjecucion re
 {
 	header head;
 	head.protocolo = 12;
-	if(termino && resultado != fallo)
+	if(termino && resultado < fallos)
 		resultado = fin;
 	enviarHeader(socketPlan, head);
 	enviarBuffer(socketPlan, (void*) &resultado, sizeof(enum resultadoEjecucion));
+}
+
+void informarError(enum resultadoEjecucion error, ESI_id id)
+{
+	switch(error)
+	{
+	case fNoAccesible:
+		error_show("ESI %i aborto por clave no accesible.\n", id);
+		break;
+	case fNoBloqueada:
+		error_show("ESI %i aborto por clave no bloqueada.\n", id);
+		break;
+	case fNoIdentificada:
+		error_show("ESI %i aborto por clave no identificada.\n", id);
+		break;
+	case fIncrementaValor:
+		error_show("ESI %i aborto por incrementar tamaño de clave.\n", id);
+		break;
+	default:
+		break;
+	}
 }

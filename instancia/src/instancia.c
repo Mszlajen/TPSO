@@ -144,7 +144,9 @@ void procesamientoInstrucciones(socket_t socketCoord)
 		instruccionActual++;
 		break;
 	case compactacion:
+		pthread_mutex_lock(&mTablaDeEntradas);
 		instruccionCompactacion();
+		pthread_mutex_unlock(&mTablaDeEntradas);
 		cambioEspacio = 0;
 		break;
 	case get:
@@ -290,7 +292,7 @@ enum resultadoEjecucion instruccionSet(instruccion_t* instruccion)
 	if(dictionary_has_key(infoClaves, instruccion -> clave))
 		return actualizarValorDeClave(instruccion -> clave, instruccion -> valor, instruccion -> tamValor);
 	else
-		return fallo;
+		return fNoIdentificada;
 }
 
 enum resultadoEjecucion instruccionCompactacion()
@@ -343,8 +345,10 @@ enum resultadoEjecucion instruccionStore(instruccion_t* instruccion)
 		clave -> tiempoUltimoUso = instruccionActual;
 		if(guardarEnArchivo(instruccion -> clave, clave))
 			return exito;
+		else
+			return fNoAlmaceno;
 	}
-	return fallo;
+	return fNoIdentificada;
 }
 
 enum resultadoEjecucion actualizarValorDeClave(char* clave, char* valor, tamValor_t tamValor)
@@ -354,7 +358,7 @@ enum resultadoEjecucion actualizarValorDeClave(char* clave, char* valor, tamValo
 	cantEntradas_t entradasUsadas = tamValorACantEntradas(informacionClave -> tamanio);
 	if(entradasNecesarias > entradasUsadas)
 	{
-		return fallo;
+		return fIncrementaValor;
 	}
 	else
 	{

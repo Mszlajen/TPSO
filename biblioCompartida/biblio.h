@@ -36,7 +36,7 @@ typedef struct {
  */
 enum instruccion {get, set, store, compactacion, create};
 enum tipoDeInstruccion {bloqueante, liberadora, noDefinido};
-enum resultadoEjecucion {exito, bloqueo, fallo, fin, necesitaCompactar};
+enum resultadoEjecucion {exito, bloqueo, fin, necesitaCompactar, fallos, fNoIdentificada, fNoAccesible, fNoBloqueada, fIncrementaValor, fNoAlmaceno};
 /*
  * Descripción de los estados:
  * existente - Tiene instancia asignada y un valor.
