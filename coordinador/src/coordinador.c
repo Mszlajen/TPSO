@@ -6,8 +6,12 @@ t_config *configuracion = NULL;
 t_log *logger = NULL;
 
 sem_t sSocketPlanificador, sTerminoConsulta, sTerminoEjecucion;
+
 pthread_mutex_t mClaves = PTHREAD_MUTEX_INITIALIZER,
-				mInstancias = PTHREAD_MUTEX_INITIALIZER;
+				mInstancias = PTHREAD_MUTEX_INITIALIZER,
+				mCondInstanciasDisponibles = PTHREAD_MUTEX_INITIALIZER;
+
+pthread_cond_t condInstanciasDisponibles = PTHREAD_COND_INITIALIZER;
 
 operacion_t operacion;
 consultaStatus_t consultaStatus;
@@ -226,6 +230,10 @@ void registrarInstancia(socket_t conexion)
 	pthread_mutex_unlock(&mInstancias);
 	nuevaInstancia -> hilo = hilo;
 	free(id);
+
+	pthread_mutex_lock(&mCondInstanciasDisponibles);
+	pthread_cond_signal(&condInstanciasDisponibles);
+	pthread_mutex_unlock(&mCondInstanciasDisponibles);
 }
 
 void registrarESI(socket_t conexion)
@@ -636,6 +644,14 @@ void ejecutarCreate()
 	operacion.instr = create;
 	do
 	{
+		if(list_is_empty(instancias))
+		{
+			log_info(logger, "No hay instancias disponibles, esperando...");
+			pthread_mutex_lock(&mCondInstanciasDisponibles);
+			pthread_cond_wait(&condInstanciasDisponibles, &mCondInstanciasDisponibles);
+			pthread_mutex_unlock(&mCondInstanciasDisponibles);
+		}
+
 		pthread_mutex_lock(&mClaves);
 		dictionary_remove(claves, operacion.clave);
 		pthread_mutex_lock(&mInstancias);
