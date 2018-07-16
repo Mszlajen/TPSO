@@ -26,13 +26,13 @@ endif
 all: instancia
 
 dependents:
-	-cd ../../biblioCompartida/make && $(MAKE) all
+	-cd ../../biblioCompartida/make && $(MAKE) clean all
 
 # Tool invocations
 instancia: $(OBJS) $(USER_OBJS) ../../biblioCompartida/make/libbiblioCompartida.so
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C Linker'
-	gcc -L"../../biblioCompartida/make" -o "instancia" $(OBJS) $(USER_OBJS) $(LIBS)
+	gcc -L"../../biblioCompartida/make" -pthread -o "instancia" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
