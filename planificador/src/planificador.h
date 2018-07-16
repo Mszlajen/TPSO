@@ -63,10 +63,10 @@ void escucharPorESI (socket_t);
 void comunicacionCoord(socket_t);
 void escucharPorFinESI(ESI*);
 
-void comandoBloquear(char*, char*);
+void comandoBloquear(char*, char*, booleano);
 void comandoDesbloquear(char*);
 void comandoListar(char*);
-void comandoKill(char*);
+void comandoKill(char*, booleano);
 void comandoStatus(socket_t, char*);
 void comandoDeadlock();
 

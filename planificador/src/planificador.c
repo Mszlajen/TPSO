@@ -73,6 +73,7 @@ int main(int argc, char** argv) {
 void terminal(socket_t socketStatus)
 {
 	char *linea, **palabras;
+	booleano enPausa = 0;
 	while(!terminoEjecucion)
 	{
 		linea = readline("");
@@ -81,13 +82,21 @@ void terminal(socket_t socketStatus)
 		switch(convertirComando(palabras[0]))
 		{
 		case pausar:
-			sem_wait(&sPausa);
+			if(!enPausa)
+			{
+				sem_wait(&sPausa);
+				enPausa = 1;
+			}
 			break;
 		case continuar:
-			sem_post(&sPausa);
+			if(enPausa)
+			{
+				sem_post(&sPausa);
+				enPausa = 0;
+			}
 			break;
 		case bloquear:
-			comandoBloquear(palabras[1], palabras[2]);
+			comandoBloquear(palabras[1], palabras[2], enPausa);
 			break;
 		case desbloquear:
 			comandoDesbloquear(palabras[1]);
@@ -96,7 +105,7 @@ void terminal(socket_t socketStatus)
 			comandoListar(palabras[1]);
 			break;
 		case kill:
-			comandoKill(palabras[1]);
+			comandoKill(palabras[1], enPausa);
 			break;
 		case status:
 			comandoStatus(socketStatus, palabras[1]);
@@ -276,7 +285,7 @@ void comunicacionCoord(socket_t socketCoord)
 	}
 }
 
-void comandoBloquear(char* clave, char* IdESI)
+void comandoBloquear(char* clave, char* IdESI, booleano enPausa)
 {
 	ESI_id IDparaBloquear = atoi(IdESI);
 	ESI* ESIParaBloquear = NULL;
@@ -291,21 +300,16 @@ void comandoBloquear(char* clave, char* IdESI)
 	//Compruebo que sea el ESI ejecutando, espero a que termine la ejecución
 	//y despues compruebo que lo siga siendo
 	pthread_mutex_lock(&mEjecutando);
-	if(esESIEnEjecucion(IDparaBloquear))
+	if(esESIEnEjecucion(IDparaBloquear) || !enPausa)
 	{
 		printf("[TERMINAL] El ESI a bloquear está ejecutando, esperando fin de ejecución.\n");
 		pthread_mutex_lock(&mEnEjecucion);
 		pthread_cond_wait(&cFinEjecucion, &mEnEjecucion);
 		pthread_mutex_unlock(&mEnEjecucion);
-
-		if(esESIEnEjecucion(IDparaBloquear))
-		{
-			ESIParaBloquear = ESIEjecutando();
-		}
 	}
 	pthread_mutex_lock(&mBloqueados);
 	pthread_mutex_lock(&mReady);
-	if(ESIParaBloquear || (ESIParaBloquear = ESIEnReady(IDparaBloquear)))
+	if((ESIParaBloquear = ESIEjecutando()) || (ESIParaBloquear = ESIEnReady(IDparaBloquear)))
 	{
 		if(claveTomada(clave))
 		{
@@ -397,7 +401,7 @@ void comandoListar(char* clave)
 	free(lista);
 }
 
-void comandoKill(char *IdESI)
+void comandoKill(char *IdESI, booleano enPausa)
 {
 	ESI_id IDparaMatar = atoi(IdESI);
 	ESI* ESIParaMatar = NULL;
@@ -412,16 +416,15 @@ void comandoKill(char *IdESI)
 	//Compruebo que sea el ESI ejecutando, espero a que termine la ejecución
 	//y despues compruebo que lo siga siendo
 	pthread_mutex_lock(&mEjecutando);
-	if(esESIEnEjecucion(IDparaMatar))
+	if(esESIEnEjecucion(IDparaMatar) || !enPausa)
 	{
 		printf("[TERMINAL] El ESI a matar está ejecutando, esperando fin de ejecución.\n");
 		pthread_mutex_lock(&mEnEjecucion);
 		pthread_cond_wait(&cFinEjecucion, &mEnEjecucion);
 		pthread_mutex_unlock(&mEnEjecucion);
-		if(esESIEnEjecucion(IDparaMatar))
-			ESIParaMatar = ESIEjecutando();
 	}
-	if(ESIParaMatar || (ESIParaMatar = ESIEnReady(IDparaMatar)) || (ESIParaMatar = ESIEstaBloqueado(IDparaMatar)))
+
+	if((ESIParaMatar = ESIEjecutando()) || (ESIParaMatar = ESIEnReady(IDparaMatar)) || (ESIParaMatar = ESIEstaBloqueado(IDparaMatar)))
 	{
 		finalizarESIBien(ESIParaMatar);
 		log_info(logger, "[TERMINAL] ESI %s fue finalizado", IdESI);
