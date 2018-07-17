@@ -1,5 +1,8 @@
 #!/bin/bash
 
+[ ! -d /home/utnso/inst1 ] && mkdir -p /home/utnso/inst1
+[ ! -d /home/utnso/inst2 ] && mkdir -p /home/utnso/inst2
+[ ! -d /home/utnso/inst3 ] && mkdir -p /home/utnso/inst3
 make -C biblioCompartida/make
 read -n 1 -s
 make -C instancia/make
