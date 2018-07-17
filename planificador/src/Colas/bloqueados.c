@@ -58,7 +58,7 @@ ESI* ESIEstaBloqueado(ESI_id esiId)
 		if(((ESI*) esi) -> id == esiId)
 			retorno = esi;
 	}
-	void buscarESIenCola(void* cola)
+	void buscarESIenCola(char* clave, void* cola)
 	{
 		list_iterate((t_list*) cola, comprobarESI);
 	}

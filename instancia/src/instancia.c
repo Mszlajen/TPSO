@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
 	{
 		header* encabezado;
 		//printf("Esperando instrucciones del coordinador.\n");
-		if(recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado) == 1)
+		if(recibirMensaje(socketCoord, sizeof(header), (void**) &encabezado))
 		{
 			salirConError("Se desconecto el coordinador.\n");
 			continue;
@@ -207,7 +207,7 @@ void recibirRespuestaHandshake(socket_t socketCoord)
 
 	cantEntradas_t *buffCantEntr;
 	tamEntradas_t *buffTamEntr;
-	recibirMensaje(socketCoord, sizeof(instancia_id), (void**) id);
+	recibirMensaje(socketCoord, sizeof(instancia_id), (void**) &id);
 	switch(head -> protocolo)
 	{
 	case 4:
@@ -637,7 +637,7 @@ booleano almacenarID(instancia_id ID)
 	booleano resultado = 0;
 	if((archivo = fopen(dirArchivo, "w")))
 	{
-		resultado = fwrite(&ID, sizeof(instancia_id), 1, archivo) == sizeof(instancia_id);
+		resultado = fwrite(&ID, sizeof(instancia_id), 1, archivo) == 1;
 		fclose(archivo);
 	}
 	free(dirArchivo);

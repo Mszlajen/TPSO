@@ -3,7 +3,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/select.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <readline/readline.h>
@@ -51,7 +50,6 @@ socket_t crearServerESI();
 
 pthread_t crearHiloTerminal (socket_t);
 pthread_t crearHiloNuevasESI (socket_t);
-pthread_t crearFinEjecucion (ESI*);
 pthread_t crearHiloCoordinador (socket_t, socket_t*);
 
 enum comandos convertirComando(char *);
@@ -61,7 +59,6 @@ void liberarRecursos();
 void terminal(socket_t);
 void escucharPorESI (socket_t);
 void comunicacionCoord(socket_t);
-void escucharPorFinESI(ESI*);
 
 void comandoBloquear(char*, char*, booleano);
 void comandoDesbloquear(char*);
