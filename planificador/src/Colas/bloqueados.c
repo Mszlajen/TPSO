@@ -104,12 +104,13 @@ booleano claveTomadaPor(char* clave, ESI** tomador)
 
 ESI* liberarClave(char* clave)
 {
-	ESI* poseedorActual = dictionary_get(tablaBloqueos, clave);
+	ESI* poseedorActual = dictionary_get(tablaBloqueos, clave),
+			*desbloqueado = desbloquearESIDeClave(clave);
 	if(dictionary_has_key(tablaBloqueos, clave))
 		dictionary_remove(tablaBloqueos, clave);
 	if(poseedorActual)
 		quitarRecurso(poseedorActual, clave);
-	return desbloquearESIDeClave(clave);
+	return desbloqueado;
 }
 
 ESI* desbloquearESIDeClave(char* clave)
