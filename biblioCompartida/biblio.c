@@ -147,7 +147,7 @@ char* resultToString(enum resultadoEjecucion result)
 		strcpy(ret, "bloqueo");
 		break;
 	case fallos:
-		ret = malloc(6);
+		ret = malloc(7);
 		strcpy(ret, "fallos");
 		break;
 	case fNoAccesible:
