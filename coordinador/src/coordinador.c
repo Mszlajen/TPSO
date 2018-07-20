@@ -355,11 +355,15 @@ void hiloInstancia(instancia_t *instancia)
 }
 
 void hiloCompactacion(instancia_t *llamadora) {
-	void activarInstancias(void *instancia) {
-		sem_post(&((instancia_t*) instancia) -> sIniciarEjecucion);
+	void activarInstancias(void *instancia) 
+	{
+		if(((instancia_t*) instancia) -> conectada)
+			sem_post(&((instancia_t*) instancia) -> sIniciarEjecucion);
 	}
-	void esperarFinCompactacion(void *instancia) {
-		sem_wait(&((instancia_t*) instancia) -> sFinCompactacion);
+	void esperarFinCompactacion(void *instancia) 
+	{
+		if(((instancia_t*) instancia) -> conectada)
+			sem_wait(&((instancia_t*) instancia) -> sFinCompactacion);
 	}
 	pthread_mutex_lock(&mClaves);
 	pthread_mutex_lock(&mInstancias);
