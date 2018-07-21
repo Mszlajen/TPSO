@@ -286,11 +286,13 @@ void escucharPorESI (socket_t socketServerESI)
 void comunicacionCoord(socket_t socketCoord)
 {
 	header *head;
-	while(1)
+	while(!terminoEjecucion)
 	{
 		if(recibirMensaje(socketCoord, sizeof(header), (void**) &head))
 		{
 			salirConError("Se desconecto el coordinador");
+			free(head);
+			continue;
 		}
 
 		//Consulta estado clave
