@@ -323,15 +323,15 @@ enum resultadoEjecucion instruccionCompactacion()
 		memcpy(tablaDeEntradas + punteroVacio * tamanioEntradas,
 				tablaDeEntradas + punteroEntrada * tamanioEntradas,
 				claveAMover -> tamanio);
+		
+		//Actualizo la información de la clave
+		claveAMover -> entradaInicial = punteroVacio;
 
 		//Actualizo los valores de la tabla de control
 		distancia = punteroEntrada - punteroVacio;
 		asociarEntradas(punteroVacio, distancia, tablaDeControl[punteroEntrada].clave);
 		punteroVacio = punteroVacio + tamValorACantEntradas(claveAMover->tamanio);
 		asociarEntradas(punteroVacio, distancia, NULL);
-
-		//Actualizo la información de la clave
-		claveAMover -> entradaInicial = punteroVacio;
 
 	}
 	return exito;
@@ -437,17 +437,17 @@ enum resultadoEjecucion actualizarValorMayorTamanio(char* clave, infoClave_t* in
 
 enum resultadoEjecucion actualizarValorMenorTamanio(char* clave, infoClave_t* informacionClave, char* valor, tamValor_t tamValor)
 {
-	cantEntradas_t entradasRestantes = tamValorACantEntradas(tamValor);
+	cantEntradas_t entradasRestantes = tamValorACantEntradas(tamValor - 1);
 	//Coloco el nuevo valor en la tabla de entradas;
-	memcpy(tablaDeEntradas + informacionClave -> entradaInicial * tamanioEntradas, valor, tamValor);
+	memcpy(tablaDeEntradas + informacionClave -> entradaInicial * tamanioEntradas, valor, tamValor - 1);
 
 	/*
 	 * Libero las entradas sobrantes.
 	 * En caso de que requiera la misma cantidad de entradas, entradas restantes va a ser 0
 	 * y asociarEntradas no va a hacer nada.
 	 */
-	cantEntradas_t finNuevaClave = informacionClave -> entradaInicial + tamValorACantEntradas(tamValor);
-	entradasRestantes = tamValorACantEntradas(informacionClave -> tamanio) - tamValorACantEntradas(tamValor);
+	cantEntradas_t finNuevaClave = informacionClave -> entradaInicial + entradasRestantes;
+	entradasRestantes = tamValorACantEntradas(informacionClave -> tamanio) - entradasRestantes;
 	asociarEntradas(finNuevaClave, entradasRestantes, NULL);
 
 	informacionClave -> tamanio = tamValor - 1;
