@@ -354,7 +354,8 @@ void hiloInstancia(instancia_t *instancia)
 	}
 }
 
-void hiloCompactacion(instancia_t *llamadora) {
+void hiloCompactacion(instancia_t *llamadora)
+{
 	void activarInstancias(void *instancia) 
 	{
 		if(((instancia_t*) instancia) -> conectada)
@@ -520,7 +521,7 @@ void hiloStatus(socket_t *socketStatus)
 		if(!dictionary_has_key(claves, consultaStatus.clave))
 		{
 			pthread_mutex_lock(&mInstancias);
-			instancia = simularDistribucion();
+			instancia = simularDistribucion(consultaStatus.clave);
 			pthread_mutex_unlock(&mInstancias);
 			consultaStatus.estado = innexistente;
 		}
@@ -530,7 +531,7 @@ void hiloStatus(socket_t *socketStatus)
 			if(!instancia)
 			{
 				pthread_mutex_lock(&mInstancias);
-				instancia = simularDistribucion();
+				instancia = simularDistribucion(consultaStatus.clave);
 				pthread_mutex_unlock(&mInstancias);
 				consultaStatus.estado = sinIniciar;
 			}
@@ -653,7 +654,7 @@ void ejecutarCreate()
 		pthread_mutex_lock(&mClaves);
 		dictionary_remove(claves, operacion.clave);
 		pthread_mutex_lock(&mInstancias);
-		instancia = correrAlgoritmo(&punteroSeleccion);
+		instancia = correrAlgoritmo(&punteroSeleccion, operacion.clave);
 		pthread_mutex_unlock(&mInstancias);
 		dictionary_put(claves, operacion.clave, instancia);
 		pthread_mutex_unlock(&mClaves);
@@ -707,7 +708,7 @@ void ejecutarSTORE()
 }
 
 //Asumo que existe al menos una instancia a donde mandarlo.
-instancia_t* correrAlgoritmo(int *puntero)
+instancia_t* correrAlgoritmo(int *puntero, char *clave)
 {
 	char * algoritmo = config_get_string_value(configuracion, "Algoritmo");
 	instancia_t *instanciaSeleccionada;
@@ -721,7 +722,7 @@ instancia_t* correrAlgoritmo(int *puntero)
 	}
 	else
 	{
-		//Aca iria el key explicit
+		instanciaSeleccionada = algoritmoKeyExplicit(clave);
 	}
 
 	return instanciaSeleccionada;
@@ -782,10 +783,36 @@ instancia_t* algoritmoLeastSpaceUsed(int *puntero)
 
 }
 
-instancia_t *simularDistribucion()
+instancia_t *algoritmoKeyExplicit(char *clave)
+{
+	/*
+	 * Como nota: me di cuenta que el key explicit
+	 * inicialmente limita el sistema a un maximo
+	 * de 26 instancias.
+	 */
+	t_list *candidatos = list_create();
+	void encontrarCandidatos(instancia_t *instancia)
+	{
+		if(instancia -> conectada)
+			list_add(candidatos, instancia);
+	}
+
+	list_iterate(instancias, encontrarCandidatos);
+
+	uint8_t letrasPorInstancias = 26 / list_size(candidatos) + (26 % list_size(candidatos)? 1 : 0);
+	uint8_t posicion = charToPosition(clave[0]) / letrasPorInstancias;
+
+	instancia_t *ret = list_get(candidatos, posicion);
+
+	list_destroy(candidatos);
+
+	return ret;
+}
+
+instancia_t *simularDistribucion(char *clave)
 {
 	int falsoPuntero = punteroSeleccion;
-	return correrAlgoritmo(&falsoPuntero);
+	return correrAlgoritmo(&falsoPuntero, clave);
 }
 
 

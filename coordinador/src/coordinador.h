@@ -13,6 +13,8 @@
 #include <commons/collections/list.h>
 #include <commons/log.c>
 
+#define charToPosition(c) (c - (isupper(c)? 65 : 97))
+
 typedef struct {
 	instancia_id id;
 	char* nombre;
@@ -66,10 +68,11 @@ void ejecutarSET();
 void ejecutarSTORE();
 void ejecutarCreate();
 
-instancia_t *correrAlgoritmo(int *puntero);
+instancia_t *correrAlgoritmo(int *puntero, char *clave);
 instancia_t *algoritmoEquitativeLoad(int *puntero);
 instancia_t *algoritmoLeastSpaceUsed(int *puntero);
-instancia_t *simularDistribucion();
+instancia_t *algoritmoKeyExplicit(char *clave);
+instancia_t *simularDistribucion(char *clave);
 
 int enviarEncabezado(socket_t conexion, uint8_t valor);
 //Devuelve 0 si envio bien, diferente en caso contrario
