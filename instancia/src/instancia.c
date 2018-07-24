@@ -15,7 +15,8 @@ pthread_mutex_t mTablaDeEntradas = PTHREAD_MUTEX_INITIALIZER;
 int terminoEjecucion = 0;
 unsigned long int instruccionActual = 0;
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
 	socket_t socketCoord = ERROR;
 
 	inicializar(argv[1], &socketCoord);
@@ -68,11 +69,16 @@ void inicializar(char* dirConfig, socket_t *socketCoord)
 
 void dump()
 {
+	void dumpear(char* nombreClave, infoClave_t *clave)
+	{
+		printf("%s posicion inicial %i\n", nombreClave, clave -> entradaInicial);
+		guardarEnArchivo(nombreClave, clave);
+	}
 	while(!terminoEjecucion)
 	{
 		sleep((unsigned int) obtenerIntervaloDeDump());
 		pthread_mutex_lock(&mTablaDeEntradas);
-		dictionary_iterator(infoClaves, guardarEnArchivo);
+		dictionary_iterator(infoClaves, dumpear);
 		pthread_mutex_unlock(&mTablaDeEntradas);
 	}
 }
